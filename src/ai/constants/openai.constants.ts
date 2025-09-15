@@ -20,3 +20,10 @@ export const OPENAI_TEXT_CONSTANTS = {
     DEFAULT_SCENE_COUNT: 6,
     PROMPT_WORD_LIMIT: 8,
 } as const;
+
+export const OPENAI_ERROR_MESSAGES = {
+    CONTENT_GENERATE_ERROR: 'An error occurred, please try again later.',
+    VIOLATED_SAFETY_POLICIES_PROMPT:
+        'Your prompt violated our safety policies. Please try with another prompt.',
+    COMIC_GENERATED_ALL_RETRY_ATTEMPT_FAILED: 'All retry attempts failed.',
+} as const;

@@ -6,6 +6,7 @@ import { Platform } from 'src/ai/enum/platform.enum';
 import { GptUserComicGenerationDto } from '../dto/gpt-user-comic-generation.dto';
 import { GptUserComicSceneGenerationDto } from '../dto/gpt-user-comic-scene-generation.dto';
 import {
+    OPENAI_ERROR_MESSAGES,
     OPENAI_IMAGE_CONSTANTS,
     OPENAI_TEXT_CONSTANTS,
 } from '../constants/openai.constants';
@@ -91,8 +92,11 @@ export class OpenAIApiService {
 
             return response;
         } catch (error) {
+            if (error instanceof HttpException) {
+                throw error;
+            }
             throw new HttpException(
-                `Failed to generate comic content: ${error.message}`,
+                OPENAI_ERROR_MESSAGES.CONTENT_GENERATE_ERROR,
                 HttpStatus.INTERNAL_SERVER_ERROR,
             );
         }
@@ -181,6 +185,15 @@ export class OpenAIApiService {
         try {
             const message = response.choices[0].message.content;
 
+            try {
+                JSON.parse(message);
+            } catch {
+                throw new HttpException(
+                    OPENAI_ERROR_MESSAGES.VIOLATED_SAFETY_POLICIES_PROMPT,
+                    HttpStatus.FORBIDDEN,
+                );
+            }
+
             const parsed = JSON.parse(message);
 
             const result = new GptUserComicGenerationDto();
@@ -229,8 +242,11 @@ export class OpenAIApiService {
 
             return result;
         } catch (error) {
+            if (error instanceof HttpException) {
+                throw error;
+            }
             throw new HttpException(
-                `Failed to parse OpenAI text response: ${error.message}`,
+                OPENAI_ERROR_MESSAGES.CONTENT_GENERATE_ERROR,
                 HttpStatus.INTERNAL_SERVER_ERROR,
             );
         }
@@ -256,11 +272,16 @@ export class OpenAIApiService {
                     };
                 }
             }
-
-            throw new Error('No image data found in response');
-        } catch (error) {
             throw new HttpException(
-                `Failed to parse OpenAI image response: ${error.message}`,
+                OPENAI_ERROR_MESSAGES.VIOLATED_SAFETY_POLICIES_PROMPT,
+                HttpStatus.FORBIDDEN,
+            );
+        } catch (error) {
+            if (error instanceof HttpException) {
+                throw error;
+            }
+            throw new HttpException(
+                OPENAI_ERROR_MESSAGES.CONTENT_GENERATE_ERROR,
                 HttpStatus.INTERNAL_SERVER_ERROR,
             );
         }
