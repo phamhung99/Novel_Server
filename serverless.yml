@@ -1,0 +1,37 @@
+service: comic
+frameworkVersion: "3"
+
+provider:
+  name: aws
+  runtime: nodejs18.x
+  region: ap-southeast-1
+  timeout: 30
+  environment:
+    OPENAI_API_KEY: ${env:OPENAI_API_KEY}
+    NODE_ENV: ${env:NODE_ENV, 'production'}
+  
+functions:
+  api:
+    handler: dist/serverless.handler
+    events:
+      - httpApi:
+          path: /
+          method: ANY
+      - httpApi:
+          path: /{proxy+}
+          method: ANY
+
+package:
+  individually: true
+  patterns:
+    - 'dist/serverless.js'
+    - '!**'
+    - '!node_modules/**'
+
+plugins:
+  - serverless-offline
+
+custom:
+  serverless-offline:
+    httpPort: 5000
+    timeout: 30
