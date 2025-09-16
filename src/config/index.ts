@@ -1,9 +1,9 @@
 import appConfig from './app.config';
-// import databaseConfig from './database.config';
+import databaseConfig from './database.config';
 import authConfig from './auth.config';
 
-export { appConfig, authConfig };
+export { appConfig, authConfig, databaseConfig };
 
-const configs = [appConfig, authConfig];
+const configs = [appConfig, authConfig, databaseConfig];
 
 export default configs;

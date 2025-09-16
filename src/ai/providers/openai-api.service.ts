@@ -4,17 +4,17 @@ import { ChatModel, ImageModel } from 'src/ai/enum/models.enum';
 import OpenAI from 'openai';
 import { Platform } from 'src/ai/enum/platform.enum';
 import { GptUserComicGenerationDto } from '../dto/gpt-user-comic-generation.dto';
-import { GptUserComicSceneGenerationDto } from '../dto/gpt-user-comic-scene-generation.dto';
-import {
-    OPENAI_ERROR_MESSAGES,
-    OPENAI_IMAGE_CONSTANTS,
-    OPENAI_TEXT_CONSTANTS,
-} from '../constants/openai.constants';
+import { ERROR_MESSAGES } from 'src/common/constants/error-messages.constants';
 import * as HtmlFormatter from 'src/ai/utils/html-formatter.util';
 import { ComicSceneResponseDto } from '../dto/comic-scene-response.dto';
 import { ComicStyleType } from '../enum/comic-style-type.enum';
-
-const COMIC = 'COMIC';
+import { DEFAULT_IMAGE } from '../constants/default-image.constants';
+import {
+    IMAGE_CONSTANTS,
+    TEXT_CONSTANTS,
+    COMIC,
+} from '../constants/ai.constants';
+import { GptUserComicSceneGenerationDto } from '../dto/gpt-user-comic-scene-generation.dto';
 
 @Injectable()
 export class OpenAIApiService {
@@ -44,8 +44,8 @@ export class OpenAIApiService {
     async callOpenAITextAPI(
         prompt: string,
         model: ChatModel,
-        characterNum: number = OPENAI_TEXT_CONSTANTS.DEFAULT_CHARACTER_COUNT,
-        sceneNum: number = OPENAI_TEXT_CONSTANTS.DEFAULT_SCENE_COUNT,
+        characterNum: number = TEXT_CONSTANTS.DEFAULT_CHARACTER_COUNT,
+        sceneNum: number = TEXT_CONSTANTS.DEFAULT_SCENE_COUNT,
     ): Promise<any> {
         try {
             const jsonFormat = JSON.stringify({
@@ -72,7 +72,7 @@ export class OpenAIApiService {
                 `Then create prompts to illustrate created ${sceneNum} scenes in very detail that can make good images with AI ${Platform.OPENAI},`,
                 `should name the characters in the scene prompt, the characters should have physical action toward each other like punch, hit, kiss, hug and each prompt should have only 8 words in full sentence.`,
                 `Finally, create ${characterNum} prompts to describe the character appearances in the comic, in very detail about the character appearances, should mention their gender.`,
-                `Each prompt must contain only ${OPENAI_TEXT_CONSTANTS.PROMPT_WORD_LIMIT}.`,
+                `Each prompt must contain only ${TEXT_CONSTANTS.PROMPT_WORD_LIMIT}.`,
                 `Should name the characters, mention their hair, skin color and shape.`,
                 `No explanation text needed, just give the result prompt!`,
                 `Ensure the JSON strictly conforms to the following format, containing only the specified keys and structures without any additional fields: ${jsonFormat}`,
@@ -86,17 +86,18 @@ export class OpenAIApiService {
                         content: content,
                     },
                 ],
-                max_completion_tokens:
-                    OPENAI_TEXT_CONSTANTS.MAX_COMPLETION_TOKENS,
+                max_completion_tokens: TEXT_CONSTANTS.MAX_COMPLETION_TOKENS,
             });
 
             return response;
         } catch (error) {
+            console.log('OpenAI API error:', error);
+
             if (error instanceof HttpException) {
                 throw error;
             }
             throw new HttpException(
-                OPENAI_ERROR_MESSAGES.CONTENT_GENERATE_ERROR,
+                ERROR_MESSAGES.CONTENT_GENERATE_ERROR,
                 HttpStatus.INTERNAL_SERVER_ERROR,
             );
         }
@@ -107,8 +108,19 @@ export class OpenAIApiService {
         model: ImageModel,
         characterPrompts: string[],
         comicStyle: ComicStyleType,
+        isDevMode?: boolean,
     ): Promise<any> {
         try {
+            if (isDevMode) {
+                return {
+                    data: [
+                        {
+                            b64_json: DEFAULT_IMAGE,
+                        },
+                    ],
+                };
+            }
+
             let finalPrompt = scenePrompt;
 
             const revisionPrompt = [
@@ -140,22 +152,22 @@ export class OpenAIApiService {
             const imageConfig: any = {
                 model: model,
                 prompt: finalPrompt,
-                n: OPENAI_IMAGE_CONSTANTS.DEFAULT_COUNT,
+                n: IMAGE_CONSTANTS.DEFAULT_COUNT,
             };
 
             switch (model) {
                 case ImageModel.GPT_IMAGE_1:
-                    imageConfig.size = OPENAI_IMAGE_CONSTANTS.DEFAULT_SIZE;
+                    imageConfig.size = IMAGE_CONSTANTS.DEFAULT_SIZE;
                     break;
                 case ImageModel.DALLE_2:
-                    imageConfig.size = OPENAI_IMAGE_CONSTANTS.DEFAULT_SIZE;
+                    imageConfig.size = IMAGE_CONSTANTS.DEFAULT_SIZE;
                     imageConfig.response_format =
-                        OPENAI_IMAGE_CONSTANTS.RESPONSE_FORMAT;
+                        IMAGE_CONSTANTS.RESPONSE_FORMAT;
                     break;
                 case ImageModel.DALLE_3:
-                    imageConfig.size = OPENAI_IMAGE_CONSTANTS.DEFAULT_SIZE;
+                    imageConfig.size = IMAGE_CONSTANTS.DEFAULT_SIZE;
                     imageConfig.response_format =
-                        OPENAI_IMAGE_CONSTANTS.RESPONSE_FORMAT;
+                        IMAGE_CONSTANTS.RESPONSE_FORMAT;
                     break;
                 default:
                     throw new HttpException(
@@ -163,12 +175,7 @@ export class OpenAIApiService {
                         HttpStatus.BAD_REQUEST,
                     );
             }
-
-            console.log('Final prompt used for image generation:', finalPrompt);
-
             const response = await this.openai.images.generate(imageConfig);
-
-            console.log(response);
 
             return response;
         } catch (error) {
@@ -189,7 +196,7 @@ export class OpenAIApiService {
                 JSON.parse(message);
             } catch {
                 throw new HttpException(
-                    OPENAI_ERROR_MESSAGES.VIOLATED_SAFETY_POLICIES_PROMPT,
+                    ERROR_MESSAGES.VIOLATED_SAFETY_POLICIES_PROMPT,
                     HttpStatus.FORBIDDEN,
                 );
             }
@@ -246,7 +253,7 @@ export class OpenAIApiService {
                 throw error;
             }
             throw new HttpException(
-                OPENAI_ERROR_MESSAGES.CONTENT_GENERATE_ERROR,
+                ERROR_MESSAGES.CONTENT_GENERATE_ERROR,
                 HttpStatus.INTERNAL_SERVER_ERROR,
             );
         }
@@ -273,7 +280,7 @@ export class OpenAIApiService {
                 }
             }
             throw new HttpException(
-                OPENAI_ERROR_MESSAGES.VIOLATED_SAFETY_POLICIES_PROMPT,
+                ERROR_MESSAGES.VIOLATED_SAFETY_POLICIES_PROMPT,
                 HttpStatus.FORBIDDEN,
             );
         } catch (error) {
@@ -281,7 +288,7 @@ export class OpenAIApiService {
                 throw error;
             }
             throw new HttpException(
-                OPENAI_ERROR_MESSAGES.CONTENT_GENERATE_ERROR,
+                ERROR_MESSAGES.CONTENT_GENERATE_ERROR,
                 HttpStatus.INTERNAL_SERVER_ERROR,
             );
         }

@@ -15,4 +15,7 @@ export class ComicImageRequestDto {
     @IsOptional()
     @IsEnum(ImageModel)
     platform?: ImageModel;
+
+    @IsOptional()
+    isDevMode?: boolean;
 }

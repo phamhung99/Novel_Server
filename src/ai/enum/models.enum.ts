@@ -1,5 +1,5 @@
 export enum ChatModel {
-    // GEMINI_20_FLASH = 'gemini-2.0-flash',
+    GEMINI_20_FLASH = 'gemini-2.0-flash',
     GPT_4O = 'gpt-4o',
     GPT_41_MINI = 'gpt-4.1-mini',
     GPT_4O_MINI = 'gpt-4o-mini',

@@ -5,15 +5,15 @@ import {
     IsOptional,
     IsString,
 } from 'class-validator';
-import { ChatModel } from 'src/ai/enum/models.enum';
+import { Platform } from '../enum/platform.enum';
 
 export class ComicGenerateRequestDto {
     @IsString()
     prompt: string;
 
     @IsOptional()
-    @IsEnum(ChatModel)
-    platform?: ChatModel;
+    @IsEnum(Platform)
+    platform?: Platform;
 
     @IsInt()
     type: number;
