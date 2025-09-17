@@ -23,6 +23,9 @@ export default () => {
             password: dbConfig.password || process.env.DB_PASSWORD,
             database: dbConfig.database || process.env.DB_DATABASE,
             synchronize: process.env.NODE_ENV !== 'production',
+            retryAttempts: 0,
+            retryDelay: 3000,
+            ssl: dbUrl ? { rejectUnauthorized: false } : undefined,
         },
     };
 };

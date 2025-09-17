@@ -1,15 +1,21 @@
 service: comic
-frameworkVersion: "3"
+frameworkVersion: '3'
 
 provider:
   name: aws
-  runtime: nodejs18.x
+  runtime: nodejs20.x
   region: ap-southeast-1
   timeout: 30
   environment:
     OPENAI_API_KEY: ${env:OPENAI_API_KEY}
     NODE_ENV: ${env:NODE_ENV, 'production'}
-  
+    DB_TYPE: ${env:DB_TYPE, 'postgres'}
+    DB_DIALECT: ${env:DB_DIALECT, 'postgres'}
+    DB_USERNAME: ${env:DB_USERNAME, 'myuser'}
+    DB_PASSWORD: ${env:DB_PASSWORD, 'mypassword'}
+    DB_HOST: ${env:DB_HOST, 'localhost'}
+    DB_DATABASE: ${env:DB_DATABASE, 'comic'}
+
 functions:
   api:
     handler: dist/serverless.handler
@@ -24,11 +30,11 @@ functions:
 package:
   individually: true
   patterns:
-    - 'dist/serverless.js'
-    - '!**'
+    - 'dist/**'
     - '!node_modules/**'
 
 plugins:
+  - serverless-jetpack
   - serverless-offline
 
 custom:

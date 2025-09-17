@@ -5,6 +5,8 @@ import configs from './config';
 import { HealthController } from './common/controllers/health.controller';
 import { UserModule } from './user/user.module';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { GptTransactionsModule } from './gpt-transactions/gpt-transactions.module';
+import { IapProductModule } from './iap-product/iap-product.module';
 
 @Module({
     imports: [
@@ -26,10 +28,17 @@ import { TypeOrmModule } from '@nestjs/typeorm';
                 synchronize: configService.get<boolean>('database.synchronize'),
                 entities: [__dirname + '/**/*.entity{.ts,.js}'],
                 autoLoadEntities: true,
+                retryAttempts: configService.get<number>(
+                    'database.retryAttempts',
+                ),
+                retryDelay: configService.get<number>('database.retryDelay'),
+                ssl: configService.get('database.ssl'),
             }),
         }),
         AiModule,
         UserModule,
+        GptTransactionsModule,
+        IapProductModule,
     ],
     controllers: [HealthController],
 })
