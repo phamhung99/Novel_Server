@@ -20,5 +20,3 @@ export const TEXT_CONSTANTS = {
     DEFAULT_SCENE_COUNT: 6,
     PROMPT_WORD_LIMIT: 8,
 } as const;
-
-export const COMIC = 'COMIC';

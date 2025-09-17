@@ -1,5 +1,5 @@
 export enum ComicStyleType {
-    GENERIC = 0,
+    COMIC = 0,
     MANHUA = 1,
     ANIME = 2,
     POP_ART = 3,

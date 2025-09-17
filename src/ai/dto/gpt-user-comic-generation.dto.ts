@@ -50,9 +50,8 @@ export class GptUserComicGenerationDto {
     @IsString()
     characterResult?: string;
 
-    @IsOptional()
     @IsString()
-    type?: string;
+    type: string;
 
     @IsOptional()
     @IsArray()

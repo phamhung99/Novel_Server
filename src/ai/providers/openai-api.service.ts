@@ -9,12 +9,9 @@ import * as HtmlFormatter from 'src/ai/utils/html-formatter.util';
 import { ComicSceneResponseDto } from '../dto/comic-scene-response.dto';
 import { ComicStyleType } from '../enum/comic-style-type.enum';
 import { DEFAULT_IMAGE } from '../constants/default-image.constants';
-import {
-    IMAGE_CONSTANTS,
-    TEXT_CONSTANTS,
-    COMIC,
-} from '../constants/ai.constants';
+import { IMAGE_CONSTANTS, TEXT_CONSTANTS } from '../constants/ai.constants';
 import { GptUserComicSceneGenerationDto } from '../dto/gpt-user-comic-scene-generation.dto';
+import { ComicGenerateRequestDto } from '../dto/comic-generate-request.dto';
 
 @Injectable()
 export class OpenAIApiService {
@@ -188,6 +185,7 @@ export class OpenAIApiService {
 
     async parseOpenAITextResponse(
         response: any,
+        comicRequest: ComicGenerateRequestDto,
     ): Promise<GptUserComicGenerationDto> {
         try {
             const message = response.choices[0].message.content;
@@ -208,8 +206,10 @@ export class OpenAIApiService {
             result.blocked = parsed.blocked || false;
             result.createdAt = new Date();
             result.platform = Platform.OPENAI;
-            result.type = COMIC;
-            result.userId = null; // to be set later
+            result.userId = null;
+
+            const type = comicRequest.type;
+            result.type = ComicStyleType[type];
 
             result.characterPrompts = JSON.stringify(parsed.characters || []);
 

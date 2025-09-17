@@ -4,10 +4,12 @@ import axios from 'axios';
 import { API_ENDPOINTS } from 'src/common/constants/api.constants';
 import { ERROR_MESSAGES } from 'src/common/constants/error-messages.constants';
 import { Platform } from '../enum/platform.enum';
-import { COMIC, TEXT_CONSTANTS } from '../constants/ai.constants';
+import { TEXT_CONSTANTS } from '../constants/ai.constants';
 import { GptUserComicGenerationDto } from '../dto/gpt-user-comic-generation.dto';
 import { ChatModel } from 'src/ai/enum/models.enum';
 import { ComicSceneResponseDto } from '../dto/comic-scene-response.dto';
+import { ComicStyleType } from '../enum/comic-style-type.enum';
+import { ComicGenerateRequestDto } from '../dto/comic-generate-request.dto';
 
 @Injectable()
 export class GeminiApiService {
@@ -99,6 +101,7 @@ export class GeminiApiService {
 
     async parseGeminiTextResponse(
         response: any,
+        comicRequest: ComicGenerateRequestDto,
     ): Promise<GptUserComicGenerationDto> {
         try {
             const message =
@@ -128,8 +131,10 @@ export class GeminiApiService {
             result.blocked = parsed.blocked || false;
             result.createdAt = new Date();
             result.platform = Platform.GEMINI;
-            result.type = COMIC;
-            result.userId = null; // to be set later
+            result.userId = null;
+
+            const type = comicRequest.type;
+            result.type = ComicStyleType[type];
 
             result.characterPrompts = JSON.stringify(parsed.characters || []);
 

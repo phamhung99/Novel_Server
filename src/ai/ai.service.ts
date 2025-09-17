@@ -26,7 +26,10 @@ export class AiService {
                 comicRequest.prompt,
                 ChatModel.GEMINI_20_FLASH,
             );
-            return this.geminiApiService.parseGeminiTextResponse(response);
+            return this.geminiApiService.parseGeminiTextResponse(
+                response,
+                comicRequest,
+            );
         }
 
         if (platform === Platform.OPENAI) {
@@ -34,7 +37,10 @@ export class AiService {
                 comicRequest.prompt,
                 ChatModel.GPT_4O_MINI,
             );
-            return this.openAIApiService.parseOpenAITextResponse(response);
+            return this.openAIApiService.parseOpenAITextResponse(
+                response,
+                comicRequest,
+            );
         }
     }
 
