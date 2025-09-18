@@ -1,5 +1,5 @@
 import { IsArray, IsEnum, IsInt, IsOptional, IsString } from 'class-validator';
-import { ImageModel } from '../enum/models.enum';
+import { ImageModel } from '../../common/enums/models.enum';
 
 export class ComicImageRequestDto {
     @IsInt()

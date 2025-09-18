@@ -1,4 +1,4 @@
-import { ComicStyleType } from '../enum/comic-style-type.enum';
+import { ComicStyleType } from '../../common/enums/comic-style-type.enum';
 
 export const PremiumComicTypes = new Set<ComicStyleType>([
     ComicStyleType.MANHUA,

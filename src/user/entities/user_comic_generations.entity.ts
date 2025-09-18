@@ -1,4 +1,4 @@
-import { GenerationType } from 'src/common/enums/generation-type.enum';
+import { GenerationType } from 'src/common/enums/app.enum';
 import {
     Entity,
     PrimaryGeneratedColumn,

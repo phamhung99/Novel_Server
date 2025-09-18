@@ -28,4 +28,10 @@ export class GptTransactionsService {
             order: { purchaseTime: 'DESC' },
         });
     }
+
+    async findByOrderId(orderId: string): Promise<GptTransaction[]> {
+        return this.transactionRepository.find({
+            where: { orderId },
+        });
+    }
 }

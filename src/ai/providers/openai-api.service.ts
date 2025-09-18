@@ -1,15 +1,18 @@
 import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { ChatModel, ImageModel } from 'src/ai/enum/models.enum';
+import { ChatModel, ImageModel } from 'src/common/enums/models.enum';
 import OpenAI from 'openai';
-import { Platform } from 'src/ai/enum/platform.enum';
+import { Platform } from 'src/common/enums/platform.enum';
 import { GptUserComicGenerationDto } from '../dto/gpt-user-comic-generation.dto';
 import { ERROR_MESSAGES } from 'src/common/constants/error-messages.constants';
 import * as HtmlFormatter from 'src/ai/utils/html-formatter.util';
 import { ComicSceneResponseDto } from '../dto/comic-scene-response.dto';
-import { ComicStyleType } from '../enum/comic-style-type.enum';
-import { DEFAULT_IMAGE } from '../constants/default-image.constants';
-import { IMAGE_CONSTANTS, TEXT_CONSTANTS } from '../constants/ai.constants';
+import { ComicStyleType } from '../../common/enums/comic-style-type.enum';
+import { DEFAULT_IMAGE } from '../../common/constants/default-image.constants';
+import {
+    IMAGE_CONSTANTS,
+    TEXT_CONSTANTS,
+} from '../../common/constants/ai.constants';
 import { GptUserComicSceneGenerationDto } from '../dto/gpt-user-comic-scene-generation.dto';
 import { ComicGenerateRequestDto } from '../dto/comic-generate-request.dto';
 

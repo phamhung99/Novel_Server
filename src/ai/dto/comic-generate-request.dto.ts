@@ -5,7 +5,7 @@ import {
     IsOptional,
     IsString,
 } from 'class-validator';
-import { Platform } from '../enum/platform.enum';
+import { Platform } from '../../common/enums/platform.enum';
 
 export class ComicGenerateRequestDto {
     @IsString()

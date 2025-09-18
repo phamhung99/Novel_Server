@@ -3,12 +3,12 @@ import { ConfigService } from '@nestjs/config';
 import axios from 'axios';
 import { API_ENDPOINTS } from 'src/common/constants/api.constants';
 import { ERROR_MESSAGES } from 'src/common/constants/error-messages.constants';
-import { Platform } from '../enum/platform.enum';
-import { TEXT_CONSTANTS } from '../constants/ai.constants';
+import { Platform } from '../../common/enums/platform.enum';
+import { TEXT_CONSTANTS } from '../../common/constants/ai.constants';
 import { GptUserComicGenerationDto } from '../dto/gpt-user-comic-generation.dto';
-import { ChatModel } from 'src/ai/enum/models.enum';
+import { ChatModel } from 'src/common/enums/models.enum';
 import { ComicSceneResponseDto } from '../dto/comic-scene-response.dto';
-import { ComicStyleType } from '../enum/comic-style-type.enum';
+import { ComicStyleType } from '../../common/enums/comic-style-type.enum';
 import { ComicGenerateRequestDto } from '../dto/comic-generate-request.dto';
 
 @Injectable()
