@@ -10,6 +10,8 @@ import { GeminiApiService } from './providers/gemini-api.service';
 import { UserService } from 'src/user/user.service';
 import { GenerationType, LightningActionType } from 'src/common/enums/app.enum';
 import { MAX_MSG_COUNT_PER_DAY } from 'src/common/constants/app.constant';
+import { ComicStyleType } from 'src/common/enums/comic-style-type.enum';
+import { ERROR_MESSAGES } from 'src/common/constants/error-messages.constants';
 
 @Injectable()
 export class AiService {
@@ -32,12 +34,16 @@ export class AiService {
                 MAX_MSG_COUNT_PER_DAY,
             );
 
-        if (hasReachedDailyComicLimit) {
-            if (!isSubUser) {
-                throw new BadRequestException(
-                    'Daily comic generation limit reached',
-                );
-            }
+        if (comicRequest.type !== ComicStyleType.COMIC) {
+            await this.userservice.subtractLightningForComicAction(
+                userId,
+                LightningActionType.COMIC_STORY_GENERATION,
+            );
+        } else if (hasReachedDailyComicLimit && !isSubUser) {
+            throw new BadRequestException(
+                ERROR_MESSAGES.COMIC_GENERATED_DAILY_LIMIT_REACHED,
+            );
+        } else if (hasReachedDailyComicLimit && isSubUser) {
             await this.userservice.subtractLightningForComicAction(
                 userId,
                 LightningActionType.COMIC_STORY_GENERATION,
@@ -47,7 +53,7 @@ export class AiService {
                 userId,
                 isPro: isSubUser,
                 genType: GenerationType.TEXT,
-                platform: platform,
+                platform,
             });
         }
 

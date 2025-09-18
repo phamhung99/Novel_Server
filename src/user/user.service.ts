@@ -4,7 +4,7 @@ import { MoreThanOrEqual, Repository } from 'typeorm';
 import { GptUser } from './entities/gpt-user.entity';
 import { UserComicGenerations } from './entities/user_comic_generations.entity';
 import { GptTransactionsService } from 'src/gpt-transactions/gpt-transactions.service';
-import { GptUserInfoResponseDto } from './dto/gpt-user-info-response.dto';
+import { GptUserInfoResponseDto } from '../common/dto/gpt-user-info-response.dto';
 import { getStartOfDay, getUnixTimestamp } from 'src/common/utils/date.utils';
 import { TIMESTAMP_7DAY } from 'src/common/constants/date.constants';
 import { GenerationType } from 'src/common/enums/app.enum';
@@ -306,6 +306,16 @@ export class UserService {
                     `Please wait ${COMIC_COOLDOWN_MS / 1000} seconds before making another request.`,
                 );
             }
+        }
+    }
+
+    async addOnetimeGen(userId: string, addedGen: number): Promise<void> {
+        if (!addedGen || addedGen <= 0) return;
+        const user = await this.findById(userId);
+        if (user) {
+            user.remainingOnetimeGen =
+                (user.remainingOnetimeGen || 0) + addedGen;
+            await this.userRepository.save(user);
         }
     }
 }

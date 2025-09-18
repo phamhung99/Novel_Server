@@ -15,4 +15,10 @@ export class IapProductService {
             where: { type: 'SUB' },
         });
     }
+
+    async getOneTimeProducts(): Promise<GptIapProduct[]> {
+        return this.iapProductRepository.find({
+            where: { type: 'ONETIME' },
+        });
+    }
 }

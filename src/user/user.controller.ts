@@ -9,7 +9,7 @@ import {
 } from '@nestjs/common';
 import { UserService } from './user.service';
 import { Request } from 'express';
-import { GptUserInfoResponseDto } from './dto/gpt-user-info-response.dto';
+import { GptUserInfoResponseDto } from '../common/dto/gpt-user-info-response.dto';
 
 @Controller('gpt')
 export class UserController {

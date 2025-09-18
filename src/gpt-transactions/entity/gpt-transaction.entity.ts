@@ -23,7 +23,7 @@ export class GptTransaction {
     @Column({ name: 'purchase_time', type: 'bigint', nullable: true })
     purchaseTime: number;
 
-    @Column({ name: 'purchase_token' })
+    @Column({ name: 'purchase_token', unique: true })
     purchaseToken: string;
 
     @Column({ name: 'quantity', type: 'int', default: 1 })

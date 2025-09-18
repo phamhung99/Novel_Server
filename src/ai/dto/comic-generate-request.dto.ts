@@ -1,11 +1,6 @@
-import {
-    IsBoolean,
-    IsEnum,
-    IsInt,
-    IsOptional,
-    IsString,
-} from 'class-validator';
+import { IsBoolean, IsEnum, IsOptional, IsString } from 'class-validator';
 import { Platform } from '../../common/enums/platform.enum';
+import { ComicStyleType } from 'src/common/enums/comic-style-type.enum';
 
 export class ComicGenerateRequestDto {
     @IsString()
@@ -15,8 +10,8 @@ export class ComicGenerateRequestDto {
     @IsEnum(Platform)
     platform?: Platform;
 
-    @IsInt()
-    type: number;
+    @IsEnum(ComicStyleType)
+    type: ComicStyleType;
 
     @IsBoolean()
     isFreeComic: boolean;

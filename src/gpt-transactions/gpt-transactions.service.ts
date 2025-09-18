@@ -34,4 +34,31 @@ export class GptTransactionsService {
             where: { orderId },
         });
     }
+
+    async findByUserIdAndPurchaseToken(
+        userId: string,
+        purchaseToken: string,
+    ): Promise<GptTransaction[]> {
+        return this.transactionRepository.find({
+            where: { userId, purchaseToken },
+        });
+    }
+
+    async createAndSaveTransaction(
+        transaction: Partial<GptTransaction> & { userId: string },
+    ): Promise<GptTransaction> {
+        const dbTransaction = this.transactionRepository.create({
+            userId: transaction.userId,
+            orderId: transaction.orderId,
+            productId: transaction.productId,
+            purchaseTime: transaction.purchaseTime,
+            purchaseToken: transaction.purchaseToken,
+            quantity:
+                transaction.quantity && transaction.quantity > 0
+                    ? transaction.quantity
+                    : 1,
+        });
+
+        return await this.transactionRepository.save(dbTransaction);
+    }
 }

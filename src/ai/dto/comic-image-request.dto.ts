@@ -1,9 +1,10 @@
-import { IsArray, IsEnum, IsInt, IsOptional, IsString } from 'class-validator';
+import { IsArray, IsEnum, IsOptional, IsString } from 'class-validator';
 import { ImageModel } from '../../common/enums/models.enum';
+import { ComicStyleType } from 'src/common/enums/comic-style-type.enum';
 
 export class ComicImageRequestDto {
-    @IsInt()
-    type: number;
+    @IsEnum(ComicStyleType)
+    type: ComicStyleType;
 
     @IsArray()
     @IsString({ each: true })

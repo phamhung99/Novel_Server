@@ -5,4 +5,5 @@ export const ERROR_MESSAGES = {
     VIOLATED_SAFETY_POLICIES_PROMPT:
         'Your prompt violated our safety policies. Please try with another prompt.',
     COMIC_GENERATED_ALL_RETRY_ATTEMPT_FAILED: 'All retry attempts failed.',
+    COMIC_GENERATED_DAILY_LIMIT_REACHED: 'Daily comic generation limit reached',
 } as const;
