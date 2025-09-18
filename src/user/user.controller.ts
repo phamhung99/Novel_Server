@@ -1,12 +1,4 @@
-import {
-    Controller,
-    Get,
-    Req,
-    Headers,
-    HttpException,
-    HttpStatus,
-    Body,
-} from '@nestjs/common';
+import { Controller, Get, Req, Headers } from '@nestjs/common';
 import { UserService } from './user.service';
 import { Request } from 'express';
 import { GptUserInfoResponseDto } from '../common/dto/gpt-user-info-response.dto';
@@ -23,25 +15,22 @@ export class UserController {
         @Headers('x-package') packageName: string = '',
         @Headers('x-language') language: string = '',
     ): Promise<GptUserInfoResponseDto> {
-        if (!userId) {
-            throw new HttpException(
-                'User ID is required',
-                HttpStatus.BAD_REQUEST,
+        let user = await this.userService.findById(userId);
+        if (!user) {
+            user = await this.userService.createOrUpdateUser(
+                userId,
+                version,
+                packageName,
+                language,
+                request.ip,
             );
         }
 
-        await this.userService.createOrUpdateUser(
-            userId,
-            version,
-            packageName,
-            language,
-            request.ip,
+        const userInfo = await this.userService.getUserInfo(user.id);
+
+        userInfo.imgGenInDayNum = await this.userService.getImgGenInDayNum(
+            user.id,
         );
-
-        const userInfo = await this.userService.getUserInfo(userId);
-
-        userInfo.imgGenInDayNum =
-            await this.userService.getImgGenInDayNum(userId);
 
         return userInfo;
     }

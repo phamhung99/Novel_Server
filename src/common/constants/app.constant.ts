@@ -6,4 +6,4 @@ export const LIGHTNING_VALUES: Record<LightningActionType, number> = {
 };
 
 export const MAX_MSG_COUNT_PER_DAY = 3;
-export const COMIC_COOLDOWN_MS = 60 * 1000; // 1 minute
+export const COMIC_COOLDOWN_MS = 20 * 1000; // 20 seconds
