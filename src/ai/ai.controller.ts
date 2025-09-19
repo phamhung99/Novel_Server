@@ -30,7 +30,7 @@ export class AiController {
             throw new BadRequestException('userId is required');
         }
 
-        await this.userService.checkComicCooldown(userId);
+        await this.userService.checkComicCooldown(userId, comicRequest.prompt);
 
         return this.aiService.generateComic(comicRequest, isSubUser, userId);
     }
@@ -45,8 +45,15 @@ export class AiController {
             throw new BadRequestException('userId is required');
         }
 
-        await this.userService.checkComicCooldown(userId);
+        await this.userService.checkComicCooldown(
+            userId,
+            comicRequest.scenePrompt,
+        );
 
-        return this.aiService.createComicImages(comicRequest, userId);
+        return this.aiService.createComicImages(
+            comicRequest,
+            userId,
+            isSubUser,
+        );
     }
 }

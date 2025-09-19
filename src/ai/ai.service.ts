@@ -38,6 +38,7 @@ export class AiService {
             await this.userservice.subtractLightningForComicAction(
                 userId,
                 LightningActionType.COMIC_STORY_GENERATION,
+                isSubUser,
             );
         } else if (hasReachedDailyComicLimit && !isSubUser) {
             throw new BadRequestException(
@@ -47,6 +48,7 @@ export class AiService {
             await this.userservice.subtractLightningForComicAction(
                 userId,
                 LightningActionType.COMIC_STORY_GENERATION,
+                isSubUser,
             );
         } else {
             await this.userservice.increaseComicGeneratedCountToday({
@@ -54,6 +56,7 @@ export class AiService {
                 isPro: isSubUser,
                 genType: GenerationType.TEXT,
                 platform,
+                prompt: comicRequest.prompt,
             });
         }
 
@@ -83,10 +86,12 @@ export class AiService {
     async createComicImages(
         comicRequest: ComicImageRequestDto,
         userId: string,
+        isSubUser: boolean,
     ): Promise<ComicSceneResponseDto> {
         await this.userservice.subtractLightningForComicAction(
             userId,
             LightningActionType.COMIC_IMAGE_GENERATION,
+            isSubUser,
         );
 
         await this.userservice.increaseComicGeneratedCountToday({
@@ -94,6 +99,7 @@ export class AiService {
             isPro: false,
             genType: GenerationType.IMAGE,
             platform: Platform.OPENAI,
+            prompt: comicRequest.scenePrompt,
         });
 
         const response = await this.openAIApiService.callOpenAIImageAPI(

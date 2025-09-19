@@ -14,6 +14,7 @@ import {
     COMIC_COOLDOWN_MS,
     LIGHTNING_VALUES,
 } from 'src/common/constants/app.constant';
+import { ERROR_MESSAGES } from 'src/common/constants/error-messages.constants';
 
 @Injectable()
 export class UserService {
@@ -174,15 +175,20 @@ export class UserService {
     async subtractLightningForComicAction(
         userId: string,
         action: LightningActionType,
+        isSubUser: boolean,
     ): Promise<void> {
         const lightningSubtractValue =
             this.getLightningSubtractValueByType(action);
 
         const user = await this.userRepository.findOneBy({ id: userId });
-        await this.subtractLighting(user, lightningSubtractValue);
+        await this.subtractLighting(user, lightningSubtractValue, isSubUser);
     }
 
-    async subtractLighting(user: GptUser, subtractedGen: number) {
+    async subtractLighting(
+        user: GptUser,
+        subtractedGen: number,
+        isSubUser: boolean,
+    ): Promise<void> {
         if (
             !user ||
             (user.remainingSubGen < subtractedGen &&
@@ -193,7 +199,7 @@ export class UserService {
             );
         }
 
-        if (user.remainingSubGen >= subtractedGen) {
+        if (isSubUser && user.remainingSubGen >= subtractedGen) {
             await this.userRepository.update(user.id, {
                 remainingSubGen: user.remainingSubGen - subtractedGen,
             });
@@ -246,11 +252,13 @@ export class UserService {
         isPro,
         genType = GenerationType.TEXT,
         platform,
+        prompt,
     }: {
         userId: string;
         isPro: boolean;
-        genType?: GenerationType;
+        genType: GenerationType;
         platform: string;
+        prompt: string;
     }): Promise<void> {
         const newGen = this.comicGenRepository.create({
             userId,
@@ -258,6 +266,7 @@ export class UserService {
             genType,
             platform,
             createdAt: new Date(),
+            prompt,
         });
         await this.comicGenRepository.save(newGen);
     }
@@ -276,25 +285,33 @@ export class UserService {
         return count >= limit;
     }
 
-    async increaseImageGeneratedCountToday(
-        userId: string,
-        isPro: boolean,
-        genType: GenerationType = GenerationType.IMAGE,
-        platform: string,
-    ): Promise<void> {
+    async increaseImageGeneratedCountToday({
+        userId,
+        isPro,
+        genType = GenerationType.IMAGE,
+        platform,
+        prompt,
+    }: {
+        userId: string;
+        isPro: boolean;
+        genType: GenerationType;
+        platform: string;
+        prompt: string;
+    }): Promise<void> {
         const newGen = this.comicGenRepository.create({
             userId,
             isPro,
             genType,
             platform,
             createdAt: new Date(),
+            prompt,
         });
         await this.comicGenRepository.save(newGen);
     }
 
-    async checkComicCooldown(userId: string): Promise<void> {
+    async checkComicCooldown(userId: string, prompt: string): Promise<void> {
         const lastGen = await this.comicGenRepository.findOne({
-            where: { userId },
+            where: { userId, prompt },
             order: { createdAt: 'DESC' },
         });
 
@@ -303,7 +320,9 @@ export class UserService {
             const diffMs = now.getTime() - lastGen.createdAt.getTime();
             if (diffMs < COMIC_COOLDOWN_MS) {
                 throw new BadRequestException(
-                    `Please wait ${COMIC_COOLDOWN_MS / 1000} seconds before making another request.`,
+                    ERROR_MESSAGES.SAME_PROMPT_COOLDOWN_MESSAGE(
+                        COMIC_COOLDOWN_MS / 1000,
+                    ),
                 );
             }
         }

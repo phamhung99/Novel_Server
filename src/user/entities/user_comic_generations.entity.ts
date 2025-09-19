@@ -28,4 +28,7 @@ export class UserComicGenerations {
         enum: GenerationType,
     })
     genType: GenerationType;
+
+    @Column({ type: 'text' })
+    prompt: string;
 }

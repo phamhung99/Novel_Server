@@ -9,7 +9,13 @@ let server: Handler;
 
 async function bootstrap() {
     const app = await NestFactory.create(AppModule);
-    app.useGlobalPipes(new ValidationPipe());
+    app.useGlobalPipes(
+        new ValidationPipe({
+            transform: true,
+            whitelist: true,
+            forbidNonWhitelisted: false,
+        }),
+    );
     app.useGlobalInterceptors(new JSendInterceptor());
     app.setGlobalPrefix('api/v1');
     await app.init();

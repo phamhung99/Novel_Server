@@ -6,4 +6,6 @@ export const ERROR_MESSAGES = {
         'Your prompt violated our safety policies. Please try with another prompt.',
     COMIC_GENERATED_ALL_RETRY_ATTEMPT_FAILED: 'All retry attempts failed.',
     COMIC_GENERATED_DAILY_LIMIT_REACHED: 'Daily comic generation limit reached',
+    SAME_PROMPT_COOLDOWN_MESSAGE: (seconds: number) =>
+        `You have already submitted the same prompt recently. Please wait ${seconds} seconds before making another request with the same prompt.`,
 } as const;
