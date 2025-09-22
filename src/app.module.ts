@@ -7,6 +7,7 @@ import { UserModule } from './user/user.module';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { GptTransactionsModule } from './gpt-transactions/gpt-transactions.module';
 import { IapProductModule } from './iap-product/iap-product.module';
+import { PromotionCodeModule } from './promotion-code/promotion-code.module';
 
 @Module({
     imports: [
@@ -39,6 +40,7 @@ import { IapProductModule } from './iap-product/iap-product.module';
         UserModule,
         GptTransactionsModule,
         IapProductModule,
+        PromotionCodeModule,
     ],
     controllers: [HealthController],
 })

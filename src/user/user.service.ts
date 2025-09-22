@@ -337,4 +337,17 @@ export class UserService {
             await this.userRepository.save(user);
         }
     }
+
+    async addPlusLightning(
+        userId: string,
+        promotionCode: string,
+        plusValue: number,
+    ): Promise<boolean> {
+        const user = await this.findById(userId);
+        if (!user) return false;
+
+        user.remainingOnetimeGen = (user.remainingOnetimeGen || 0) + plusValue;
+        await this.userRepository.save(user);
+        return true;
+    }
 }

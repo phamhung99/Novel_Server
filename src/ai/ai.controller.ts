@@ -5,6 +5,7 @@ import {
     Query,
     Headers,
     BadRequestException,
+    Get,
 } from '@nestjs/common';
 import { AiService } from './ai.service';
 import { ComicGenerateRequestDto } from './dto/comic-generate-request.dto';
@@ -12,12 +13,14 @@ import { ComicImageRequestDto } from './dto/comic-image-request.dto';
 import { GptUserComicGenerationDto } from './dto/gpt-user-comic-generation.dto';
 import { ComicSceneResponseDto } from './dto/comic-scene-response.dto';
 import { UserService } from 'src/user/user.service';
+import { PromotionCodeService } from 'src/promotion-code/promotion-code.service';
 
 @Controller('/ai')
 export class AiController {
     constructor(
         private readonly aiService: AiService,
         private readonly userService: UserService,
+        private readonly promotionCodeService: PromotionCodeService,
     ) {}
 
     @Post('/comic/generate')
@@ -55,5 +58,35 @@ export class AiController {
             userId,
             isSubUser,
         );
+    }
+
+    @Post('/comic/report')
+    async reportComic(
+        @Headers('x-user-id') userId: string,
+        @Body() reportData: any,
+    ): Promise<any> {
+        return;
+    }
+
+    @Get('/plus-lightning')
+    async checkUser(
+        @Query('promotionCode') promotionCode: string,
+        @Headers('x-user-id') userId: string,
+    ): Promise<boolean> {
+        let isSuccess = false;
+
+        const promoExists =
+            await this.promotionCodeService.existsByPromotionCode(
+                promotionCode,
+            );
+        if (promoExists) {
+            isSuccess = await this.userService.addPlusLightning(
+                userId,
+                promotionCode,
+                200,
+            );
+        }
+
+        return isSuccess;
     }
 }
