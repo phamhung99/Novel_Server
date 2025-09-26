@@ -8,6 +8,9 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { GptTransactionsModule } from './gpt-transactions/gpt-transactions.module';
 import { IapProductModule } from './iap-product/iap-product.module';
 import { PromotionCodeModule } from './promotion-code/promotion-code.module';
+import { ServeStaticModule } from '@nestjs/serve-static';
+import { join } from 'path';
+import { DashboardModule } from './dashboard/dashboard.module';
 
 @Module({
     imports: [
@@ -15,6 +18,10 @@ import { PromotionCodeModule } from './promotion-code/promotion-code.module';
             isGlobal: true,
             load: configs,
             envFilePath: `.env.${process.env.NODE_ENV || 'development'}`,
+        }),
+        ServeStaticModule.forRoot({
+            rootPath: join(__dirname, '..', 'public'),
+            serveRoot: '/',
         }),
         TypeOrmModule.forRootAsync({
             imports: [ConfigModule],
@@ -41,6 +48,7 @@ import { PromotionCodeModule } from './promotion-code/promotion-code.module';
         GptTransactionsModule,
         IapProductModule,
         PromotionCodeModule,
+        DashboardModule,
     ],
     controllers: [HealthController],
 })

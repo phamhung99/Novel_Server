@@ -9,7 +9,7 @@ import { IapProductModule } from 'src/iap-product/iap-product.module';
 @Module({
     controllers: [GptTransactionsController],
     providers: [GptTransactionsService],
-    exports: [GptTransactionsService],
+    exports: [GptTransactionsService, TypeOrmModule],
     imports: [
         TypeOrmModule.forFeature([GptTransaction]),
         forwardRef(() => UserModule),

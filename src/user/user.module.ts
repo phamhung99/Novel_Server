@@ -15,6 +15,6 @@ import { IapProductModule } from 'src/iap-product/iap-product.module';
         GptTransactionsModule,
         IapProductModule,
     ],
-    exports: [UserService],
+    exports: [UserService, TypeOrmModule],
 })
 export class UserModule {}

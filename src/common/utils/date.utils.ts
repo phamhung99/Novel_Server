@@ -57,3 +57,7 @@ export function getEndOfDay(date: Date): Date {
         999,
     );
 }
+
+export function get24HoursAgo(): Date {
+    return new Date(Date.now() - 24 * 60 * 60 * 1000);
+}
