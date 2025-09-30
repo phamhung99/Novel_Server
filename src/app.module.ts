@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { MiddlewareConsumer, Module } from '@nestjs/common';
 import { AiModule } from './ai/ai.module';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import configs from './config';
@@ -11,6 +11,7 @@ import { PromotionCodeModule } from './promotion-code/promotion-code.module';
 import { ServeStaticModule } from '@nestjs/serve-static';
 import { join } from 'path';
 import { DashboardModule } from './dashboard/dashboard.module';
+import { PackageMiddleware } from './common/middleware/package.middleware';
 
 @Module({
     imports: [
@@ -52,4 +53,8 @@ import { DashboardModule } from './dashboard/dashboard.module';
     ],
     controllers: [HealthController],
 })
-export class AppModule {}
+export class AppModule {
+    configure(consumer: MiddlewareConsumer) {
+        consumer.apply(PackageMiddleware).forRoutes('*');
+    }
+}
