@@ -157,6 +157,35 @@ export class StoryService {
         }
     }
 
+    // Chapter methods by index
+    async findChapterByIndex(storyId: string, index: number): Promise<Chapter> {
+        const chapter = await this.chapterRepository.findOne({
+            where: { storyId, index },
+            relations: ['story'],
+        });
+
+        if (!chapter) {
+            throw new NotFoundException(`Chapter ${index} not found in story ${storyId}`);
+        }
+
+        return chapter;
+    }
+
+    async updateChapterByIndex(
+        storyId: string,
+        index: number,
+        updateChapterDto: UpdateChapterDto,
+    ): Promise<Chapter> {
+        const chapter = await this.findChapterByIndex(storyId, index);
+        Object.assign(chapter, updateChapterDto);
+        return this.chapterRepository.save(chapter);
+    }
+
+    async deleteChapterByIndex(storyId: string, index: number): Promise<void> {
+        const chapter = await this.findChapterByIndex(storyId, index);
+        await this.chapterRepository.delete(chapter.id);
+    }
+
     // Publication workflow methods
     async requestPublication(id: string): Promise<Story> {
         const story = await this.findStoryById(id);

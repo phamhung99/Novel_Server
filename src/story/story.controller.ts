@@ -150,7 +150,7 @@ export class StoryController {
     }
 
     // Chapter endpoints
-    @Post(':storyId/chapters')
+    @Post(':storyId/chapter')
     async createChapter(
         @Param('storyId') storyId: string,
         @Body() createChapterDto: CreateChapterDto,
@@ -158,27 +158,34 @@ export class StoryController {
         return this.storyService.createChapter(storyId, createChapterDto);
     }
 
-    @Get(':storyId/chapters')
+    @Get(':storyId/chapter')
     async getChaptersByStory(@Param('storyId') storyId: string) {
         return this.storyService.findChaptersByStory(storyId);
     }
 
-    @Get('chapters/:id')
-    async getChapterById(@Param('id') id: string) {
-        return this.storyService.findChapterById(id);
+    @Get(':storyId/chapter/:index')
+    async getChapterByIndex(
+        @Param('storyId') storyId: string,
+        @Param('index') index: number,
+    ) {
+        return this.storyService.findChapterByIndex(storyId, index);
     }
 
-    @Put('chapters/:id')
+    @Put(':storyId/chapter/:index')
     async updateChapter(
-        @Param('id') id: string,
+        @Param('storyId') storyId: string,
+        @Param('index') index: number,
         @Body() updateChapterDto: UpdateChapterDto,
     ) {
-        return this.storyService.updateChapter(id, updateChapterDto);
+        return this.storyService.updateChapterByIndex(storyId, index, updateChapterDto);
     }
 
-    @Delete('chapters/:id')
-    async deleteChapter(@Param('id') id: string) {
-        await this.storyService.deleteChapter(id);
+    @Delete(':storyId/chapter/:index')
+    async deleteChapter(
+        @Param('storyId') storyId: string,
+        @Param('index') index: number,
+    ) {
+        await this.storyService.deleteChapterByIndex(storyId, index);
         return { message: 'Chapter deleted successfully' };
     }
 }
