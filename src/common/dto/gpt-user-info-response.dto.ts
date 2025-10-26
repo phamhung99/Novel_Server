@@ -23,6 +23,10 @@ export class GptUserInfoResponseDto {
 
     username: string;
 
+    firstName: string;
+
+    lastName: string;
+
     profileImage: string;
 
     static from(
@@ -36,6 +40,8 @@ export class GptUserInfoResponseDto {
     ): GptUserInfoResponseDto {
         const dto = new GptUserInfoResponseDto();
         dto.userId = user.id;
+        dto.firstName = user.firstName || '';
+        dto.lastName = user.lastName || '';
         dto.remainingSubGen = user.getRemainingSubGen();
         dto.remainingOnetimeGen = user.getRemainingOnetimeGen();
         dto.maxSubGen = maxSubGen;

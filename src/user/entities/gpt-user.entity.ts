@@ -11,6 +11,12 @@ export class GptUser {
     @PrimaryColumn()
     id: string;
 
+    @Column({ name: 'first_name', nullable: true, default: '' })
+    firstName: string;
+
+    @Column({ name: 'last_name', nullable: true, default: '' })
+    lastName: string;
+
     @Column({ nullable: true })
     ptokens: string;
 

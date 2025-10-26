@@ -31,6 +31,23 @@ export class UserService {
         return this.userRepository.findOne({ where: { id: userId } });
     }
 
+    async updateUserName(userId: string, updateData: { firstName?: string; lastName?: string }): Promise<GptUser> {
+        const user = await this.findById(userId);
+        if (!user) {
+            throw new BadRequestException('User not found');
+        }
+
+        if (updateData.firstName !== undefined) {
+            user.firstName = updateData.firstName;
+        }
+        
+        if (updateData.lastName !== undefined) {
+            user.lastName = updateData.lastName;
+        }
+
+        return this.userRepository.save(user);
+    }
+
     async createOrUpdateUser(
         userId: string,
         version: number,

@@ -1,7 +1,8 @@
-import { Controller, Get, Req, Headers } from '@nestjs/common';
+import { Controller, Get, Req, Headers, Body, Patch, UsePipes, ValidationPipe } from '@nestjs/common';
 import { UserService } from './user.service';
 import { Request } from 'express';
 import { GptUserInfoResponseDto } from '../common/dto/gpt-user-info-response.dto';
+import { UpdateUserNameDto } from './dto/update-user-name.dto';
 
 @Controller('gpt')
 export class UserController {
@@ -31,6 +32,25 @@ export class UserController {
         userInfo.imgGenInDayNum = await this.userService.getImgGenInDayNum(
             user.id,
         );
+
+        return userInfo;
+    }
+
+    @Patch('user/name')
+    @UsePipes(new ValidationPipe({ transform: true }))
+    async updateUserName(
+        @Headers('x-user-id') userId: string,
+        @Body() updateData: UpdateUserNameDto,
+    ) {
+        // Update the user's name
+        await this.userService.updateUserName(userId, {
+            firstName: updateData.firstName,
+            lastName: updateData.lastName,
+        });
+
+        // Get the updated user info
+        const userInfo = await this.userService.getUserInfo(userId);
+        userInfo.imgGenInDayNum = await this.userService.getImgGenInDayNum(userId);
 
         return userInfo;
     }
