@@ -8,11 +8,13 @@ import {
     ManyToOne,
     JoinColumn,
     OneToMany,
+    OneToOne,
 } from 'typeorm';
 import { GptUser } from '../../user/entities/gpt-user.entity';
 import { StoryType } from '../../common/enums/story-type.enum';
 import { StoryStatus } from '../../common/enums/story-status.enum';
 import { Chapter } from './chapter.entity';
+import { StoryGeneration } from './story-generation.entity';
 
 @Entity('story')
 export class Story {
@@ -81,4 +83,8 @@ export class Story {
 
     @OneToMany(() => Chapter, (chapter) => chapter.story)
     chapters: Chapter[];
+
+    @OneToOne(() => StoryGeneration, { nullable: true })
+    @JoinColumn({ name: 'generation_id' })
+    generation?: StoryGeneration;
 }

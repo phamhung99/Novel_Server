@@ -18,6 +18,16 @@ import { UpdateChapterDto } from './dto/update-chapter.dto';
 import { RequestPublicationDto } from './dto/request-publication.dto';
 import { ApproveStoryDto } from './dto/approve-story.dto';
 import { RejectStoryDto } from './dto/reject-story.dto';
+import {
+    GenerateChapterDto,
+    GenerateCompleteChapterDto,
+} from './dto/generate-chapter.dto';
+import {
+    InitializeStoryDto,
+    InitializeStoryResponseDto,
+    GenerateChapterOnDemandDto,
+    GenerateChapterOnDemandResponseDto,
+} from './dto/generate-story-outline.dto';
 
 @Controller('story')
 export class StoryController {
@@ -102,9 +112,9 @@ export class StoryController {
         @Body() requestDto: RequestPublicationDto,
     ) {
         const story = await this.storyService.requestPublication(id);
-        return { 
+        return {
             message: 'Publication request submitted successfully',
-            story 
+            story,
         };
     }
 
@@ -118,9 +128,9 @@ export class StoryController {
             throw new BadRequestException('Admin ID is required');
         }
         const story = await this.storyService.approveStory(id, adminId);
-        return { 
+        return {
             message: 'Story approved and published successfully',
-            story 
+            story,
         };
     }
 
@@ -133,19 +143,23 @@ export class StoryController {
         if (!adminId) {
             throw new BadRequestException('Admin ID is required');
         }
-        const story = await this.storyService.rejectStory(id, adminId, rejectDto.reason);
-        return { 
+        const story = await this.storyService.rejectStory(
+            id,
+            adminId,
+            rejectDto.reason,
+        );
+        return {
             message: 'Story rejected',
-            story 
+            story,
         };
     }
 
     @Post(':id/unpublish')
     async unpublishStory(@Param('id') id: string) {
         const story = await this.storyService.unpublishStory(id);
-        return { 
+        return {
             message: 'Story unpublished successfully',
-            story 
+            story,
         };
     }
 
@@ -177,7 +191,11 @@ export class StoryController {
         @Param('index') index: number,
         @Body() updateChapterDto: UpdateChapterDto,
     ) {
-        return this.storyService.updateChapterByIndex(storyId, index, updateChapterDto);
+        return this.storyService.updateChapterByIndex(
+            storyId,
+            index,
+            updateChapterDto,
+        );
     }
 
     @Delete(':storyId/chapter/:index')
@@ -187,5 +205,79 @@ export class StoryController {
     ) {
         await this.storyService.deleteChapterByIndex(storyId, index);
         return { message: 'Chapter deleted successfully' };
+    }
+
+    // REQUEST 1: Initialize story with outline
+    @Post('generate/initialize')
+    async initializeStory(
+        @Headers('x-user-id') userId: string,
+        @Body() initializeStoryDto: InitializeStoryDto,
+    ): Promise<InitializeStoryResponseDto> {
+        if (!userId) {
+            throw new BadRequestException('userId is required');
+        }
+        return this.storyService.initializeStoryWithOutline(
+            userId,
+            initializeStoryDto,
+        );
+    }
+
+    // REQUEST 2: Generate single chapter on-demand
+    @Post(':storyId/generate/chapter-on-demand')
+    async generateChapterOnDemand(
+        @Param('storyId') storyId: string,
+        @Body() generateChapterOnDemandDto: GenerateChapterOnDemandDto,
+    ): Promise<GenerateChapterOnDemandResponseDto> {
+        return this.storyService.generateChapterOnDemand(
+            storyId,
+            generateChapterOnDemandDto,
+        );
+    }
+
+    // Legacy endpoint (kept for backward compatibility)
+    @Post(':storyId/generate/chapter')
+    async generateChapter(
+        @Param('storyId') storyId: string,
+        @Body() generateChapterDto: GenerateChapterDto,
+    ) {
+        const result = await this.storyService.generateChapter(
+            storyId,
+            generateChapterDto,
+        );
+        return {
+            message: 'Chapter generated successfully',
+            data: result,
+        };
+    }
+
+    // Generation History endpoints
+    @Get(':storyId/generation/history')
+    async getGenerationHistory(@Param('storyId') storyId: string) {
+        const history =
+            await this.storyService.getStoryGenerationHistory(storyId);
+        return {
+            message: 'Generation history retrieved successfully',
+            data: history,
+        };
+    }
+
+    @Get('generation/:generationId')
+    async getGenerationById(@Param('generationId') generationId: string) {
+        const generation =
+            await this.storyService.getGenerationById(generationId);
+        return {
+            message: 'Generation details retrieved successfully',
+            data: generation,
+        };
+    }
+
+    @Get(':storyId/generation/chapters/history')
+    async getChapterGenerationHistory(@Param('storyId') storyId: string) {
+        const history =
+            await this.storyService.getChapterGenerationHistory(storyId);
+        return {
+            message: 'Chapter generation history retrieved successfully',
+            data: history,
+        };
     }
 }
