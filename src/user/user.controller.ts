@@ -1,4 +1,13 @@
-import { Controller, Get, Req, Headers, Body, Patch, UsePipes, ValidationPipe } from '@nestjs/common';
+import {
+    Controller,
+    Get,
+    Req,
+    Headers,
+    Body,
+    Patch,
+    UsePipes,
+    ValidationPipe,
+} from '@nestjs/common';
 import { UserService } from './user.service';
 import { Request } from 'express';
 import { GptUserInfoResponseDto } from '../common/dto/gpt-user-info-response.dto';
@@ -50,7 +59,8 @@ export class UserController {
 
         // Get the updated user info
         const userInfo = await this.userService.getUserInfo(userId);
-        userInfo.imgGenInDayNum = await this.userService.getImgGenInDayNum(userId);
+        userInfo.imgGenInDayNum =
+            await this.userService.getImgGenInDayNum(userId);
 
         return userInfo;
     }

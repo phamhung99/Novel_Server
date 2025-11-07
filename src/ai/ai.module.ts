@@ -23,7 +23,11 @@ import { StoryGeneration } from '../story/entities/story-generation.entity';
         StoryGenerationProviderFactory,
         StoryGenerationApiService,
     ],
-    imports: [UserModule, PromotionCodeModule, TypeOrmModule.forFeature([StoryGeneration])],
+    imports: [
+        UserModule,
+        PromotionCodeModule,
+        TypeOrmModule.forFeature([StoryGeneration]),
+    ],
     exports: [StoryGenerationApiService, StoryGenerationProviderFactory],
 })
 export class AiModule {}

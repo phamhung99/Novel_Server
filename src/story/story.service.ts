@@ -1,9 +1,17 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+    Injectable,
+    NotFoundException,
+    BadRequestException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Story } from './entities/story.entity';
 import { Chapter } from './entities/chapter.entity';
-import { StoryGeneration, GenerationType, GenerationStatus } from './entities/story-generation.entity';
+import {
+    StoryGeneration,
+    GenerationType,
+    GenerationStatus,
+} from './entities/story-generation.entity';
 import { ChapterGeneration } from './entities/chapter-generation.entity';
 import { CreateStoryDto } from './dto/create-story.dto';
 import { UpdateStoryDto } from './dto/update-story.dto';
@@ -58,9 +66,9 @@ export class StoryService {
 
     async findPublicStories(): Promise<Story[]> {
         return this.storyRepository.find({
-            where: { 
-                isPublic: true, 
-                status: StoryStatus.PUBLISHED 
+            where: {
+                isPublic: true,
+                status: StoryStatus.PUBLISHED,
             },
             relations: ['author', 'chapters'],
             order: { createdAt: 'DESC' },
@@ -185,7 +193,9 @@ export class StoryService {
         });
 
         if (!chapter) {
-            throw new NotFoundException(`Chapter ${index} not found in story ${storyId}`);
+            throw new NotFoundException(
+                `Chapter ${index} not found in story ${storyId}`,
+            );
         }
 
         return chapter;
@@ -209,11 +219,11 @@ export class StoryService {
     // Publication workflow methods
     async requestPublication(id: string): Promise<Story> {
         const story = await this.findStoryById(id);
-        
+
         if (story.status === StoryStatus.PENDING) {
             throw new BadRequestException('Story is already pending approval');
         }
-        
+
         if (story.status === StoryStatus.PUBLISHED) {
             throw new BadRequestException('Story is already published');
         }
@@ -224,7 +234,7 @@ export class StoryService {
 
     async approveStory(id: string, adminId: string): Promise<Story> {
         const story = await this.findStoryById(id);
-        
+
         if (story.status !== StoryStatus.PENDING) {
             throw new BadRequestException('Story is not pending approval');
         }
@@ -235,13 +245,17 @@ export class StoryService {
         story.approvedBy = adminId;
         story.approvedAt = new Date();
         story.rejectionReason = null;
-        
+
         return this.storyRepository.save(story);
     }
 
-    async rejectStory(id: string, adminId: string, reason: string): Promise<Story> {
+    async rejectStory(
+        id: string,
+        adminId: string,
+        reason: string,
+    ): Promise<Story> {
         const story = await this.findStoryById(id);
-        
+
         if (story.status !== StoryStatus.PENDING) {
             throw new BadRequestException('Story is not pending approval');
         }
@@ -251,13 +265,13 @@ export class StoryService {
         story.approvedBy = adminId;
         story.approvedAt = new Date();
         story.rejectionReason = reason;
-        
+
         return this.storyRepository.save(story);
     }
 
     async unpublishStory(id: string): Promise<Story> {
         const story = await this.findStoryById(id);
-        
+
         if (story.status !== StoryStatus.PUBLISHED) {
             throw new BadRequestException('Story is not published');
         }
@@ -265,7 +279,7 @@ export class StoryService {
         // Unpublish returns to private state
         story.status = StoryStatus.PRIVATE;
         story.isPublic = false;
-        
+
         return this.storyRepository.save(story);
     }
 
@@ -359,7 +373,8 @@ export class StoryService {
                 additionalContext: outlineResponse.additionalContext,
                 numberOfChapters: dto.numberOfChapters,
                 outline: outlineResponse.outline,
-                message: 'Story outline generated successfully. Ready to generate chapters on-demand.',
+                message:
+                    'Story outline generated successfully. Ready to generate chapters on-demand.',
             };
         } catch (error) {
             console.error('Error initializing story:', error);
@@ -396,9 +411,10 @@ export class StoryService {
             // Get previous chapter summaries from ChapterGenerations
             const previousSummaries: string[] = [];
             for (const chapter of previousChapters) {
-                const chapterGen = await this.chapterGenerationRepository.findOne({
-                    where: { chapterId: chapter.id },
-                });
+                const chapterGen =
+                    await this.chapterGenerationRepository.findOne({
+                        where: { chapterId: chapter.id },
+                    });
                 if (chapterGen && chapterGen.structure?.summary) {
                     previousSummaries.push(
                         `Chương ${chapter.index}: ${chapterGen.structure.summary}`,
@@ -486,13 +502,19 @@ export class StoryService {
         const nextIndex = existingChapters.length + 1;
 
         // Collect summaries from all previous chapters if not provided
-        let previousChaptersSummaries = generateChapterDto.previousChaptersSummaries || [];
-        if (previousChaptersSummaries.length === 0 && existingChapters.length > 0) {
+        let previousChaptersSummaries =
+            generateChapterDto.previousChaptersSummaries || [];
+        if (
+            previousChaptersSummaries.length === 0 &&
+            existingChapters.length > 0
+        ) {
             // Auto-generate summaries from existing chapters
-            previousChaptersSummaries = existingChapters.map((chapter, index) => {
-                const summary = chapter.content?.substring(0, 300) || '';
-                return `Chương ${index + 1}: ${summary}...`;
-            });
+            previousChaptersSummaries = existingChapters.map(
+                (chapter, index) => {
+                    const summary = chapter.content?.substring(0, 300) || '';
+                    return `Chương ${index + 1}: ${summary}...`;
+                },
+            );
         }
 
         // Create story generation record for batch tracking
@@ -502,7 +524,9 @@ export class StoryService {
             status: GenerationStatus.IN_PROGRESS,
             aiProvider: generateChapterDto.aiProvider || 'gpt',
             aiModel:
-                generateChapterDto.aiProvider === 'grok' ? 'grok-4' : 'gpt-4o-mini',
+                generateChapterDto.aiProvider === 'grok'
+                    ? 'grok-4'
+                    : 'gpt-4o-mini',
             chapterNumber: nextIndex,
             prompt: {
                 chapterNumber: nextIndex,
@@ -518,7 +542,8 @@ export class StoryService {
             setting: generateChapterDto.storyAttributes?.setting,
             plotTheme: generateChapterDto.storyAttributes?.plotTheme,
             writingStyle: generateChapterDto.storyAttributes?.writingStyle,
-            additionalContext: generateChapterDto.storyAttributes?.additionalContext,
+            additionalContext:
+                generateChapterDto.storyAttributes?.additionalContext,
         });
 
         const savedStoryGeneration =
@@ -550,7 +575,8 @@ export class StoryService {
                 structure: {
                     openingHook: chapterStructure.openingHook,
                     sceneSetting: chapterStructure.sceneSetting,
-                    characterIntroduction: chapterStructure.characterIntroduction,
+                    characterIntroduction:
+                        chapterStructure.characterIntroduction,
                     plotDevelopment: chapterStructure.plotDevelopment,
                 },
             });
@@ -581,7 +607,9 @@ export class StoryService {
     }
 
     // Generation History Methods
-    async getStoryGenerationHistory(storyId: string): Promise<StoryGeneration[]> {
+    async getStoryGenerationHistory(
+        storyId: string,
+    ): Promise<StoryGeneration[]> {
         return this.storyGenerationRepository.find({
             where: { storyId },
             relations: ['chapterGenerations'],
@@ -596,7 +624,9 @@ export class StoryService {
         });
 
         if (!generation) {
-            throw new NotFoundException(`Generation with ID ${generationId} not found`);
+            throw new NotFoundException(
+                `Generation with ID ${generationId} not found`,
+            );
         }
 
         return generation;

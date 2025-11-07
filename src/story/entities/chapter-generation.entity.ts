@@ -18,9 +18,13 @@ export class ChapterGeneration {
     @Column({ name: 'story_generation_id' })
     storyGenerationId: string;
 
-    @ManyToOne(() => StoryGeneration, (storyGen) => storyGen.chapterGenerations, {
-        onDelete: 'CASCADE',
-    })
+    @ManyToOne(
+        () => StoryGeneration,
+        (storyGen) => storyGen.chapterGenerations,
+        {
+            onDelete: 'CASCADE',
+        },
+    )
     @JoinColumn({ name: 'story_generation_id' })
     storyGeneration: StoryGeneration;
 

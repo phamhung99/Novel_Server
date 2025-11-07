@@ -108,6 +108,9 @@ export class StoryGeneration {
     @UpdateDateColumn({ name: 'updated_at' })
     updatedAt: Date;
 
-    @OneToMany(() => ChapterGeneration, (chapterGen) => chapterGen.storyGeneration)
+    @OneToMany(
+        () => ChapterGeneration,
+        (chapterGen) => chapterGen.storyGeneration,
+    )
     chapterGenerations: ChapterGeneration[];
 }

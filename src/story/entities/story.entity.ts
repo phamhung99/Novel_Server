@@ -50,7 +50,13 @@ export class Story {
     @Column({ type: 'int', default: 0 })
     views: number;
 
-    @Column({ type: 'decimal', precision: 3, scale: 2, default: 0, nullable: true })
+    @Column({
+        type: 'decimal',
+        precision: 3,
+        scale: 2,
+        default: 0,
+        nullable: true,
+    })
     rating: number;
 
     @Column({

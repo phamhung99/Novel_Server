@@ -55,7 +55,10 @@ export class GrokApiService implements IStoryGenerationProvider {
                 };
             }
 
-            const response = await this.client.post('/chat/completions', requestBody);
+            const response = await this.client.post(
+                '/chat/completions',
+                requestBody,
+            );
 
             return response.data.choices[0].message.content;
         } catch (error) {

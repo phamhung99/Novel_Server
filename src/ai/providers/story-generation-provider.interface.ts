@@ -18,7 +18,11 @@ export interface IStoryGenerationProvider {
      * @param responseSchema - Optional JSON schema for structured response (Grok only)
      * @returns Generated content as string
      */
-    generateContent(systemPrompt: string, userPrompt: string, responseSchema?: object): Promise<string>;
+    generateContent(
+        systemPrompt: string,
+        userPrompt: string,
+        responseSchema?: object,
+    ): Promise<string>;
 
     /**
      * Get the provider name
