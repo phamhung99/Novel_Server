@@ -5,9 +5,6 @@ import configs from './config';
 import { HealthController } from './common/controllers/health.controller';
 import { UserModule } from './user/user.module';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { GptTransactionsModule } from './gpt-transactions/gpt-transactions.module';
-import { IapProductModule } from './iap-product/iap-product.module';
-import { PromotionCodeModule } from './promotion-code/promotion-code.module';
 import { ServeStaticModule } from '@nestjs/serve-static';
 import { join } from 'path';
 import { DashboardModule } from './dashboard/dashboard.module';
@@ -47,9 +44,6 @@ import { StoryModule } from './story/story.module';
         }),
         AiModule,
         UserModule,
-        GptTransactionsModule,
-        IapProductModule,
-        PromotionCodeModule,
         DashboardModule,
         StoryModule,
     ],

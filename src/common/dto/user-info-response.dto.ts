@@ -1,4 +1,4 @@
-export class GptUserInfoResponseDto {
+export class UserInfoResponseDto {
     userId: string;
 
     remainingSubGen: number;
@@ -37,8 +37,8 @@ export class GptUserInfoResponseDto {
         comicGeneratedCountToday: number,
         freeComicGenCountToday: number,
         proComicGenCountToday: number,
-    ): GptUserInfoResponseDto {
-        const dto = new GptUserInfoResponseDto();
+    ): UserInfoResponseDto {
+        const dto = new UserInfoResponseDto();
         dto.userId = user.id;
         dto.firstName = user.firstName || '';
         dto.lastName = user.lastName || '';

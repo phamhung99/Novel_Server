@@ -10,7 +10,7 @@ import {
     OneToMany,
     OneToOne,
 } from 'typeorm';
-import { GptUser } from '../../user/entities/gpt-user.entity';
+import { User } from 'src/user/entities/user.entity';
 import { StoryType } from '../../common/enums/story-type.enum';
 import { StoryStatus } from '../../common/enums/story-status.enum';
 import { Chapter } from './chapter.entity';
@@ -24,9 +24,9 @@ export class Story {
     @Column({ name: 'author_id' })
     authorId: string;
 
-    @ManyToOne(() => GptUser)
+    @ManyToOne(() => User)
     @JoinColumn({ name: 'author_id' })
-    author: GptUser;
+    author: User;
 
     @Column()
     title: string;

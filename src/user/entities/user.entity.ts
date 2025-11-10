@@ -6,8 +6,8 @@ import {
     UpdateDateColumn,
 } from 'typeorm';
 
-@Entity('gpt_users')
-export class GptUser {
+@Entity('users')
+export class User {
     @PrimaryColumn()
     id: string;
 
