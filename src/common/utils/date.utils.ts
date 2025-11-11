@@ -58,6 +58,8 @@ export function getEndOfDay(date: Date): Date {
     );
 }
 
-export function get24HoursAgo(): Date {
-    return new Date(Date.now() - 24 * 60 * 60 * 1000);
+export function get24hAgo(): Date {
+    const now = new Date();
+    now.setHours(now.getHours() - 24);
+    return now;
 }

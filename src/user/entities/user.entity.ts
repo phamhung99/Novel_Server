@@ -11,14 +11,11 @@ export class User {
     @PrimaryColumn()
     id: string;
 
-    @Column({ name: 'first_name', nullable: true, default: '' })
+    @Column({ name: 'first_name', nullable: true })
     firstName: string;
 
-    @Column({ name: 'last_name', nullable: true, default: '' })
+    @Column({ name: 'last_name', nullable: true })
     lastName: string;
-
-    @Column({ nullable: true })
-    ptokens: string;
 
     @Column({ nullable: true })
     country: string;
@@ -26,56 +23,21 @@ export class User {
     @Column({ name: 'ip_country_code', nullable: true })
     ipCountryCode: string;
 
-    @Column({ name: 'package_name', nullable: true })
-    packageName: string;
-
-    @Column({ nullable: true, type: 'int' })
-    version: number;
-
-    @Column({ name: 'remaining_sub_gen', nullable: true, type: 'int' })
-    remainingSubGen: number;
-
-    @Column({ name: 'remaining_onetime_gen', nullable: true, type: 'int' })
-    remainingOnetimeGen: number;
-
-    @Column({ name: 'sub_gen_reset_at', nullable: true, type: 'timestamp' })
-    subGenResetAt: Date;
-
-    @Column({ name: 'total_accesses', nullable: true, type: 'int' })
-    totalAccesses: number;
-
     @Column({ nullable: true })
     username: string;
+
+    @Column({ nullable: true })
+    email: string;
 
     @Column({ name: 'profile_image', nullable: true })
     profileImage: string;
 
-    @Column({ name: 'device_token', nullable: true })
-    deviceToken: string;
+    @Column({ name: 'active', type: 'bool', default: true })
+    active: boolean;
 
-    @CreateDateColumn({ name: 'created_at' })
+    @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
     createdAt: Date;
 
-    @UpdateDateColumn({ name: 'updated_at' })
+    @UpdateDateColumn({ name: 'updated_at', type: 'timestamptz' })
     updatedAt: Date;
-
-    isNewIapPlan(): boolean {
-        return (
-            this.remainingSubGen === null || this.remainingSubGen === undefined
-        );
-    }
-
-    getRemainingSubGen(): number {
-        if (this.remainingSubGen == null) {
-            return 0;
-        }
-        return this.remainingSubGen;
-    }
-
-    getRemainingOnetimeGen(): number {
-        if (this.remainingOnetimeGen == null) {
-            return 0;
-        }
-        return this.remainingOnetimeGen;
-    }
 }

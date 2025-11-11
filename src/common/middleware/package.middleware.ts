@@ -4,12 +4,8 @@ import { Request, Response, NextFunction } from 'express';
 @Injectable()
 export class PackageMiddleware implements NestMiddleware {
     use(req: Request, res: Response, next: NextFunction) {
-        const packageName = req.header('X-PACKAGE');
-        console.log('Package Name:', packageName);
+        // const packageName = req.header('X-PACKAGE');
 
-        if (packageName !== 'com.comickey.comicworld') {
-            throw new ForbiddenException('Invalid package');
-        }
         next();
     }
 }
