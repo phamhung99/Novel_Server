@@ -48,10 +48,10 @@ export class StoryGeneration {
     status: GenerationStatus;
 
     @Column({ name: 'ai_provider' })
-    aiProvider: string; // 'gpt' or 'grok'
+    aiProvider: string;
 
     @Column({ name: 'ai_model' })
-    aiModel: string; // e.g., 'gpt-4o-mini', 'grok-4'
+    aiModel: string;
 
     @Column({ type: 'jsonb' })
     prompt: Record<string, any>;
@@ -59,20 +59,26 @@ export class StoryGeneration {
     @Column({ type: 'jsonb', nullable: true })
     response: Record<string, any>;
 
-    @Column({ type: 'int', nullable: true })
+    @Column({ name: 'tokens_used', type: 'int', nullable: true })
     tokensUsed: number;
 
-    @Column({ type: 'decimal', precision: 10, scale: 4, nullable: true })
+    @Column({
+        name: 'cost_usd',
+        type: 'decimal',
+        precision: 10,
+        scale: 4,
+        nullable: true,
+    })
     costUsd: number;
 
-    @Column({ type: 'int' })
-    chapterNumber: number; // Chapter number being generated
+    @Column({ name: 'chapter_number', type: 'int' })
+    chapterNumber: number;
 
-    @Column({ type: 'text', nullable: true })
+    @Column({ name: 'error_message', type: 'text', nullable: true })
     errorMessage: string;
 
     @Column({ type: 'jsonb', nullable: true })
-    metadata: Record<string, any>; // Additional metadata
+    metadata: Record<string, any>;
 
     // Story Attributes - persisted for reuse across chapters
     @Column({ nullable: true })
@@ -84,28 +90,28 @@ export class StoryGeneration {
     @Column({ type: 'simple-array', nullable: true })
     genres?: string[];
 
-    @Column({ nullable: true })
+    @Column({ name: 'main_character', nullable: true })
     mainCharacter?: string;
 
-    @Column({ type: 'text', nullable: true })
+    @Column({ name: 'sub_characters', type: 'text', nullable: true })
     subCharacters?: string;
 
     @Column({ nullable: true })
     setting?: string;
 
-    @Column({ nullable: true })
+    @Column({ name: 'plot_theme', nullable: true })
     plotTheme?: string;
 
-    @Column({ nullable: true })
+    @Column({ name: 'writing_style', nullable: true })
     writingStyle?: string;
 
-    @Column({ type: 'text', nullable: true })
+    @Column({ name: 'additional_context', type: 'text', nullable: true })
     additionalContext?: string;
 
-    @CreateDateColumn({ name: 'created_at' })
+    @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
     createdAt: Date;
 
-    @UpdateDateColumn({ name: 'updated_at' })
+    @UpdateDateColumn({ name: 'updated_at', type: 'timestamptz' })
     updatedAt: Date;
 
     @OneToMany(

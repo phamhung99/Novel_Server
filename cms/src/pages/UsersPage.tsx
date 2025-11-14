@@ -1,4 +1,4 @@
-import { Box, CircularProgress, Typography } from '@mui/material';
+import { Box, Typography } from '@mui/material';
 import { DataGrid, type GridColDef } from '@mui/x-data-grid';
 import { useEffect, useState } from 'react';
 import { fetchUsers, type User } from '../api/userApi';
@@ -42,7 +42,7 @@ export default function UsersPage() {
     };
 
     useEffect(() => {
-        loadUsers(page, pageSize);
+        loadUsers({ page, pageSize });
     }, [page, pageSize]);
 
     const columns: GridColDef[] = [

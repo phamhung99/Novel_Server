@@ -2,7 +2,10 @@ import { Drawer, List, ListItemButton, ListItemText } from '@mui/material';
 import { useLocation } from 'react-router-dom';
 import { ROUTES } from '../constants/app.constants';
 
-const menuItems = [{ label: 'Manage Users', path: ROUTES.USERS }];
+const menuItems = [
+    { label: 'Manage Users', path: ROUTES.USERS },
+    { label: 'Upload Story', path: ROUTES.STORY_UPLOAD },
+];
 
 export default function Sidebar({
     onNavigate,

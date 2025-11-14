@@ -1,40 +1,18 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import {
-    fetchUsers,
-    createUser,
-    updateUser,
-    deleteUser,
-    type User,
-} from '../api/userApi';
+import { useQuery } from '@tanstack/react-query';
+import { fetchUsers } from '../api/userApi';
 
-export const useUsers = () => {
-    const queryClient = useQueryClient();
-
+export const useUsers = (
+    page: number,
+    pageSize: number,
+    field?: string,
+    sort?: 'asc' | 'desc',
+) => {
     const usersQuery = useQuery({
-        queryKey: ['users'],
-        queryFn: fetchUsers,
-    });
-
-    const createMutation = useMutation({
-        mutationFn: createUser,
-        onSuccess: () => queryClient.invalidateQueries({ queryKey: ['users'] }),
-    });
-
-    const updateMutation = useMutation({
-        mutationFn: ({ id, data }: { id: string; data: Partial<User> }) =>
-            updateUser(id, data),
-        onSuccess: () => queryClient.invalidateQueries({ queryKey: ['users'] }),
-    });
-
-    const deleteMutation = useMutation({
-        mutationFn: deleteUser,
-        onSuccess: () => queryClient.invalidateQueries({ queryKey: ['users'] }),
+        queryKey: ['users', page, pageSize, field, sort],
+        queryFn: () => fetchUsers({ page: page + 1, pageSize, field, sort }),
     });
 
     return {
         usersQuery,
-        createMutation,
-        updateMutation,
-        deleteMutation,
     };
 };

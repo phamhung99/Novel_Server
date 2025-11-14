@@ -35,30 +35,36 @@ export class ChapterGeneration {
     @JoinColumn({ name: 'chapter_id' })
     chapter: Chapter;
 
-    @Column({ type: 'int' })
+    @Column({ name: 'chapter_number', type: 'int' })
     chapterNumber: number;
 
-    @Column({ type: 'text', nullable: true })
+    @Column({ name: 'prompt', type: 'text', nullable: true })
     prompt: string;
 
-    @Column({ type: 'text', nullable: true })
+    @Column({ name: 'generated_content', type: 'text', nullable: true })
     generatedContent: string;
 
-    @Column({ type: 'jsonb', nullable: true })
-    structure: Record<string, any>; // Parsed chapter structure
+    @Column({ name: 'structure', type: 'jsonb', nullable: true })
+    structure: Record<string, any>;
 
-    @Column({ type: 'int', nullable: true })
+    @Column({ name: 'tokens_used', type: 'int', nullable: true })
     tokensUsed: number;
 
-    @Column({ type: 'decimal', precision: 10, scale: 4, nullable: true })
+    @Column({
+        name: 'cost_usd',
+        type: 'decimal',
+        precision: 10,
+        scale: 4,
+        nullable: true,
+    })
     costUsd: number;
 
-    @Column({ type: 'text', nullable: true })
+    @Column({ name: 'error_message', type: 'text', nullable: true })
     errorMessage: string;
 
-    @CreateDateColumn({ name: 'created_at' })
+    @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
     createdAt: Date;
 
-    @UpdateDateColumn({ name: 'updated_at' })
+    @UpdateDateColumn({ name: 'updated_at', type: 'timestamptz' })
     updatedAt: Date;
 }
