@@ -32,6 +32,7 @@ import { StoryModule } from './story/story.module';
                 username: configService.get<string>('database.username'),
                 password: configService.get<string>('database.password'),
                 database: configService.get<string>('database.database'),
+                schema: configService.get<string>('database.schema'),
                 synchronize: configService.get<boolean>('database.synchronize'),
                 entities: [__dirname + '/**/*.entity{.ts,.js}'],
                 autoLoadEntities: true,

@@ -18,6 +18,9 @@ export class CreateStoryDto {
     genres?: string[];
 
     @IsOptional()
+    is_public?: boolean;
+
+    @IsOptional()
     @IsUrl()
     coverImage?: string;
 }
