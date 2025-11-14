@@ -31,6 +31,7 @@ import {
     GenerateChapterOnDemandResponseDto,
 } from './dto/generate-story-outline.dto';
 import { StoryGenerationApiService } from '../ai/providers/story-generation-api.service';
+import { StoryVisibility } from 'src/common/enums/story-visibility.enum';
 
 @Injectable()
 export class StoryService {
@@ -67,7 +68,7 @@ export class StoryService {
     async findPublicStories(): Promise<Story[]> {
         return this.storyRepository.find({
             where: {
-                isPublic: true,
+                visibility: StoryVisibility.PUBLIC,
                 status: StoryStatus.PUBLISHED,
             },
             relations: ['author', 'chapters'],
@@ -241,7 +242,7 @@ export class StoryService {
 
         // Approve = Publish directly
         story.status = StoryStatus.PUBLISHED;
-        story.isPublic = true;
+        story.visibility = StoryVisibility.PUBLIC;
         story.approvedBy = adminId;
         story.approvedAt = new Date();
         story.rejectionReason = null;
@@ -261,7 +262,7 @@ export class StoryService {
         }
 
         story.status = StoryStatus.REJECTED;
-        story.isPublic = false;
+        story.visibility = StoryVisibility.PRIVATE;
         story.approvedBy = adminId;
         story.approvedAt = new Date();
         story.rejectionReason = reason;
@@ -277,8 +278,8 @@ export class StoryService {
         }
 
         // Unpublish returns to private state
-        story.status = StoryStatus.PRIVATE;
-        story.isPublic = false;
+        story.status = StoryStatus.DRAFT;
+        story.visibility = StoryVisibility.PRIVATE;
 
         return this.storyRepository.save(story);
     }

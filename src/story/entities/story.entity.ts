@@ -15,6 +15,7 @@ import { StoryType } from '../../common/enums/story-type.enum';
 import { StoryStatus } from '../../common/enums/story-status.enum';
 import { Chapter } from './chapter.entity';
 import { StoryGeneration } from './story-generation.entity';
+import { StoryVisibility } from 'src/common/enums/story-visibility.enum';
 
 @Entity('story')
 export class Story {
@@ -62,12 +63,16 @@ export class Story {
     @Column({
         type: 'enum',
         enum: StoryStatus,
-        default: StoryStatus.PRIVATE,
+        default: StoryStatus.DRAFT,
     })
     status: StoryStatus;
 
-    @Column({ name: 'is_public', default: false })
-    isPublic: boolean;
+    @Column({
+        type: 'enum',
+        enum: StoryVisibility,
+        default: StoryVisibility.PRIVATE,
+    })
+    visibility: StoryVisibility;
 
     @Column({ name: 'approved_by', nullable: true })
     approvedBy: string;

@@ -5,48 +5,97 @@ import {
     CircularProgress,
     TextField,
     Typography,
+    MenuItem,
+    Select,
+    InputLabel,
+    FormControl,
+    OutlinedInput,
+    Checkbox,
+    ListItemText,
 } from '@mui/material';
-import axios from 'axios';
+import axios from '../api/axios';
 
-interface StoryForm {
+const StoryType = {
+    NOVEL: 'novel',
+    SHORT_STORY: 'short_story',
+    FANFICTION: 'fanfiction',
+    POETRY: 'poetry',
+    COMIC: 'comic',
+} as const;
+
+type StoryType = (typeof StoryType)[keyof typeof StoryType];
+
+const StoryVisibility = {
+    PUBLIC: 'public',
+    PRIVATE: 'private',
+    UNLISTED: 'unlisted',
+} as const;
+
+type StoryVisibility = (typeof StoryVisibility)[keyof typeof StoryVisibility];
+
+const GENRES = ['Action', 'Romance', 'Fantasy', 'Sci-Fi', 'Horror', 'Comedy'];
+
+interface CreateStoryForm {
     title: string;
-    description: string;
-    coverFile?: File;
+    synopsis?: string;
+    type: StoryType;
+    genres: string[];
+    visibility: StoryVisibility;
+    coverImage?: File;
 }
 
 export default function StoryUploadPage() {
-    const [form, setForm] = useState<StoryForm>({ title: '', description: '' });
+    const [form, setForm] = useState<CreateStoryForm>({
+        title: '',
+        synopsis: '',
+        type: StoryType.NOVEL,
+        genres: [],
+        visibility: StoryVisibility.PUBLIC,
+    });
     const [uploading, setUploading] = useState(false);
     const [successMsg, setSuccessMsg] = useState('');
     const [errorMsg, setErrorMsg] = useState('');
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files[0]) {
-            setForm({ ...form, coverFile: e.target.files[0] });
+            setForm({ ...form, coverImage: e.target.files[0] });
         }
     };
 
     const handleSubmit = async () => {
-        if (!form.title || !form.description) {
-            setErrorMsg('Title and description are required');
+        if (!form.title || !form.type || !form.visibility) {
+            setErrorMsg('Please fill all required fields');
             return;
         }
 
         const formData = new FormData();
         formData.append('title', form.title);
-        formData.append('description', form.description);
-        if (form.coverFile) formData.append('cover', form.coverFile);
+        if (form.synopsis) formData.append('synopsis', form.synopsis);
+        formData.append('type', form.type);
+        formData.append('visibility', form.visibility);
+        form.genres.forEach((g) => formData.append('genres[]', g));
+        if (form.coverImage) formData.append('coverImage', form.coverImage);
 
         try {
             setUploading(true);
             setErrorMsg('');
             setSuccessMsg('');
-            await axios.post('/api/stories', formData, {
+
+            await axios.post('/api/v1/story', formData, {
                 headers: { 'Content-Type': 'multipart/form-data' },
             });
-            setSuccessMsg('Story uploaded successfully!');
-            setForm({ title: '', description: '' });
+
+            setSuccessMsg('Story created successfully!');
+            setForm({
+                title: '',
+                synopsis: '',
+                type: StoryType.NOVEL,
+                genres: [],
+                visibility: StoryVisibility.PUBLIC,
+            });
         } catch (err: any) {
+            console.log(err?.response?.data?.message);
+
             setErrorMsg(err?.response?.data?.message || 'Upload failed');
         } finally {
             setUploading(false);
@@ -54,58 +103,118 @@ export default function StoryUploadPage() {
     };
 
     return (
-        <Box p={2} maxWidth={600} mx="auto">
+        <Box
+            p={4}
+            maxWidth={600}
+            mx="auto"
+            display="flex"
+            flexDirection="column"
+            gap={2}
+        >
             <Typography variant="h5" mb={2}>
-                Upload New Story
+                Create New Story
             </Typography>
 
             <TextField
                 label="Title"
                 value={form.title}
                 onChange={(e) => setForm({ ...form, title: e.target.value })}
+                required
                 fullWidth
-                sx={{ mb: 2 }}
             />
 
             <TextField
-                label="Description"
-                value={form.description}
-                onChange={(e) =>
-                    setForm({ ...form, description: e.target.value })
-                }
+                label="Synopsis"
+                value={form.synopsis}
+                onChange={(e) => setForm({ ...form, synopsis: e.target.value })}
                 multiline
                 rows={4}
                 fullWidth
-                sx={{ mb: 2 }}
             />
 
-            <Button variant="contained" component="label" sx={{ mb: 2 }}>
-                Upload Cover
+            <FormControl fullWidth>
+                <InputLabel>Type</InputLabel>
+                <Select
+                    value={form.type}
+                    onChange={(e) =>
+                        setForm({ ...form, type: e.target.value as StoryType })
+                    }
+                    label="Type"
+                >
+                    {Object.values(StoryType).map((t) => (
+                        <MenuItem key={t} value={t}>
+                            {t.charAt(0).toUpperCase() + t.slice(1)}
+                        </MenuItem>
+                    ))}
+                </Select>
+            </FormControl>
+
+            <FormControl fullWidth sx={{ mb: 2 }}>
+                <InputLabel>Genres</InputLabel>
+                <Select
+                    multiple
+                    value={form.genres}
+                    onChange={(e) =>
+                        setForm({
+                            ...form,
+                            genres:
+                                typeof e.target.value === 'string'
+                                    ? e.target.value.split(',')
+                                    : e.target.value,
+                        })
+                    }
+                    input={<OutlinedInput label="Genres" />}
+                    renderValue={(selected) => selected.join(', ')}
+                >
+                    {GENRES.map((genre) => (
+                        <MenuItem key={genre} value={genre}>
+                            <Checkbox checked={form.genres.includes(genre)} />
+                            <ListItemText primary={genre} />
+                        </MenuItem>
+                    ))}
+                </Select>
+            </FormControl>
+
+            <FormControl fullWidth>
+                <InputLabel>Visibility</InputLabel>
+                <Select
+                    value={form.visibility}
+                    onChange={(e) =>
+                        setForm({
+                            ...form,
+                            visibility: e.target.value as StoryVisibility,
+                        })
+                    }
+                    label="Visibility"
+                >
+                    {Object.values(StoryVisibility).map((v) => (
+                        <MenuItem key={v} value={v}>
+                            {v.charAt(0).toUpperCase() + v.slice(1)}
+                        </MenuItem>
+                    ))}
+                </Select>
+            </FormControl>
+
+            <Button variant="contained" component="label">
+                Upload Cover Image
                 <input type="file" hidden onChange={handleFileChange} />
             </Button>
-
-            {form.coverFile && (
-                <Typography mb={2}>Selected: {form.coverFile.name}</Typography>
+            {form.coverImage && (
+                <Typography>Selected: {form.coverImage.name}</Typography>
             )}
 
             {uploading ? (
                 <CircularProgress />
             ) : (
                 <Button variant="contained" onClick={handleSubmit}>
-                    Submit
+                    Create Story
                 </Button>
             )}
 
             {successMsg && (
-                <Typography color="success.main" mt={2}>
-                    {successMsg}
-                </Typography>
+                <Typography color="success.main">{successMsg}</Typography>
             )}
-            {errorMsg && (
-                <Typography color="error.main" mt={2}>
-                    {errorMsg}
-                </Typography>
-            )}
+            {errorMsg && <Typography color="error.main">{errorMsg}</Typography>}
         </Box>
     );
 }

@@ -1,5 +1,6 @@
 import { IsString, IsOptional, IsEnum, IsArray, IsUrl } from 'class-validator';
 import { StoryType } from '../../common/enums/story-type.enum';
+import { StoryVisibility } from 'src/common/enums/story-visibility.enum';
 
 export class CreateStoryDto {
     @IsString()
@@ -17,8 +18,8 @@ export class CreateStoryDto {
     @IsString({ each: true })
     genres?: string[];
 
-    @IsOptional()
-    is_public?: boolean;
+    @IsEnum(StoryVisibility)
+    visibility: StoryVisibility;
 
     @IsOptional()
     @IsUrl()
