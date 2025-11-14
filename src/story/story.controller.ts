@@ -9,6 +9,8 @@ import {
     Param,
     Headers,
     BadRequestException,
+    UseInterceptors,
+    UploadedFile,
 } from '@nestjs/common';
 import { StoryService } from './story.service';
 import { CreateStoryDto } from './dto/create-story.dto';
@@ -28,10 +30,43 @@ import {
     GenerateChapterOnDemandDto,
     GenerateChapterOnDemandResponseDto,
 } from './dto/generate-story-outline.dto';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { diskStorage } from 'multer';
+import { extname } from 'path';
+import { existsSync, mkdirSync } from 'fs';
 
 @Controller('story')
 export class StoryController {
     constructor(private readonly storyService: StoryService) {}
+
+    @Post('upload-cover')
+    @UseInterceptors(
+        FileInterceptor('image', {
+            storage: diskStorage({
+                destination: tmpDir,
+                filename: (req, file, cb) => {
+                    const uniqueSuffix =
+                        Date.now() + '-' + Math.round(Math.random() * 1e9);
+                    cb(
+                        null,
+                        `${file.fieldname}-${uniqueSuffix}${extname(file.originalname)}`,
+                    );
+                },
+            }),
+        }),
+    )
+    async uploadCover(
+        @Headers('x-user-id') userId: string,
+        @UploadedFile() file: Express.Multer.File,
+    ) {
+        if (!userId) {
+            throw new BadRequestException('userId is required');
+        }
+        if (!file) {
+            throw new BadRequestException('No file uploaded');
+        }
+        return this.storyService.uploadCover(userId, file);
+    }
 
     @Post()
     async createStory(
