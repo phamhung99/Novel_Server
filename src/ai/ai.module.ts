@@ -2,8 +2,6 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AiController } from './ai.controller';
 import { AiService } from './ai.service';
-import { OpenAIApiService } from './providers/openai-api.service';
-import { GeminiApiService } from './providers/gemini-api.service';
 import { UserModule } from 'src/user/user.module';
 import { GptApiService } from './providers/gpt-api.service';
 import { GrokApiService } from './providers/grok-api.service';
@@ -15,8 +13,6 @@ import { StoryGeneration } from '../story/entities/story-generation.entity';
     controllers: [AiController],
     providers: [
         AiService,
-        OpenAIApiService,
-        GeminiApiService,
         GptApiService,
         GrokApiService,
         StoryGenerationProviderFactory,

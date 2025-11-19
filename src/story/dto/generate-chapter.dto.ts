@@ -52,7 +52,7 @@ export class ChapterStructureResponseDto {
  */
 export class GenerateCompleteChapterDto {
     @IsString()
-    storyId: string;
+    storyId?: string;
 
     @IsNumber()
     chapterNumber: number;

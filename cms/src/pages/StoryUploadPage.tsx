@@ -1,303 +1,259 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import {
     Box,
     Button,
-    CircularProgress,
     TextField,
     Typography,
     MenuItem,
     Select,
     InputLabel,
     FormControl,
-    OutlinedInput,
-    Checkbox,
-    ListItemText,
+    CircularProgress,
+    Paper,
 } from '@mui/material';
-import axios from '../api/axios';
+import axios from '../api/axios'; // cấu hình axios với baseURL của bạn
 
-const StoryType = {
-    NOVEL: 'novel',
-    SHORT_STORY: 'short_story',
-    FANFICTION: 'fanfiction',
-    POETRY: 'poetry',
-    COMIC: 'comic',
-} as const;
+const genresList = ['Ngôn Tình', 'Hệ Thống', 'Nữ Cường', 'Hài Hước', 'Kinh Dị'];
 
-type StoryType = (typeof StoryType)[keyof typeof StoryType];
+const userId = 'thieptrinh01156789';
 
-const StoryVisibility = {
-    PUBLIC: 'public',
-    PRIVATE: 'private',
-    UNLISTED: 'unlisted',
-} as const;
+const StoryUploadPage: React.FC = () => {
+    // Step management
+    const [step, setStep] = useState<1 | 2>(1);
 
-type StoryVisibility = (typeof StoryVisibility)[keyof typeof StoryVisibility];
+    // Story creation state
+    const [storyPrompt, setStoryPrompt] = useState('');
+    const [genres, setGenres] = useState<string[]>([]);
+    const [numberOfChapters, setNumberOfChapters] = useState<number>(1);
+    const [aiProvider, setAiProvider] = useState<'grok' | 'gpt'>('grok');
 
-const GENRES = ['Action', 'Romance', 'Fantasy', 'Sci-Fi', 'Horror', 'Comedy'];
+    const [storyResponse, setStoryResponse] = useState<any>(null);
+    const [loading, setLoading] = useState(false);
 
-export default function StoryWizardPage() {
-    const [step, setStep] = useState(1);
+    // Chapter creation state
+    const [chapterNumber, setChapterNumber] = useState(1);
+    const [wordCount, setWordCount] = useState<number>(1300);
+    const [chapterResponse, setChapterResponse] = useState<any>(null);
 
-    // Step 1
-    const [coverFile, setCoverFile] = useState<File | null>(null);
-    const [coverUrl, setCoverUrl] = useState('');
-    const [uploadingCover, setUploadingCover] = useState(false);
-
-    // Step 2
-    const [form, setForm] = useState({
-        title: '',
-        synopsis: '',
-        type: StoryType.NOVEL as StoryType,
-        genres: [] as string[],
-        visibility: StoryVisibility.PUBLIC as StoryVisibility,
-    });
-
-    const [submitting, setSubmitting] = useState(false);
-    const [successMsg, setSuccessMsg] = useState('');
-    const [errorMsg, setErrorMsg] = useState('');
-
-    // ===== Step 1: Upload cover image =====
-    const handleCoverChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (e.target.files && e.target.files[0]) {
-            setCoverFile(e.target.files[0]);
-        }
-    };
-
-    const uploadCover = async () => {
-        if (!coverFile) return;
-        const data = new FormData();
-        data.append('coverImage', coverFile);
-
-        try {
-            setUploadingCover(true);
-            setErrorMsg('');
-            setSuccessMsg('');
-
-            // giả sử BE trả về { url: "https://..." }
-            const res = await axios.post('/api/v1/story/upload-cover', data, {
-                headers: { 'Content-Type': 'multipart/form-data' },
-            });
-
-            setCoverUrl(res.data.url);
-            setSuccessMsg('Cover uploaded successfully!');
-            setStep(2);
-        } catch (err: any) {
-            console.error(err);
-            setErrorMsg(err?.response?.data?.message || 'Upload failed');
-        } finally {
-            setUploadingCover(false);
-        }
-    };
-
-    // ===== Step 2: Submit story form =====
-    const handleSubmitStory = async () => {
-        if (!form.title || !form.type || !form.visibility) {
-            setErrorMsg('Please fill all required fields');
+    // Handlers
+    const handleInitializeStory = async () => {
+        if (!storyPrompt || genres.length === 0) {
+            alert('Vui lòng nhập prompt và chọn ít nhất 1 genre');
             return;
         }
 
+        setLoading(true);
         try {
-            setSubmitting(true);
-            setErrorMsg('');
-            setSuccessMsg('');
-
-            await axios.post('/api/v1/story', {
-                ...form,
-                coverImage: coverUrl, // dùng url từ bước 1
-            });
-
-            setSuccessMsg('Story created successfully!');
-            setForm({
-                title: '',
-                synopsis: '',
-                type: StoryType.NOVEL,
-                genres: [],
-                visibility: StoryVisibility.PUBLIC,
-            });
-            setCoverFile(null);
-            setCoverUrl('');
-            setStep(1);
+            const res = await axios.post(
+                '/generate/initialize',
+                {
+                    storyPrompt,
+                    genres,
+                    numberOfChapters,
+                    aiProvider,
+                },
+                {
+                    headers: {
+                        'x-user-id': userId,
+                    },
+                },
+            );
+            setStoryResponse(res.data);
+            setStep(2);
         } catch (err: any) {
             console.error(err);
-            setErrorMsg(err?.response?.data?.message || 'Submission failed');
+            alert('Lỗi khi tạo story');
         } finally {
-            setSubmitting(false);
+            setLoading(false);
+        }
+    };
+
+    const handleGenerateChapter = async () => {
+        if (!storyResponse) return;
+
+        setLoading(true);
+        try {
+            const res = await axios.post(
+                `/${storyResponse.storyId}/generate/chapter-on-demand`,
+                {
+                    chapterNumber,
+                    wordCount,
+                    aiProvider,
+                },
+            );
+            setChapterResponse(res.data);
+        } catch (err: any) {
+            console.error(err);
+            alert('Lỗi khi tạo chapter');
+        } finally {
+            setLoading(false);
         }
     };
 
     return (
-        <Box
-            p={4}
-            maxWidth={600}
-            mx="auto"
-            display="flex"
-            flexDirection="column"
-            gap={2}
-        >
-            <Typography variant="h5" mb={2}>
-                {step === 1
-                    ? 'Step 1: Upload Cover Image'
-                    : 'Step 2: Fill Story Details'}
+        <Box p={4}>
+            <Typography variant="h4" mb={3}>
+                {step === 1 ? 'Tạo Story' : 'Tạo Chapter'}
             </Typography>
 
             {step === 1 && (
-                <>
-                    <Button variant="contained" component="label">
-                        Select Cover Image
-                        <input
-                            type="file"
-                            hidden
-                            onChange={handleCoverChange}
-                        />
-                    </Button>
-                    {coverFile && (
-                        <Typography>Selected: {coverFile.name}</Typography>
-                    )}
-                    {coverFile && (
-                        <Box mt={2}>
-                            {uploadingCover ? (
-                                <CircularProgress />
-                            ) : (
-                                <Button
-                                    variant="contained"
-                                    onClick={uploadCover}
-                                >
-                                    Upload & Next
-                                </Button>
-                            )}
-                        </Box>
-                    )}
-                </>
-            )}
-
-            {step === 2 && (
-                <>
-                    {coverUrl && (
-                        <Box mb={2}>
-                            <Typography>Cover Preview:</Typography>
-                            <img
-                                src={coverUrl}
-                                alt="cover"
-                                style={{
-                                    width: '100%',
-                                    maxHeight: 300,
-                                    objectFit: 'contain',
-                                }}
-                            />
-                        </Box>
-                    )}
-
+                <Paper
+                    sx={{
+                        p: 3,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: 2,
+                    }}
+                >
                     <TextField
-                        label="Title"
-                        value={form.title}
-                        onChange={(e) =>
-                            setForm({ ...form, title: e.target.value })
-                        }
-                        required
-                        fullWidth
-                    />
-                    <TextField
-                        label="Synopsis"
-                        value={form.synopsis}
-                        onChange={(e) =>
-                            setForm({ ...form, synopsis: e.target.value })
-                        }
-                        multiline
-                        rows={4}
+                        label="Story Prompt"
+                        value={storyPrompt}
+                        onChange={(e) => setStoryPrompt(e.target.value)}
                         fullWidth
                     />
 
-                    <FormControl fullWidth sx={{ mt: 2 }}>
-                        <InputLabel>Type</InputLabel>
-                        <Select
-                            value={form.type}
-                            onChange={(e) =>
-                                setForm({
-                                    ...form,
-                                    type: e.target.value as StoryType,
-                                })
-                            }
-                            label="Type"
-                        >
-                            {Object.values(StoryType).map((t) => (
-                                <MenuItem key={t} value={t}>
-                                    {t.charAt(0).toUpperCase() + t.slice(1)}
-                                </MenuItem>
-                            ))}
-                        </Select>
-                    </FormControl>
-
-                    <FormControl fullWidth sx={{ mt: 2 }}>
+                    <FormControl fullWidth>
                         <InputLabel>Genres</InputLabel>
                         <Select
                             multiple
-                            value={form.genres}
+                            value={genres}
                             onChange={(e) =>
-                                setForm({
-                                    ...form,
-                                    genres:
-                                        typeof e.target.value === 'string'
-                                            ? e.target.value.split(',')
-                                            : e.target.value,
-                                })
+                                setGenres(
+                                    typeof e.target.value === 'string'
+                                        ? e.target.value.split(',')
+                                        : e.target.value,
+                                )
                             }
-                            input={<OutlinedInput label="Genres" />}
-                            renderValue={(selected) => selected.join(', ')}
+                            renderValue={(selected) =>
+                                (selected as string[]).join(', ')
+                            }
                         >
-                            {GENRES.map((genre) => (
-                                <MenuItem key={genre} value={genre}>
-                                    <Checkbox
-                                        checked={form.genres.includes(genre)}
-                                    />
-                                    <ListItemText primary={genre} />
+                            {genresList.map((g) => (
+                                <MenuItem key={g} value={g}>
+                                    {g}
                                 </MenuItem>
                             ))}
                         </Select>
                     </FormControl>
 
-                    <FormControl fullWidth sx={{ mt: 2 }}>
-                        <InputLabel>Visibility</InputLabel>
+                    <TextField
+                        label="Number of Chapters"
+                        type="number"
+                        inputProps={{ min: 1, max: 10 }}
+                        value={numberOfChapters}
+                        onChange={(e) =>
+                            setNumberOfChapters(Number(e.target.value))
+                        }
+                    />
+
+                    <FormControl fullWidth>
+                        <InputLabel>AI Provider</InputLabel>
                         <Select
-                            value={form.visibility}
+                            value={aiProvider}
                             onChange={(e) =>
-                                setForm({
-                                    ...form,
-                                    visibility: e.target
-                                        .value as StoryVisibility,
-                                })
+                                setAiProvider(e.target.value as 'grok' | 'gpt')
                             }
-                            label="Visibility"
                         >
-                            {Object.values(StoryVisibility).map((v) => (
-                                <MenuItem key={v} value={v}>
-                                    {v.charAt(0).toUpperCase() + v.slice(1)}
-                                </MenuItem>
-                            ))}
+                            <MenuItem value="grok">Grok</MenuItem>
+                            <MenuItem value="gpt">GPT</MenuItem>
                         </Select>
                     </FormControl>
 
-                    <Box mt={3} display="flex" gap={2}>
-                        <Button variant="outlined" onClick={() => setStep(1)}>
-                            Back
-                        </Button>
-                        {submitting ? (
-                            <CircularProgress />
-                        ) : (
-                            <Button
-                                variant="contained"
-                                onClick={handleSubmitStory}
-                            >
-                                Submit Story
-                            </Button>
-                        )}
-                    </Box>
-                </>
+                    <Button
+                        variant="contained"
+                        onClick={handleInitializeStory}
+                        disabled={loading}
+                    >
+                        {loading ? <CircularProgress size={24} /> : 'Tạo Story'}
+                    </Button>
+                </Paper>
             )}
 
-            {successMsg && (
-                <Typography color="success.main">{successMsg}</Typography>
+            {step === 2 && storyResponse && (
+                <Paper
+                    sx={{
+                        p: 3,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: 2,
+                    }}
+                >
+                    <Typography variant="h6">Story Created:</Typography>
+                    <Typography>Title: {storyResponse.title}</Typography>
+                    <Typography>Synopsis: {storyResponse.synopsis}</Typography>
+                    <Typography>
+                        Genres: {storyResponse.genres.join(', ')}
+                    </Typography>
+                    <Typography>
+                        Number of Chapters: {storyResponse.numberOfChapters}
+                    </Typography>
+
+                    <TextField
+                        label="Chapter Number"
+                        type="number"
+                        inputProps={{
+                            min: 1,
+                            max: storyResponse.numberOfChapters,
+                        }}
+                        value={chapterNumber}
+                        onChange={(e) =>
+                            setChapterNumber(Number(e.target.value))
+                        }
+                    />
+                    <TextField
+                        label="Word Count"
+                        type="number"
+                        value={wordCount}
+                        onChange={(e) => setWordCount(Number(e.target.value))}
+                    />
+                    <FormControl fullWidth>
+                        <InputLabel>AI Provider</InputLabel>
+                        <Select
+                            value={aiProvider}
+                            onChange={(e) =>
+                                setAiProvider(e.target.value as 'grok' | 'gpt')
+                            }
+                        >
+                            <MenuItem value="grok">Grok</MenuItem>
+                            <MenuItem value="gpt">GPT</MenuItem>
+                        </Select>
+                    </FormControl>
+
+                    <Button
+                        variant="contained"
+                        onClick={handleGenerateChapter}
+                        disabled={loading}
+                    >
+                        {loading ? (
+                            <CircularProgress size={24} />
+                        ) : (
+                            'Tạo Chapter'
+                        )}
+                    </Button>
+
+                    {chapterResponse && (
+                        <Box mt={3}>
+                            <Typography variant="h6">
+                                Chapter Generated:
+                            </Typography>
+                            <Typography>
+                                Title: {chapterResponse.title}
+                            </Typography>
+                            <Typography>
+                                Content: {chapterResponse.content}
+                            </Typography>
+                            <Typography>
+                                Summary: {chapterResponse.summary}
+                            </Typography>
+                            <Typography>
+                                Image Prompt: {chapterResponse.imagePrompt}
+                            </Typography>
+                        </Box>
+                    )}
+                </Paper>
             )}
-            {errorMsg && <Typography color="error.main">{errorMsg}</Typography>}
         </Box>
     );
-}
+};
+
+export default StoryUploadPage;

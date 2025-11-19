@@ -7,3 +7,15 @@ export enum GenerationType {
     IMAGE = 'image',
     TEXT = 'text',
 }
+
+export enum AllowedFileMimeTypes {
+    TXT = 'text/plain',
+    DOCX = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+}
+
+export enum AllowedImageMimeTypes {
+    JPEG = 'image/jpeg',
+    PNG = 'image/png',
+    JPG = 'image/jpg',
+    WEBP = 'image/webp',
+}

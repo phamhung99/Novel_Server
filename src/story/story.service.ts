@@ -87,7 +87,7 @@ export class StoryService {
     async findStoryById(id: string): Promise<Story> {
         const story = await this.storyRepository.findOne({
             where: { id },
-            relations: ['author', 'chapters'],
+            relations: ['author', 'chapters', 'generation'],
         });
 
         if (!story) {
@@ -148,6 +148,20 @@ export class StoryService {
             storyId: story.id,
         });
         return this.chapterRepository.save(chapter);
+    }
+
+    async createChaptersBulk(
+        storyId: string,
+        createChaptersDto: CreateChapterDto[],
+    ): Promise<Chapter[]> {
+        const story = await this.findStoryById(storyId);
+        const chapters = createChaptersDto.map((dto) =>
+            this.chapterRepository.create({
+                ...dto,
+                storyId: story.id,
+            }),
+        );
+        return this.chapterRepository.save(chapters);
     }
 
     async findChaptersByStory(storyId: string): Promise<Chapter[]> {

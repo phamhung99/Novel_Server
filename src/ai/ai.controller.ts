@@ -1,4 +1,4 @@
-import { Controller } from '@nestjs/common';
+import { Body, Controller, Post } from '@nestjs/common';
 import { AiService } from './ai.service';
 import { UserService } from 'src/user/user.service';
 

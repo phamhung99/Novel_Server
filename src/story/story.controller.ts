@@ -11,6 +11,7 @@ import {
     BadRequestException,
     UseInterceptors,
     UploadedFile,
+    ParseFilePipe,
 } from '@nestjs/common';
 import { StoryService } from './story.service';
 import { CreateStoryDto } from './dto/create-story.dto';
@@ -20,10 +21,7 @@ import { UpdateChapterDto } from './dto/update-chapter.dto';
 import { RequestPublicationDto } from './dto/request-publication.dto';
 import { ApproveStoryDto } from './dto/approve-story.dto';
 import { RejectStoryDto } from './dto/reject-story.dto';
-import {
-    GenerateChapterDto,
-    GenerateCompleteChapterDto,
-} from './dto/generate-chapter.dto';
+import { GenerateChapterDto } from './dto/generate-chapter.dto';
 import {
     InitializeStoryDto,
     InitializeStoryResponseDto,
@@ -32,8 +30,17 @@ import {
 } from './dto/generate-story-outline.dto';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
-import { extname } from 'path';
+import { extname, join } from 'path';
 import { existsSync, mkdirSync } from 'fs';
+import { MAX_FILE_SIZE_UPLOAD } from 'src/common/constants/app.constant';
+import { CustomMaxFileSizeValidator } from 'src/common/validators/custom-max-file-size.validator';
+import { MimeTypeValidator } from 'src/common/validators/mime-type.validator';
+import { AllowedImageMimeTypes } from 'src/common/enums/app.enum';
+
+const tmpDir =
+    process.env.NODE_ENV === 'production' ? '/tmp' : join(process.cwd(), 'tmp');
+
+if (!existsSync(tmpDir)) mkdirSync(tmpDir);
 
 @Controller('story')
 export class StoryController {
@@ -57,15 +64,27 @@ export class StoryController {
     )
     async uploadCover(
         @Headers('x-user-id') userId: string,
-        @UploadedFile() file: Express.Multer.File,
-    ) {
+        @UploadedFile(
+            new ParseFilePipe({
+                validators: [
+                    new CustomMaxFileSizeValidator(MAX_FILE_SIZE_UPLOAD),
+                    new MimeTypeValidator(AllowedImageMimeTypes),
+                ],
+                fileIsRequired: true,
+            }),
+        )
+        image: Express.Multer.File,
+    ): Promise<any> {
         if (!userId) {
             throw new BadRequestException('userId is required');
         }
-        if (!file) {
+        if (!image) {
             throw new BadRequestException('No file uploaded');
         }
-        return this.storyService.uploadCover(userId, file);
+        return {
+            filename: image.filename,
+            path: image.path,
+        };
     }
 
     @Post()
@@ -205,6 +224,14 @@ export class StoryController {
         @Body() createChapterDto: CreateChapterDto,
     ) {
         return this.storyService.createChapter(storyId, createChapterDto);
+    }
+
+    @Post(':storyId/chapter/bulk')
+    async createChaptersBulk(
+        @Param('storyId') storyId: string,
+        @Body() createChaptersDto: CreateChapterDto[],
+    ) {
+        return this.storyService.createChaptersBulk(storyId, createChaptersDto);
     }
 
     @Get(':storyId/chapter')
