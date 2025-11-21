@@ -21,16 +21,30 @@ import {
 } from './response-schemas';
 
 // Internal DTOs for 3-step flow
-interface StoryOutlineResponse {
+export interface StoryOutlineResponse {
+    // STORY
     title: string;
     synopsis: string;
     genres: string[];
+
+    setting: string;
     mainCharacter: string;
     subCharacters: string;
-    setting: string;
-    plotTheme: string;
+    antagonist: string;
+    motif: string;
+    tone: string;
     writingStyle: string;
-    additionalContext: string;
+    plotLogic: string;
+    hiddenTheme: string;
+
+    // OUTPUT_CHUONG_1
+    chapterTitle: string;
+    chapterContent: string;
+    chapterSummary: string;
+    chapterDirections: string[];
+    imagePrompt: string;
+
+    // EXTRA
     numberOfChapters: number;
     outline: string;
 }
@@ -73,31 +87,54 @@ export class StoryGenerationApiService {
         const aiProvider =
             this.storyGenerationProviderFactory.getProvider(providerName);
 
-        const systemPrompt = `Bạn là một người viết truyện chuyên nghiệp. 
-Nhiệm vụ của bạn là lên ý tưởng để viết một câu truyện theo chủ đề được cung cấp.
-Thể loại: ${dto.genres.join(', ')}`;
+        const systemPrompt = `Bạn là một tiểu thuyết gia bậc thầy kiêm chuyên gia cấu trúc truyện AI.`;
 
-        const userPrompt = `Lên ý tưởng để viết một câu truyện theo chủ đề: ${dto.storyIdea}
-Thể loại: ${dto.genres.join(', ')}
+        const userPrompt = `
+Dựa vào yêu cầu sau: ${dto.storyIdea}
 
-Cấu trúc khung truyện:
-1. **Khung truyện**:
-   - **Thể loại**: 
-   - **Bối cảnh**: 
-   - **Nhân vật chính**: 
-   - **Nhân vật phụ**: 
-   - **Chủ đề cốt truyện**: 
-   - **Số chương**: ${dto.numberOfChapters}
+Bạn hãy tự động xác định và sáng tạo:
+- **Thể loại truyện**
+- **Bối cảnh** (thời đại, thế giới, không gian)
+- **Nhân vật chính** (tên, giới tính, xuất thân, mục tiêu)
+- **Nhân vật phụ quan trọng**
+- **Phản diện** (phải tồn tại nhưng có thể ẩn danh hoặc gieo bóng)
+- **Phong cách viết** (điện ảnh, cổ phong, hiện đại, trữ tình…)
+- **Biểu tượng cảm xúc xuyên truyện (Motif)**
+- **Tông cảm xúc nền** (tò mò, cô độc, khát vọng, bi thương, hi vọng...)
 
-2. **Phong cách viết**:
-   - **Giọng văn**: 
-   - **Ngôn ngữ**: 
-   - **Góc nhìn**: 
-   - **Hội thoại**: 
-   - **Chi tiết giác quan**: 
-   - **Nhịp độ**: 
+**KIỂU MỞ TRUYỆN** (AI TỰ CHỌN hoặc tự sáng tạo phù hợp):
+1. **Hiện sinh** – triết lý, cô đơn → mở bằng suy tư, hành động nhỏ chứa mâu thuẫn.  
+2. **Hành động** – chiến đấu, hacker, sinh tồn → mở giữa hành động, nhịp nhanh.  
+3. **Sự kiện lạ** – công nghệ, huyền bí, xuyên không → mở bằng hiện tượng phi logic.  
+4. **Hồi ức / Giấc mơ** – cảm xúc, tình yêu, bi kịch → mở bằng giấc mơ hoặc ký ức nối hiện tại.  
+5. **Thế giới** – dị giới, tu tiên, hệ thống → mở bằng miêu tả thế giới, luật lệ, quy tắc.
 
-3. **Hướng dẫn bổ sung**:`;
+**YÊU CẦU NỘI DUNG**:
+1. Viết **Chương 1** (1300 từ), có tiêu đề riêng hấp dẫn.
+2. Cấu trúc: mở đầu – phát triển – cao trào nhẹ – kết mở sang chương 2.
+3. Giới thiệu **nhân vật chính**, **motif cảm xúc**, **bóng phản diện**.
+4. Không tóm tắt, viết miêu tả chi tiết và có nhịp cảm xúc.
+5. Trả về chi tiết **Chương 1** với chữ: "Chi tiết chương 1", không thêm từ khác.
+
+**OUTPUT_CHUONG_1**
+1. **Tiêu đề chương**  
+2. **Nội dung chi tiết** (1300 từ)  
+3. **Tóm tắt chương 1** (200 từ)  
+4. **Hai hướng phát triển chương 2**, ngắn ≤12 từ, dùng tên nhân vật cụ thể  
+5. **Prompt 20 từ tạo ảnh minh họa**
+
+**META_CHUONG_1**
+1. **Thể loại truyện**  
+2. **Bối cảnh**  
+3. **Nhân vật chính**  
+4. **Nhân vật phụ**  
+5. **Phản diện** (ẩn hoặc hiện)  
+6. **Motif cảm xúc**  
+7. **Tông cảm xúc nền**  
+8. **Phong cách viết**  
+9. **Logic phát triển**  
+10. **Chủ đề tiềm ẩn**
+`;
 
         try {
             const response = await aiProvider.generateContent(
@@ -369,37 +406,60 @@ Bạn có thể thêm vào cấu trúc các mục cần thiết để tăng tín
         numberOfChapters: number,
     ): StoryOutlineResponse {
         try {
-            // Try to parse as JSON first (from structured response)
+            // Try structured JSON first
+            console.log('content', content);
+
             const parsed = JSON.parse(content);
+            console.log('parsed', parsed);
+
             return {
                 title: parsed.title || 'Untitled',
                 synopsis: parsed.synopsis || '',
                 genres: Array.isArray(parsed.genres) ? parsed.genres : [],
+
+                setting: parsed.setting || '',
                 mainCharacter: parsed.mainCharacter || '',
                 subCharacters: parsed.subCharacters || '',
-                setting: parsed.setting || '',
-                plotTheme: parsed.plotTheme || '',
+                antagonist: parsed.antagonist || '',
+                motif: parsed.motif || '',
+                tone: parsed.tone || '',
                 writingStyle: parsed.writingStyle || '',
-                additionalContext: parsed.additionalContext || '',
+                plotLogic: parsed.plotLogic || '',
+                hiddenTheme: parsed.hiddenTheme || '',
+
+                chapterTitle: parsed.chapterTitle || '',
+                chapterContent: parsed.chapterContent || '',
+                chapterSummary: parsed.chapterSummary || '',
+                chapterDirections: Array.isArray(parsed.chapterDirections)
+                    ? parsed.chapterDirections
+                    : [],
+                imagePrompt: parsed.imagePrompt || '',
+
                 numberOfChapters,
                 outline: parsed.outline || content,
             };
         } catch (jsonError) {
-            // Fallback to text parsing if JSON parsing fails
             this.logger.warn(
                 'Failed to parse JSON response, falling back to text parsing',
             );
+
             try {
                 return {
                     title:
-                        this.extractSection(content, 'Tên truyện|Tiêu đề') ||
-                        'Untitled',
+                        this.extractSection(
+                            content,
+                            'Tên truyện|Tiêu đề|Title',
+                        ) || 'Untitled',
                     synopsis:
                         this.extractSection(content, 'Tóm tắt|Synopsis') || '',
+
                     genres: this.extractArraySection(
                         content,
                         'Thể loại|Genres',
                     ),
+
+                    setting:
+                        this.extractSection(content, 'Bối cảnh|Setting') || '',
                     mainCharacter:
                         this.extractSection(
                             content,
@@ -410,23 +470,57 @@ Bạn có thể thêm vào cấu trúc các mục cần thiết để tăng tín
                             content,
                             'Nhân vật phụ|Sub Characters',
                         ) || '',
-                    setting:
-                        this.extractSection(content, 'Bối cảnh|Setting') || '',
-                    plotTheme:
-                        this.extractSection(
-                            content,
-                            'Chủ đề cốt truyện|Plot Theme',
-                        ) || '',
+
+                    antagonist:
+                        this.extractSection(content, 'Phản diện|Antagonist') ||
+                        '',
+                    motif:
+                        this.extractSection(content, 'Motif cảm xúc|Motif') ||
+                        '',
+                    tone:
+                        this.extractSection(content, 'Tông cảm xúc nền|Tone') ||
+                        '',
                     writingStyle:
                         this.extractSection(
                             content,
                             'Phong cách viết|Writing Style',
                         ) || '',
-                    additionalContext:
+                    plotLogic:
                         this.extractSection(
                             content,
-                            'Hướng dẫn bổ sung|Additional Context',
+                            'Logic phát triển|Plot Logic',
                         ) || '',
+                    hiddenTheme:
+                        this.extractSection(
+                            content,
+                            'Chủ đề tiềm ẩn|Hidden Theme',
+                        ) || '',
+
+                    chapterTitle:
+                        this.extractSection(
+                            content,
+                            'Tiêu đề chương|Chapter Title',
+                        ) || '',
+                    chapterContent:
+                        this.extractSection(
+                            content,
+                            'Nội dung chi tiết|Chapter Content',
+                        ) || '',
+                    chapterSummary:
+                        this.extractSection(
+                            content,
+                            'Tóm tắt chương|Chapter Summary',
+                        ) || '',
+                    chapterDirections: this.extractArraySection(
+                        content,
+                        'Hướng phát triển|Chapter Directions',
+                    ),
+                    imagePrompt:
+                        this.extractSection(
+                            content,
+                            'Prompt tạo ảnh|minh họa|Image Prompt',
+                        ) || '',
+
                     numberOfChapters,
                     outline: content,
                 };
@@ -436,12 +530,20 @@ Bạn có thể thêm vào cấu trúc các mục cần thiết để tăng tín
                     title: 'Untitled',
                     synopsis: '',
                     genres: [],
+                    setting: '',
                     mainCharacter: '',
                     subCharacters: '',
-                    setting: '',
-                    plotTheme: '',
+                    antagonist: '',
+                    motif: '',
+                    tone: '',
                     writingStyle: '',
-                    additionalContext: '',
+                    plotLogic: '',
+                    hiddenTheme: '',
+                    chapterTitle: '',
+                    chapterContent: '',
+                    chapterSummary: '',
+                    chapterDirections: [],
+                    imagePrompt: '',
                     numberOfChapters,
                     outline: content,
                 };

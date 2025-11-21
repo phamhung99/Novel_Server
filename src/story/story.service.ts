@@ -21,14 +21,12 @@ import { StoryStatus } from '../common/enums/story-status.enum';
 import {
     GenerateChapterDto,
     ChapterStructureResponseDto,
-    GenerateCompleteChapterDto,
-    CompleteChapterResponseDto,
 } from './dto/generate-chapter.dto';
 import {
     InitializeStoryDto,
-    InitializeStoryResponseDto,
     GenerateChapterOnDemandDto,
     GenerateChapterOnDemandResponseDto,
+    InitializeStoryResponseDto,
 } from './dto/generate-story-outline.dto';
 import { StoryGenerationApiService } from '../ai/providers/story-generation-api.service';
 import { StoryVisibility } from 'src/common/enums/story-visibility.enum';
@@ -350,7 +348,7 @@ export class StoryService {
                     (dto.aiProvider || 'grok') === 'grok'
                         ? 'grok-4'
                         : 'gpt-4o-mini',
-                chapterNumber: 0, // Outline generation
+                chapterNumber: 1, // Outline generation
                 prompt: {
                     storyPrompt: dto.storyPrompt,
                     numberOfChapters: dto.numberOfChapters,
@@ -363,9 +361,12 @@ export class StoryService {
                 mainCharacter: outlineResponse.mainCharacter,
                 subCharacters: outlineResponse.subCharacters,
                 setting: outlineResponse.setting,
-                plotTheme: outlineResponse.plotTheme,
+                hiddenTheme: outlineResponse.hiddenTheme,
                 writingStyle: outlineResponse.writingStyle,
-                additionalContext: outlineResponse.additionalContext,
+                antagonist: outlineResponse.antagonist,
+                motif: outlineResponse.motif,
+                tone: outlineResponse.tone,
+                plotLogic: outlineResponse.plotLogic,
             });
 
             const savedStoryGeneration =
@@ -375,6 +376,31 @@ export class StoryService {
             savedStory.generation = savedStoryGeneration;
             await this.storyRepository.save(savedStory);
 
+            const chapterNumber = 1;
+
+            // Save chapter
+            const chapter = this.chapterRepository.create({
+                storyId: savedStory.id,
+                index: chapterNumber,
+                title: outlineResponse.title || 'chương 1',
+                content: outlineResponse.chapterContent || '',
+            });
+
+            const savedChapter = await this.chapterRepository.save(chapter);
+
+            // Create chapter generation record
+            const chapterGeneration = this.chapterGenerationRepository.create({
+                storyGenerationId: storyGeneration.id,
+                chapterId: savedChapter.id,
+                chapterNumber,
+                generatedContent: outlineResponse.chapterContent || '',
+                structure: {
+                    summary: outlineResponse.chapterSummary,
+                    imagePrompt: outlineResponse.imagePrompt,
+                },
+            });
+
+            await this.chapterGenerationRepository.save(chapterGeneration);
             return {
                 storyId: savedStory.id,
                 title: outlineResponse.title,
@@ -382,10 +408,13 @@ export class StoryService {
                 genres: outlineResponse.genres,
                 mainCharacter: outlineResponse.mainCharacter,
                 subCharacters: outlineResponse.subCharacters,
+                antagonist: outlineResponse.antagonist,
+                motif: outlineResponse.motif,
+                tone: outlineResponse.tone,
+                plotLogic: outlineResponse.plotLogic,
                 setting: outlineResponse.setting,
-                plotTheme: outlineResponse.plotTheme,
+                hiddenTheme: outlineResponse.hiddenTheme,
                 writingStyle: outlineResponse.writingStyle,
-                additionalContext: outlineResponse.additionalContext,
                 numberOfChapters: dto.numberOfChapters,
                 outline: outlineResponse.outline,
                 message:
@@ -510,8 +539,6 @@ export class StoryService {
         structure: ChapterStructureResponseDto;
         generation: ChapterGeneration;
     }> {
-        const story = await this.findStoryById(storyId);
-
         // Get existing chapters
         const existingChapters = await this.findChaptersByStory(storyId);
         const nextIndex = existingChapters.length + 1;

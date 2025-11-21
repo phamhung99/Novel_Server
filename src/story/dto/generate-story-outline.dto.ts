@@ -66,17 +66,24 @@ export class InitializeStoryDto {
  */
 export class InitializeStoryResponseDto {
     storyId: string;
+
     title: string;
     synopsis: string;
     genres: string[];
+
+    setting: string;
     mainCharacter: string;
     subCharacters: string;
-    setting: string;
-    plotTheme: string;
+    antagonist: string;
+    motif: string;
+    tone: string;
     writingStyle: string;
-    additionalContext: string;
+    plotLogic: string;
+    hiddenTheme: string;
+
     numberOfChapters: number;
     outline: string;
+
     message: string;
 }
 

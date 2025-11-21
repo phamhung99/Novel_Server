@@ -80,7 +80,7 @@ export class StoryGeneration {
     @Column({ type: 'jsonb', nullable: true })
     metadata: Record<string, any>;
 
-    // Story Attributes - persisted for reuse across chapters
+    // Story Attributes
     @Column({ nullable: true })
     title?: string;
 
@@ -90,6 +90,9 @@ export class StoryGeneration {
     @Column({ type: 'simple-array', nullable: true })
     genres?: string[];
 
+    @Column({ nullable: true })
+    setting?: string;
+
     @Column({ name: 'main_character', nullable: true })
     mainCharacter?: string;
 
@@ -97,14 +100,28 @@ export class StoryGeneration {
     subCharacters?: string;
 
     @Column({ nullable: true })
-    setting?: string;
+    antagonist?: string;
 
-    @Column({ name: 'plot_theme', nullable: true })
-    plotTheme?: string;
+    @Column({ nullable: true })
+    motif?: string;
+
+    @Column({ nullable: true })
+    tone?: string;
 
     @Column({ name: 'writing_style', nullable: true })
     writingStyle?: string;
 
+    @Column({ name: 'plot_logic', nullable: true })
+    plotLogic?: string;
+
+    @Column({ name: 'hidden_theme', type: 'text', nullable: true })
+    hiddenTheme?: string;
+
+    // removed in future versions
+    @Column({ name: 'plot_theme', type: 'text', nullable: true })
+    plotTheme?: string;
+
+    // removed in future versions
     @Column({ name: 'additional_context', type: 'text', nullable: true })
     additionalContext?: string;
 
