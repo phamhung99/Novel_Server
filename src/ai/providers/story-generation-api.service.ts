@@ -7,17 +7,14 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import {
+    ChapterStructureResponse,
     GenerateChapterDto,
-    ChapterStructureResponseDto,
-    GenerateCompleteChapterDto,
-    CompleteChapterResponseDto,
 } from '../../story/dto/generate-chapter.dto';
 import { StoryGenerationProviderFactory } from './story-generation-provider.factory';
 import { StoryGeneration } from '../../story/entities/story-generation.entity';
 import {
     STORY_OUTLINE_SCHEMA,
     CHAPTER_STRUCTURE_SCHEMA,
-    COMPLETE_CHAPTER_SCHEMA,
 } from './response-schemas';
 
 // Internal DTOs for 3-step flow
@@ -49,15 +46,6 @@ export interface StoryOutlineResponse {
     outline: string;
 }
 
-interface ChapterStructureResponse {
-    chapterNumber: number;
-    openingHook: string;
-    sceneSetting: string;
-    characterIntroduction: string;
-    plotDevelopment: string;
-    structure: string;
-}
-
 /**
  * Story Generation API Service
  * Orchestrates chapter generation using story generation AI providers
@@ -78,7 +66,7 @@ export class StoryGenerationApiService {
      * Internal method for 3-step async process
      */
     async generateStoryOutline(dto: {
-        storyIdea: string;
+        storyPrompt: string;
         genres: string[];
         numberOfChapters: number;
         aiProvider: string;
@@ -90,7 +78,7 @@ export class StoryGenerationApiService {
         const systemPrompt = `Bạn là một tiểu thuyết gia bậc thầy kiêm chuyên gia cấu trúc truyện AI.`;
 
         const userPrompt = `
-Dựa vào yêu cầu sau: ${dto.storyIdea}
+Dựa vào yêu cầu sau: ${dto.storyPrompt}
 
 Bạn hãy tự động xác định và sáng tạo:
 - **Thể loại truyện**
@@ -155,37 +143,52 @@ Bạn hãy tự động xác định và sáng tạo:
      * STEP 2: Generate chapter structure
      * Internal method for 3-step async process
      */
-    async generateChapterStructure(dto: {
+    async generateMiddleChapters(dto: {
         storyId: string;
         chapterNumber: number;
-        storyOutline: string;
-        previousChaptersSummaries?: string[];
+        previousChapterSummary: string;
         aiProvider: string;
+        storyPrompt: string;
+        direction: string;
+        previousChapterMeta: string;
     }): Promise<ChapterStructureResponse> {
         const providerName = dto.aiProvider || 'grok';
         const aiProvider =
             this.storyGenerationProviderFactory.getProvider(providerName);
 
-        const systemPrompt = `Bạn là một người viết truyện chuyên nghiệp. 
-Nhiệm vụ của bạn là xây dựng cấu trúc chương dựa trên dàn ý truyện đã được cung cấp.`;
+        const summaryWordLimit = 200 + (dto.chapterNumber - 1) * 50;
 
-        const previousChaptersContext =
-            dto.previousChaptersSummaries &&
-            dto.previousChaptersSummaries.length > 0
-                ? `\n**Tóm tắt các chương trước:**\n${dto.previousChaptersSummaries.map((summary, index) => `${index + 1}. ${summary}`).join('\n')}`
-                : '';
+        const systemPrompt = `Bạn là một tiểu thuyết gia bậc thầy kiêm chuyên gia cấu trúc truyện AI.`;
 
-        const userPrompt = `Từ dàn ý và tóm tắt nội dung chương trước xây dựng cấu trúc chương ${dto.chapterNumber} theo cấu trúc cơ bản sau. 
-Bạn có thể thêm vào cấu trúc các mục cần thiết để tăng tính hấp dẫn và phù hợp với nội dung.
+        const userPrompt = `Dựa trên dữ liệu: ${dto.storyPrompt}
+Tóm tắt nội dung câu chuyện trước đó: ${dto.previousChapterSummary || 'Không có dữ liệu trước đó.'}
 
-**Dàn ý truyện:**
-${dto.storyOutline}${previousChaptersContext}
+Viết Chương ${dto.chapterNumber} (1300 từ) tiếp tục phong cách và cảm xúc theo hướng ${dto.direction}.
+cùng các thông tin sau ${dto.previousChapterMeta}
 
-**Cấu trúc chương ${dto.chapterNumber}**:
-- **Mở đầu hấp dẫn**:
-- **Miêu tả bối cảnh**:
-- **Giới thiệu nhân vật**:
-- **Hướng phát triển cốt truyện**:`;
+**YÊU CẦU NỘI DUNG**
+1. Tiếp nối logic chương trước. Đảm bảo tính logic về mặt không gian, thời gian, địa điểm và nhân vật.
+2. Cho nhân vật đối mặt thử thách (thể chất, tâm lý hoặc triết lý).
+3. Phản diện nếu đã xuất hiện thì có đối đầu hoặc tương phản gián tiếp. Nếu chưa xuất hiện thì dần xuất hiện rõ rệt.
+4. Motif cảm xúc được tái hiện hoặc biến đổi.
+5. Kết chương bằng cao trào hoặc tiết lộ.
+
+**OUTPUT_CHUONG_${dto.chapterNumber}**
+1. **Tiêu đề chương**
+2. **Nội dung chi tiết** (1300 từ)
+3. **Tóm tắt TRUYỆN ĐẾN HIỆN TẠI** (≤ ${summaryWordLimit} từ) - PHẢI tổng hợp từ: (A) "Tóm tắt nội dung câu chuyện trước đó" + (B) "Nội dung chương ${dto.chapterNumber} vừa viết"
+4. **Hai hướng phát triển chương sau** - ngắn gọn, không quá 12 từ
+
+**META_CHUONG_${dto.chapterNumber}**
+1. **Phong cách viết**
+2. **Tông cảm xúc** (3 cảm xúc chính)
+3. **Logic phát triển**
+4. **Motif cảm xúc** (trạng thái hiện tại)
+5. **Nhân vật chính** (biến chuyển nội tâm)
+6. **Nhân vật phụ** (thay đổi vai trò / cảm xúc)
+7. **Phản diện** (chiến lược / hành động)
+8. **Biểu đồ cảm xúc** [khởi đầu → đỉnh → kết]
+9. **Chủ đề triết lý phụ**`;
 
         try {
             const response = await aiProvider.generateContent(
@@ -202,178 +205,255 @@ ${dto.storyOutline}${previousChaptersContext}
         }
     }
 
-    /**
-     * STEP 3: Generate complete chapter
-     * Using chapter structure → AI generates full content + summary + image prompt
-     */
-    async generateCompleteChapter(
-        dto: GenerateCompleteChapterDto,
-    ): Promise<CompleteChapterResponseDto> {
+    async generatePenultimateChapter(dto: {
+        storyId: string;
+        chapterNumber: number;
+        previousChapterSummary: string;
+        aiProvider: string;
+        storyPrompt: string;
+        direction: string;
+        previousChapterMeta: string;
+    }): Promise<ChapterStructureResponse> {
         const providerName = dto.aiProvider || 'grok';
         const aiProvider =
             this.storyGenerationProviderFactory.getProvider(providerName);
 
-        const systemPrompt = `Bạn là một người viết truyện chuyên nghiệp. 
-Nhiệm vụ của bạn là viết nội dung chương, tóm tắt chương, và tạo prompt để sinh ảnh.`;
+        const summaryWordLimit = 200 + (dto.chapterNumber - 1) * 50;
 
-        const wordCount = dto.wordCount || 1300;
-        const userPrompt = `Thực hiện 3 yêu cầu:
+        const systemPrompt = `Bạn là một tiểu thuyết gia bậc thầy kiêm chuyên gia cấu trúc truyện AI.`;
 
-1. Viết nội dung chương ${dto.chapterNumber} theo dàn bài trên (khoảng ${wordCount} từ).
-2. Tóm tắt nội dung chương ${dto.chapterNumber} (tối đa 200 từ).
-3. Viết prompt để dùng để gen ảnh trên OpenAI dựa trên nội dung chương ${dto.chapterNumber} (tối đa 200 ký tự).
+        const userPrompt = `Dựa trên dữ liệu: ${dto.storyPrompt}
+Tóm tắt nội dung câu chuyện trước đó: ${dto.previousChapterSummary || 'Không có dữ liệu trước đó.'}
 
-**Cấu trúc chương:**
-${dto.chapterStructure}
+Viết Chương ${dto.chapterNumber} (1300 từ) tiếp tục phong cách và cảm xúc theo hướng ${dto.direction}.
+cùng các thông tin sau ${dto.previousChapterMeta}
 
-Định dạng câu trả lời:
-**NỘI DUNG CHƯƠNG:**
-[nội dung chương ở đây]
+**YÊU CẦU NỘI DUNG**
+1. Tiếp nối logic chương trước. Đảm bảo tính logic về mặt không gian, thời gian, địa điểm và nhân vật.
+2. Cho nhân vật đối mặt thử thách (thể chất, tâm lý hoặc triết lý).
+3. Phản diện nếu đã xuất hiện thì có đối đầu hoặc tương phản gián tiếp. Nếu chưa xuất hiện thì dần xuất hiện rõ rệt.
+4. Motif cảm xúc được tái hiện hoặc biến đổi.
+5. Kết chương bằng cao trào hoặc tiết lộ.
+6. Chương này là chương trước chương kết thúc của câu chuyện. Hãy chuẩn bị cho sự kết thúc câu chuyện ở chương sau (chương cuối cùng) để đảm bảo cái kết ở chương sau không gây cảm giác đột ngột cho người đọc.
 
-**TÓM TẮT:**
-[tóm tắt ở đây]
+**OUTPUT_CHUONG_${dto.chapterNumber}**
+1. **Tiêu đề chương**
+2. **Nội dung chi tiết** (1300 từ)
+3. **Tóm tắt TRUYỆN ĐẾN HIỆN TẠI** (≤ ${summaryWordLimit} từ) - PHẢI tổng hợp từ: (A) "Tóm tắt nội dung câu chuyện trước đó" + (B) "Nội dung chương ${dto.chapterNumber} vừa viết"
+4. **Hai hướng phát triển chương sau** - ngắn gọn, không quá 12 từ
 
-**IMAGE PROMPT:**
-[image prompt ở đây]`;
+**META_CHUONG_${dto.chapterNumber}**
+1. **Phong cách viết**
+2. **Tông cảm xúc** (3 cảm xúc chính)
+3. **Logic phát triển**
+4. **Motif cảm xúc** (trạng thái hiện tại)
+5. **Nhân vật chính** (biến chuyển nội tâm)
+6. **Nhân vật phụ** (thay đổi vai trò / cảm xúc)
+7. **Phản diện** (chiến lược / hành động)
+8. **Biểu đồ cảm xúc** [khởi đầu → đỉnh → kết]
+9. **Chủ đề triết lý phụ**`;
 
         try {
             const response = await aiProvider.generateContent(
                 systemPrompt,
                 userPrompt,
-                COMPLETE_CHAPTER_SCHEMA,
+                CHAPTER_STRUCTURE_SCHEMA,
             );
-            return this.parseCompleteChapter(response, dto.chapterNumber);
+            return this.parseChapterStructure(response, dto.chapterNumber);
         } catch (error) {
-            this.logger.error('Error generating complete chapter:', error);
+            this.logger.error('Error generating chapter structure:', error);
             throw new BadRequestException(
-                `Failed to generate complete chapter: ${error.message}`,
+                `Failed to generate chapter structure: ${error.message}`,
             );
         }
     }
 
-    async generateChapter(
-        dto: GenerateChapterDto,
-    ): Promise<ChapterStructureResponseDto> {
-        // Fetch story attributes from DB if not provided in DTO
-        let storyAttributes = dto.storyAttributes;
-        if (!storyAttributes) {
-            // Try to fetch from the StoryGeneration record for this story
-            const generation = await this.storyGenerationRepository.findOne({
-                where: { storyId: dto.storyId },
-            });
-
-            if (generation) {
-                // Reconstruct attributes from direct columns
-                storyAttributes = {
-                    title: generation.title,
-                    synopsis: generation.synopsis,
-                    genres: generation.genres || [],
-                    mainCharacter: generation.mainCharacter,
-                    subCharacters: generation.subCharacters,
-                    setting: generation.setting,
-                    plotTheme: generation.plotTheme,
-                    writingStyle: generation.writingStyle,
-                    additionalContext: generation.additionalContext,
-                };
-            } else {
-                throw new NotFoundException(
-                    `Story attributes not found for story ${dto.storyId}. Please provide storyAttributes in the request.`,
-                );
-            }
-        }
-
-        // Create a temporary DTO with fetched attributes for prompt building
-        const dtoWithAttributes = { ...dto, storyAttributes };
-
-        const providerName = dto.aiProvider || 'gpt';
+    async generateFinalChapter(dto: {
+        storyId: string;
+        chapterNumber: number;
+        previousChapterSummary: string;
+        aiProvider: string;
+        storyPrompt: string;
+        direction: string;
+        previousChapterMeta: string;
+    }): Promise<ChapterStructureResponse> {
+        const providerName = dto.aiProvider || 'grok';
         const aiProvider =
             this.storyGenerationProviderFactory.getProvider(providerName);
 
-        const systemPrompt = `Bạn là một người viết truyện chuyên nghiệp. 
-Nhiệm vụ của bạn là viết các chương truyện hấp dẫn, với cấu trúc rõ ràng và nội dung phong phú.`;
+        const summaryWordLimit = 200 + (dto.chapterNumber - 1) * 50;
 
-        const userPrompt = this.buildChapterPrompt(dtoWithAttributes);
+        const systemPrompt = `Bạn là một tiểu thuyết gia bậc thầy kiêm chuyên gia cấu trúc truyện AI.`;
+
+        const userPrompt = `Dựa trên dữ liệu: ${dto.storyPrompt}
+Tóm tắt nội dung câu chuyện trước đó: ${dto.previousChapterSummary || 'Không có dữ liệu trước đó.'}
+
+Viết Chương ${dto.chapterNumber} (1300 từ) tiếp tục phong cách và cảm xúc theo hướng ${dto.direction}.
+cùng các thông tin sau ${dto.previousChapterMeta}
+
+**YÊU CẦU NỘI DUNG**
+1. Tiếp nối logic chương trước. Đảm bảo tính logic về mặt không gian, thời gian, địa điểm và nhân vật.
+2. Cho nhân vật đối mặt thử thách (thể chất, tâm lý hoặc triết lý).
+3. Phản diện nếu đã xuất hiện thì có đối đầu hoặc tương phản gián tiếp. Nếu chưa xuất hiện thì dần xuất hiện rõ rệt.
+4. Motif cảm xúc được tái hiện hoặc biến đổi.
+5. Kết chương bằng cao trào hoặc tiết lộ.
+6. Chương này là chương kết thúc của câu chuyện. Hãy kết thúc câu chuyện nhưng đảm bảo cái kết ở chương này không gây cảm giác đột ngột cho người đọc.
+
+**OUTPUT_CHUONG_${dto.chapterNumber}**
+1. **Tiêu đề chương**
+2. **Nội dung chi tiết** (1300 từ)
+3. **Tóm tắt TRUYỆN ĐẾN HIỆN TẠI** (≤ ${summaryWordLimit} từ) - PHẢI tổng hợp từ: (A) "Tóm tắt nội dung câu chuyện trước đó" + (B) "Nội dung chương ${dto.chapterNumber} vừa viết"
+4. **Hai hướng phát triển chương sau** - ngắn gọn, không quá 12 từ
+
+**META_CHUONG_${dto.chapterNumber}**
+1. **Phong cách viết**
+2. **Tông cảm xúc** (3 cảm xúc chính)
+3. **Logic phát triển**
+4. **Motif cảm xúc** (trạng thái hiện tại)
+5. **Nhân vật chính** (biến chuyển nội tâm)
+6. **Nhân vật phụ** (thay đổi vai trò / cảm xúc)
+7. **Phản diện** (chiến lược / hành động)
+8. **Biểu đồ cảm xúc** [khởi đầu → đỉnh → kết]
+9. **Chủ đề triết lý phụ**`;
 
         try {
             const response = await aiProvider.generateContent(
                 systemPrompt,
                 userPrompt,
+                CHAPTER_STRUCTURE_SCHEMA,
             );
-
-            return this.parseChapterResponse(response, dto.chapterNumber);
+            return this.parseChapterStructure(response, dto.chapterNumber);
         } catch (error) {
-            this.logger.error('Error generating chapter:', error);
+            this.logger.error('Error generating chapter structure:', error);
             throw new BadRequestException(
-                `Failed to generate chapter: ${error.message}`,
+                `Failed to generate chapter structure: ${error.message}`,
             );
         }
     }
 
-    private buildChapterPrompt(dto: GenerateChapterDto): string {
-        const storyContext = `
-**Thông tin truyện:**
-- Tiêu đề: ${dto.storyAttributes.title}
-- Tóm tắt: ${dto.storyAttributes.synopsis}
-- Thể loại: ${dto.storyAttributes.genres.join(', ')}
-${dto.storyAttributes.mainCharacter ? `- Nhân vật chính: ${dto.storyAttributes.mainCharacter}` : ''}
-${dto.storyAttributes.setting ? `- Bối cảnh: ${dto.storyAttributes.setting}` : ''}
-${dto.storyAttributes.plotTheme ? `- Chủ đề cốt truyện: ${dto.storyAttributes.plotTheme}` : ''}
-${dto.storyAttributes.writingStyle ? `- Phong cách viết: ${dto.storyAttributes.writingStyle}` : ''}
-${dto.storyAttributes.additionalContext ? `- Thêm thông tin: ${dto.storyAttributes.additionalContext}` : ''}
-`;
+    //     async generateChapter(
+    //         dto: GenerateChapterDto,
+    //     ): Promise<ChapterStructureResponseDto> {
+    //         // Fetch story attributes from DB if not provided in DTO
+    //         let storyAttributes = dto.storyAttributes;
+    //         if (!storyAttributes) {
+    //             // Try to fetch from the StoryGeneration record for this story
+    //             const generation = await this.storyGenerationRepository.findOne({
+    //                 where: { storyId: dto.storyId },
+    //             });
 
-        const previousChaptersContext =
-            dto.previousChaptersSummaries &&
-            dto.previousChaptersSummaries.length > 0
-                ? `
-**Tóm tắt các chương trước:**
-${dto.previousChaptersSummaries.map((summary, index) => `${index + 1}. ${summary}`).join('\n')}
-`
-                : '';
+    //             if (generation) {
+    //                 // Reconstruct attributes from direct columns
+    //                 storyAttributes = {
+    //                     title: generation.title,
+    //                     synopsis: generation.synopsis,
+    //                     genres: generation.genres || [],
+    //                     mainCharacter: generation.mainCharacter,
+    //                     subCharacters: generation.subCharacters,
+    //                     setting: generation.setting,
+    //                     plotTheme: generation.plotTheme,
+    //                     writingStyle: generation.writingStyle,
+    //                     additionalContext: generation.additionalContext,
+    //                 };
+    //             } else {
+    //                 throw new NotFoundException(
+    //                     `Story attributes not found for story ${dto.storyId}. Please provide storyAttributes in the request.`,
+    //                 );
+    //             }
+    //         }
 
-        return `${storyContext}${previousChaptersContext}
-Từ thông tin truyện và các chương trước, xây dựng cấu trúc chương ${dto.chapterNumber} theo cấu trúc cơ bản sau. 
-Bạn có thể thêm vào cấu trúc các mục cần thiết để tăng tính hấp dẫn và phù hợp với nội dung.
-Đảm bảo chương ${dto.chapterNumber} kế tiếp một cách tự nhiên từ các chương trước.
+    //         // Create a temporary DTO with fetched attributes for prompt building
+    //         const dtoWithAttributes = { ...dto, storyAttributes };
 
-**Cấu trúc chương (${dto.wordCount || 300} từ)**:
-- **Mở đầu hấp dẫn**:
-- **Miêu tả bối cảnh**:
-- **Giới thiệu nhân vật**:
-- **Hướng phát triển cốt truyện**:`;
-    }
+    //         const providerName = dto.aiProvider || 'gpt';
+    //         const aiProvider =
+    //             this.storyGenerationProviderFactory.getProvider(providerName);
 
-    private parseChapterResponse(
-        content: string,
-        chapterNumber: number,
-    ): ChapterStructureResponseDto {
-        try {
-            return {
-                chapterNumber,
-                openingHook: this.extractSection(content, 'Mở đầu hấp dẫn'),
-                sceneSetting: this.extractSection(content, 'Miêu tả bối cảnh'),
-                characterIntroduction: this.extractSection(
-                    content,
-                    'Giới thiệu nhân vật',
-                ),
-                plotDevelopment: this.extractSection(
-                    content,
-                    'Hướng phát triển cốt truyện',
-                ),
-                content,
-            };
-        } catch (error) {
-            this.logger.error('Error parsing chapter response:', error);
-            return {
-                chapterNumber,
-                openingHook: '',
-                sceneSetting: '',
-                characterIntroduction: '',
-                plotDevelopment: '',
-                content,
-            };
-        }
-    }
+    //         const systemPrompt = `Bạn là một người viết truyện chuyên nghiệp.
+    // Nhiệm vụ của bạn là viết các chương truyện hấp dẫn, với cấu trúc rõ ràng và nội dung phong phú.`;
+
+    //         const userPrompt = this.buildChapterPrompt(dtoWithAttributes);
+
+    //         try {
+    //             const response = await aiProvider.generateContent(
+    //                 systemPrompt,
+    //                 userPrompt,
+    //             );
+
+    //             return this.parseChapterResponse(response, dto.chapterNumber);
+    //         } catch (error) {
+    //             this.logger.error('Error generating chapter:', error);
+    //             throw new BadRequestException(
+    //                 `Failed to generate chapter: ${error.message}`,
+    //             );
+    //         }
+    //     }
+
+    //     private buildChapterPrompt(dto: GenerateChapterDto): string {
+    //         const storyContext = `
+    // **Thông tin truyện:**
+    // - Tiêu đề: ${dto.storyAttributes.title}
+    // - Tóm tắt: ${dto.storyAttributes.synopsis}
+    // - Thể loại: ${dto.storyAttributes.genres.join(', ')}
+    // ${dto.storyAttributes.mainCharacter ? `- Nhân vật chính: ${dto.storyAttributes.mainCharacter}` : ''}
+    // ${dto.storyAttributes.setting ? `- Bối cảnh: ${dto.storyAttributes.setting}` : ''}
+    // ${dto.storyAttributes.plotTheme ? `- Chủ đề cốt truyện: ${dto.storyAttributes.plotTheme}` : ''}
+    // ${dto.storyAttributes.writingStyle ? `- Phong cách viết: ${dto.storyAttributes.writingStyle}` : ''}
+    // ${dto.storyAttributes.additionalContext ? `- Thêm thông tin: ${dto.storyAttributes.additionalContext}` : ''}
+    // `;
+
+    //         const previousChaptersContext =
+    //             dto.previousChaptersSummaries &&
+    //             dto.previousChaptersSummaries.length > 0
+    //                 ? `
+    // **Tóm tắt các chương trước:**
+    // ${dto.previousChaptersSummaries.map((summary, index) => `${index + 1}. ${summary}`).join('\n')}
+    // `
+    //                 : '';
+
+    //         return `${storyContext}${previousChaptersContext}
+    // Từ thông tin truyện và các chương trước, xây dựng cấu trúc chương ${dto.chapterNumber} theo cấu trúc cơ bản sau.
+    // Bạn có thể thêm vào cấu trúc các mục cần thiết để tăng tính hấp dẫn và phù hợp với nội dung.
+    // Đảm bảo chương ${dto.chapterNumber} kế tiếp một cách tự nhiên từ các chương trước.
+
+    // **Cấu trúc chương (${dto.wordCount || 300} từ)**:
+    // - **Mở đầu hấp dẫn**:
+    // - **Miêu tả bối cảnh**:
+    // - **Giới thiệu nhân vật**:
+    // - **Hướng phát triển cốt truyện**:`;
+    //     }
+
+    // private parseChapterResponse(
+    //     content: string,
+    //     chapterNumber: number,
+    // ): ChapterStructureResponseDto {
+    //     try {
+    //         return {
+    //             chapterNumber,
+    //             openingHook: this.extractSection(content, 'Mở đầu hấp dẫn'),
+    //             sceneSetting: this.extractSection(content, 'Miêu tả bối cảnh'),
+    //             characterIntroduction: this.extractSection(
+    //                 content,
+    //                 'Giới thiệu nhân vật',
+    //             ),
+    //             plotDevelopment: this.extractSection(
+    //                 content,
+    //                 'Hướng phát triển cốt truyện',
+    //             ),
+    //             content,
+    //         };
+    //     } catch (error) {
+    //         this.logger.error('Error parsing chapter response:', error);
+    //         return {
+    //             chapterNumber,
+    //             openingHook: '',
+    //             sceneSetting: '',
+    //             characterIntroduction: '',
+    //             plotDevelopment: '',
+    //             content,
+    //         };
+    //     }
+    // }
 
     private extractSection(content: string, sectionName: string): string {
         // Support multiple section names separated by |
@@ -406,7 +486,6 @@ Bạn có thể thêm vào cấu trúc các mục cần thiết để tăng tín
         numberOfChapters: number,
     ): StoryOutlineResponse {
         try {
-            // Try structured JSON first
             console.log('content', content);
 
             const parsed = JSON.parse(content);
@@ -551,60 +630,99 @@ Bạn có thể thêm vào cấu trúc các mục cần thiết để tăng tín
         }
     }
 
-    /**
-     * Parse chapter structure response from AI
-     * Expects structured JSON response with chapter structure sections
-     */
     private parseChapterStructure(
         content: string,
         chapterNumber: number,
     ): ChapterStructureResponse {
         try {
-            // Try to parse as JSON first (from structured response)
+            console.log('content', content);
+
             const parsed = JSON.parse(content);
+            console.log('parsed', parsed);
+
             return {
-                chapterNumber: parsed.chapterNumber || chapterNumber,
-                openingHook: parsed.openingHook || '',
-                sceneSetting: parsed.sceneSetting || '',
-                characterIntroduction: parsed.characterIntroduction || '',
-                plotDevelopment: parsed.plotDevelopment || '',
-                structure: parsed.structure || content,
+                chapterNumber,
+                title: parsed.title || '',
+                content: parsed.content || '',
+                structure: {
+                    summary: parsed.summary || '',
+                    directions: Array.isArray(parsed.directions)
+                        ? parsed.directions
+                        : [],
+
+                    writingStyle: parsed.writingStyle || '',
+                    tone: parsed.tone || '',
+                    plotLogic: parsed.plotLogic || '',
+                    emotionalMotif: parsed.emotionalMotif || '',
+                    mainCharacterArc: parsed.mainCharacterArc || '',
+                    subCharacterArc: parsed.subCharacterArc || '',
+                    antagonistAction: parsed.antagonistAction || '',
+                    emotionChart: parsed.emotionChart || '',
+                    philosophicalSubtheme: parsed.philosophicalSubtheme || '',
+                },
+                raw: content,
             };
         } catch (jsonError) {
-            // Fallback to text parsing if JSON parsing fails
             this.logger.warn(
                 'Failed to parse JSON response, falling back to text parsing',
             );
+
             try {
+                const extract = (label: string) =>
+                    this.extractSection(content, label);
+
                 return {
                     chapterNumber,
-                    openingHook: this.extractSection(
-                        content,
-                        'Mở đầu hấp dẫn|Opening Hook',
-                    ),
-                    sceneSetting: this.extractSection(
-                        content,
-                        'Miêu tả bối cảnh|Scene Setting',
-                    ),
-                    characterIntroduction: this.extractSection(
-                        content,
-                        'Giới thiệu nhân vật|Character Introduction',
-                    ),
-                    plotDevelopment: this.extractSection(
-                        content,
-                        'Hướng phát triển cốt truyện|Plot Development',
-                    ),
-                    structure: content,
+
+                    title: extract('Tiêu đề chương|Title'),
+                    content: extract('Nội dung chi tiết|Content'),
+                    structure: {
+                        summary: extract('Tóm tắt truyện đến hiện tại|Summary'),
+                        directions: extract('Hướng phát triển|Directions')
+                            .split('\n')
+                            .map((s) => s.trim())
+                            .filter(Boolean),
+
+                        writingStyle: extract('Phong cách viết|Writing Style'),
+                        tone: extract('Tông cảm xúc|Tone'),
+                        plotLogic: extract('Logic phát triển|Plot Logic'),
+                        emotionalMotif: extract(
+                            'Motif cảm xúc|Emotional Motif',
+                        ),
+                        mainCharacterArc: extract(
+                            'Nhân vật chính|Main Character',
+                        ),
+                        subCharacterArc: extract('Nhân vật phụ|Sub Character'),
+                        antagonistAction: extract('Phản diện|Antagonist'),
+                        emotionChart: extract('Biểu đồ cảm xúc|Emotion Chart'),
+                        philosophicalSubtheme: extract(
+                            'Chủ đề triết lý|Philosophical Subtheme',
+                        ),
+                    },
+                    raw: content,
                 };
             } catch (error) {
                 this.logger.error('Error parsing chapter structure:', error);
+
                 return {
                     chapterNumber,
-                    openingHook: '',
-                    sceneSetting: '',
-                    characterIntroduction: '',
-                    plotDevelopment: '',
-                    structure: content,
+                    title: '',
+                    content: '',
+                    structure: {
+                        summary: '',
+                        directions: [],
+
+                        writingStyle: '',
+                        tone: '',
+                        plotLogic: '',
+                        emotionalMotif: '',
+                        mainCharacterArc: '',
+                        subCharacterArc: '',
+                        antagonistAction: '',
+                        emotionChart: '',
+                        philosophicalSubtheme: '',
+                    },
+                    raw: content,
                 };
             }
         }
@@ -614,50 +732,50 @@ Bạn có thể thêm vào cấu trúc các mục cần thiết để tăng tín
      * Parse complete chapter response from AI
      * Expects structured JSON response with content, summary, and imagePrompt
      */
-    private parseCompleteChapter(
-        content: string,
-        chapterNumber: number,
-    ): CompleteChapterResponseDto {
-        try {
-            // Try to parse as JSON first (from structured response)
-            const parsed = JSON.parse(content);
-            return {
-                chapterNumber: parsed.chapterNumber || chapterNumber,
-                content: parsed.content || '',
-                summary: parsed.summary || '',
-                imagePrompt: parsed.imagePrompt || '',
-            };
-        } catch (jsonError) {
-            // Fallback to text parsing if JSON parsing fails
-            this.logger.warn(
-                'Failed to parse JSON response, falling back to text parsing',
-            );
-            try {
-                const chapterContent = this.extractSection(
-                    content,
-                    'NỘI DUNG CHƯƠNG|Content',
-                );
-                const summary = this.extractSection(content, 'TÓM TẮT|Summary');
-                const imagePrompt = this.extractSection(
-                    content,
-                    'IMAGE PROMPT|Image Prompt',
-                );
+    // private parseCompleteChapter(
+    //     content: string,
+    //     chapterNumber: number,
+    // ): CompleteChapterResponseDto {
+    //     try {
+    //         // Try to parse as JSON first (from structured response)
+    //         const parsed = JSON.parse(content);
+    //         return {
+    //             chapterNumber: parsed.chapterNumber || chapterNumber,
+    //             content: parsed.content || '',
+    //             summary: parsed.summary || '',
+    //             imagePrompt: parsed.imagePrompt || '',
+    //         };
+    //     } catch (jsonError) {
+    //         // Fallback to text parsing if JSON parsing fails
+    //         this.logger.warn(
+    //             'Failed to parse JSON response, falling back to text parsing',
+    //         );
+    //         try {
+    //             const chapterContent = this.extractSection(
+    //                 content,
+    //                 'NỘI DUNG CHƯƠNG|Content',
+    //             );
+    //             const summary = this.extractSection(content, 'TÓM TẮT|Summary');
+    //             const imagePrompt = this.extractSection(
+    //                 content,
+    //                 'IMAGE PROMPT|Image Prompt',
+    //             );
 
-                return {
-                    chapterNumber,
-                    content: chapterContent || content,
-                    summary: summary || '',
-                    imagePrompt: imagePrompt || '',
-                };
-            } catch (error) {
-                this.logger.error('Error parsing complete chapter:', error);
-                return {
-                    chapterNumber,
-                    content: content,
-                    summary: '',
-                    imagePrompt: '',
-                };
-            }
-        }
-    }
+    //             return {
+    //                 chapterNumber,
+    //                 content: chapterContent || content,
+    //                 summary: summary || '',
+    //                 imagePrompt: imagePrompt || '',
+    //             };
+    //         } catch (error) {
+    //             this.logger.error('Error parsing complete chapter:', error);
+    //             return {
+    //                 chapterNumber,
+    //                 content: content,
+    //                 summary: '',
+    //                 imagePrompt: '',
+    //             };
+    //         }
+    //     }
+    // }
 }

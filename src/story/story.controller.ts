@@ -25,8 +25,6 @@ import { GenerateChapterDto } from './dto/generate-chapter.dto';
 import {
     InitializeStoryDto,
     InitializeStoryResponseDto,
-    GenerateChapterOnDemandDto,
-    GenerateChapterOnDemandResponseDto,
 } from './dto/generate-story-outline.dto';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
@@ -284,33 +282,36 @@ export class StoryController {
         );
     }
 
-    // REQUEST 2: Generate single chapter on-demand
-    @Post(':storyId/generate/chapter-on-demand')
-    async generateChapterOnDemand(
+    @Post(':storyId/generate/chapter')
+    async generateChapterWithContext(
         @Param('storyId') storyId: string,
-        @Body() generateChapterOnDemandDto: GenerateChapterOnDemandDto,
-    ): Promise<GenerateChapterOnDemandResponseDto> {
-        return this.storyService.generateChapterOnDemand(
+        @Body() generateChapterDto: GenerateChapterDto,
+    ) {
+        if (!storyId) {
+            throw new BadRequestException('storyId is required');
+        }
+
+        return await this.storyService.generateChapters(
             storyId,
-            generateChapterOnDemandDto,
+            generateChapterDto,
         );
     }
 
     // Legacy endpoint (kept for backward compatibility)
-    @Post(':storyId/generate/chapter')
-    async generateChapter(
-        @Param('storyId') storyId: string,
-        @Body() generateChapterDto: GenerateChapterDto,
-    ) {
-        const result = await this.storyService.generateChapter(
-            storyId,
-            generateChapterDto,
-        );
-        return {
-            message: 'Chapter generated successfully',
-            data: result,
-        };
-    }
+    // @Post(':storyId/generate/chapter')
+    // async generateChapter(
+    //     @Param('storyId') storyId: string,
+    //     @Body() generateChapterDto: GenerateChapterDto,
+    // ) {
+    //     const result = await this.storyService.generateChapter(
+    //         storyId,
+    //         generateChapterDto,
+    //     );
+    //     return {
+    //         message: 'Chapter generated successfully',
+    //         data: result,
+    //     };
+    // }
 
     // Generation History endpoints
     @Get(':storyId/generation/history')

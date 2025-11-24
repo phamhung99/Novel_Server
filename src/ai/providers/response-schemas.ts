@@ -92,12 +92,6 @@ export const STORY_OUTLINE_SCHEMA = {
             description:
                 'Prompt 20 từ tạo ảnh minh họa (**Prompt tạo ảnh minh họa**)',
         },
-
-        // Tổng thể outline
-        // outline: {
-        //     type: 'string',
-        //     description: 'Full story outline / framework for all chapters',
-        // },
     },
     required: [
         'title',
@@ -117,76 +111,92 @@ export const STORY_OUTLINE_SCHEMA = {
         'chapterSummary',
         'chapterDirections',
         'imagePrompt',
-        'outline',
     ],
 };
 
-/**
- * Schema for Chapter Structure Response
- * Ensures AI returns structured chapter planning data
- */
 export const CHAPTER_STRUCTURE_SCHEMA = {
     type: 'object',
     properties: {
-        chapterNumber: {
-            type: 'number',
-            description: 'Chapter number',
-        },
-        openingHook: {
+        title: {
             type: 'string',
-            description: 'Opening hook to grab reader attention',
-        },
-        sceneSetting: {
-            type: 'string',
-            description: 'Scene setting and atmosphere description',
-        },
-        characterIntroduction: {
-            type: 'string',
-            description: 'Character introduction or development',
-        },
-        plotDevelopment: {
-            type: 'string',
-            description: 'Plot development and key events',
-        },
-        structure: {
-            type: 'string',
-            description: 'Full chapter structure outline',
-        },
-    },
-    required: [
-        'chapterNumber',
-        'openingHook',
-        'sceneSetting',
-        'characterIntroduction',
-        'plotDevelopment',
-        'structure',
-    ],
-};
-
-/**
- * Schema for Complete Chapter Response
- * Ensures AI returns chapter content, summary, and image prompt
- */
-export const COMPLETE_CHAPTER_SCHEMA = {
-    type: 'object',
-    properties: {
-        chapterNumber: {
-            type: 'number',
-            description: 'Chapter number',
+            description: 'Tiêu đề chương (**1. Tiêu đề chương**)',
         },
         content: {
             type: 'string',
-            description: 'Full chapter content (~1300 words)',
+            description:
+                'Nội dung chi tiết chương (~1300 từ) (**2. Nội dung chi tiết**)',
         },
         summary: {
             type: 'string',
             description:
-                'Chapter summary (~200 words) for context in next chapter',
+                'Tóm tắt TRUYỆN ĐẾN HIỆN TẠI (≤250 từ). PHẢI tổng hợp từ phần A ("Tóm tắt trước đó") + phần B ("Nội dung chương hiện tại"). Không tự tạo thêm thông tin. (**3. Tóm tắt truyện đến hiện tại**)',
         },
-        imagePrompt: {
+        directions: {
+            type: 'array',
+            items: { type: 'string' },
+            description:
+                'Hai hướng phát triển cho chương sau, ≤12 từ mỗi hướng (**4. Hai hướng phát triển chương sau**)',
+        },
+
+        // STORY DEVELOPMENT METADATA
+        writingStyle: {
             type: 'string',
-            description: 'Image generation prompt (~200 characters)',
+            description: 'Phong cách viết của chương (**1. Phong cách viết**)',
+        },
+        tone: {
+            type: 'string',
+            description: 'Ba cảm xúc chính của chương (**2. Tông cảm xúc**)',
+        },
+        plotLogic: {
+            type: 'string',
+            description:
+                'Logic triển khai cốt truyện trong chương (**3. Logic phát triển**)',
+        },
+        emotionalMotif: {
+            type: 'string',
+            description:
+                'Motif cảm xúc tại thời điểm hiện tại (**4. Motif cảm xúc**)',
+        },
+        mainCharacterArc: {
+            type: 'string',
+            description:
+                'Biến chuyển nội tâm nhân vật chính trong chương (**5. Nhân vật chính**)',
+        },
+        subCharacterArc: {
+            type: 'string',
+            description:
+                'Thay đổi vai trò / cảm xúc của nhân vật phụ (**6. Nhân vật phụ**)',
+        },
+        antagonistAction: {
+            type: 'string',
+            description:
+                'Chiến lược hoặc hành động của phản diện trong chương (**7. Phản diện**)',
+        },
+        emotionChart: {
+            type: 'string',
+            description:
+                'Biểu đồ cảm xúc: khởi đầu → đỉnh → kết (**8. Biểu đồ cảm xúc**)',
+        },
+        philosophicalSubtheme: {
+            type: 'string',
+            description:
+                'Chủ đề triết lý phụ lồng trong chương (**9. Chủ đề triết lý phụ**)',
         },
     },
-    required: ['chapterNumber', 'content', 'summary', 'imagePrompt'],
+    required: [
+        'chapterTitle',
+        'chapterContent',
+        'chapterSummary',
+        'chapterDirections',
+
+        'writingStyle',
+        'tone',
+        'plotLogic',
+        'emotionalMotif',
+        'mainCharacterArc',
+        'subCharacterArc',
+        'antagonistAction',
+        'emotionChart',
+        'philosophicalSubtheme',
+    ],
 };

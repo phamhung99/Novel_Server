@@ -40,7 +40,7 @@ export class GrokApiService implements IStoryGenerationProvider {
                     { role: 'user', content: userPrompt },
                 ],
                 temperature: 0.7,
-                max_tokens: 2000,
+                max_tokens: 4000,
             };
 
             // Add response_format with JSON schema if provided
@@ -59,6 +59,8 @@ export class GrokApiService implements IStoryGenerationProvider {
                 '/chat/completions',
                 requestBody,
             );
+
+            console.log('response', response);
 
             return response.data.choices[0].message.content;
         } catch (error) {

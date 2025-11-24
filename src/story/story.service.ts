@@ -19,17 +19,16 @@ import { CreateChapterDto } from './dto/create-chapter.dto';
 import { UpdateChapterDto } from './dto/update-chapter.dto';
 import { StoryStatus } from '../common/enums/story-status.enum';
 import {
+    ChapterStructureResponse,
     GenerateChapterDto,
-    ChapterStructureResponseDto,
 } from './dto/generate-chapter.dto';
 import {
     InitializeStoryDto,
-    GenerateChapterOnDemandDto,
-    GenerateChapterOnDemandResponseDto,
     InitializeStoryResponseDto,
 } from './dto/generate-story-outline.dto';
 import { StoryGenerationApiService } from '../ai/providers/story-generation-api.service';
 import { StoryVisibility } from 'src/common/enums/story-visibility.enum';
+import { excludeFields } from 'src/common/utils/exclude-fields';
 
 @Injectable()
 export class StoryService {
@@ -321,10 +320,9 @@ export class StoryService {
         }
 
         try {
-            // STEP 1: Generate story outline
             const outlineResponse =
                 await this.storyGenerationApiService.generateStoryOutline({
-                    storyIdea: dto.storyPrompt,
+                    storyPrompt: dto.storyPrompt,
                     genres: dto.genres,
                     numberOfChapters: dto.numberOfChapters,
                     aiProvider: dto.aiProvider || 'grok',
@@ -348,7 +346,6 @@ export class StoryService {
                     (dto.aiProvider || 'grok') === 'grok'
                         ? 'grok-4'
                         : 'gpt-4o-mini',
-                chapterNumber: 1, // Outline generation
                 prompt: {
                     storyPrompt: dto.storyPrompt,
                     numberOfChapters: dto.numberOfChapters,
@@ -397,11 +394,13 @@ export class StoryService {
                 structure: {
                     summary: outlineResponse.chapterSummary,
                     imagePrompt: outlineResponse.imagePrompt,
+                    directions: outlineResponse.chapterDirections,
                 },
             });
 
             await this.chapterGenerationRepository.save(chapterGeneration);
             return {
+                // story parts
                 storyId: savedStory.id,
                 title: outlineResponse.title,
                 synopsis: outlineResponse.synopsis,
@@ -417,6 +416,13 @@ export class StoryService {
                 writingStyle: outlineResponse.writingStyle,
                 numberOfChapters: dto.numberOfChapters,
                 outline: outlineResponse.outline,
+                // chapter parts
+                chapterId: savedChapter.id,
+                chapterNumber,
+                chapterTitle: savedChapter.title,
+                chapterContent: outlineResponse.chapterContent || '',
+                chapterSummary: outlineResponse.chapterSummary,
+                chapterImagePrompt: outlineResponse.imagePrompt,
                 message:
                     'Story outline generated successfully. Ready to generate chapters on-demand.',
             };
@@ -426,227 +432,268 @@ export class StoryService {
         }
     }
 
-    /**
-     * REQUEST 2: Generate single chapter on-demand
-     * Generates chapter incrementally when user requests
-     * Uses story outline and previous chapter summaries for context
-     */
-    async generateChapterOnDemand(
-        storyId: string,
-        dto: GenerateChapterOnDemandDto,
-    ): Promise<GenerateChapterOnDemandResponseDto> {
+    async generateChapters(storyId: string, dto: GenerateChapterDto) {
         try {
-            // Verify story exists and get story generation with outline
-            const story = await this.findStoryById(storyId);
-            const storyGeneration = story.generation;
+            const storyGeneration =
+                await this.storyGenerationRepository.findOne({
+                    where: { storyId },
+                });
 
             if (!storyGeneration) {
-                throw new NotFoundException(
-                    'Story outline not found. Initialize story first.',
+                throw new BadRequestException(
+                    'Story generation record not found. Initialize story first.',
                 );
             }
 
-            // Get previous chapters for context
-            const previousChapters = await this.chapterRepository.find({
-                where: { storyId },
-                order: { index: 'ASC' },
-            });
+            const existingChapters = await this.findChaptersByStory(storyId);
 
-            // Get previous chapter summaries from ChapterGenerations
-            const previousSummaries: string[] = [];
-            for (const chapter of previousChapters) {
-                const chapterGen =
-                    await this.chapterGenerationRepository.findOne({
-                        where: { chapterId: chapter.id },
-                    });
-                if (chapterGen && chapterGen.structure?.summary) {
-                    previousSummaries.push(
-                        `Chương ${chapter.index}: ${chapterGen.structure.summary}`,
-                    );
-                }
+            if (existingChapters.length === 0) {
+                throw new BadRequestException(
+                    'No previous chapters found. Initialize story first.',
+                );
             }
 
-            const aiProvider = dto.aiProvider || 'grok';
+            const lastChapter = existingChapters[existingChapters.length - 1];
+            const chapterNumber = lastChapter.index + 1;
 
-            // STEP 2: Generate chapter structure
-            const structureResponse =
-                await this.storyGenerationApiService.generateChapterStructure({
-                    storyId,
-                    chapterNumber: dto.chapterNumber,
-                    storyOutline: storyGeneration.response?.outline || '',
-                    previousChaptersSummaries: previousSummaries,
-                    aiProvider,
+            const lastChapterGeneration =
+                await this.chapterGenerationRepository.findOne({
+                    where: {
+                        chapterId: lastChapter.id,
+                        storyGenerationId: storyGeneration.id,
+                    },
                 });
 
-            // STEP 3: Generate complete chapter
-            const completeChapter =
-                await this.storyGenerationApiService.generateCompleteChapter({
-                    storyId,
-                    chapterNumber: dto.chapterNumber,
-                    chapterStructure: structureResponse.structure,
-                    wordCount: dto.wordCount || 1300,
-                    aiProvider,
-                });
+            let previousChapterMeta;
 
-            // Save chapter
+            if (chapterNumber === 2) {
+                previousChapterMeta = JSON.stringify({
+                    genres: storyGeneration.genres,
+                    mainCharacter: storyGeneration.mainCharacter,
+                    subCharacters: storyGeneration.subCharacters,
+                    setting: storyGeneration.setting,
+                    hiddenTheme: storyGeneration.hiddenTheme,
+                    writingStyle: storyGeneration.writingStyle,
+                    antagonist: storyGeneration.antagonist,
+                    motif: storyGeneration.motif,
+                    tone: storyGeneration.tone,
+                    plotLogic: storyGeneration.plotLogic,
+                });
+            } else {
+                previousChapterMeta = lastChapterGeneration
+                    ? JSON.stringify(
+                          excludeFields(lastChapterGeneration.structure, [
+                              'summary',
+                          ]),
+                      )
+                    : null;
+            }
+
+            let chapterStructureResponse: ChapterStructureResponse;
+            const totalChapters = storyGeneration.prompt.numberOfChapters;
+            const penultimateChapterNumber = totalChapters - 1;
+
+            if (chapterNumber > 1 && chapterNumber < penultimateChapterNumber) {
+                chapterStructureResponse =
+                    await this.storyGenerationApiService.generateMiddleChapters(
+                        {
+                            storyId,
+                            chapterNumber,
+                            previousChapterSummary:
+                                lastChapterGeneration?.structure.summary || '',
+                            aiProvider: dto.aiProvider || 'grok',
+                            storyPrompt: dto.storyPrompt || '',
+                            direction: dto.direction || '',
+                            previousChapterMeta,
+                        },
+                    );
+            } else if (chapterNumber === penultimateChapterNumber) {
+                chapterStructureResponse =
+                    await this.storyGenerationApiService.generatePenultimateChapter(
+                        {
+                            storyId,
+                            chapterNumber,
+                            previousChapterSummary:
+                                lastChapterGeneration?.structure.summary || '',
+                            aiProvider: dto.aiProvider || 'grok',
+                            storyPrompt: dto.storyPrompt || '',
+                            direction: dto.direction || '',
+                            previousChapterMeta,
+                        },
+                    );
+            } else if (chapterNumber === totalChapters) {
+                chapterStructureResponse =
+                    await this.storyGenerationApiService.generateFinalChapter({
+                        storyId,
+                        chapterNumber,
+                        previousChapterSummary:
+                            lastChapterGeneration?.structure.summary || '',
+                        aiProvider: dto.aiProvider || 'grok',
+                        storyPrompt: dto.storyPrompt || '',
+                        direction: dto.direction || '',
+                        previousChapterMeta,
+                    });
+            } else {
+                throw new BadRequestException(
+                    'All chapters have already been generated.',
+                );
+            }
+
             const chapter = this.chapterRepository.create({
                 storyId,
-                index: dto.chapterNumber,
-                title: `Chương ${dto.chapterNumber}`,
-                content: completeChapter.content || '',
+                index: chapterNumber,
+                title: chapterStructureResponse.title,
+                content: chapterStructureResponse.content,
             });
 
             const savedChapter = await this.chapterRepository.save(chapter);
 
-            // Create chapter generation record
             const chapterGeneration = this.chapterGenerationRepository.create({
                 storyGenerationId: storyGeneration.id,
                 chapterId: savedChapter.id,
-                chapterNumber: dto.chapterNumber,
-                generatedContent: completeChapter.content,
-                structure: {
-                    summary: completeChapter.summary,
-                    imagePrompt: completeChapter.imagePrompt,
-                },
-            });
-
-            await this.chapterGenerationRepository.save(chapterGeneration);
-
-            return {
-                chapterId: savedChapter.id,
-                chapterNumber: dto.chapterNumber,
-                title: savedChapter.title,
-                content: completeChapter.content,
-                summary: completeChapter.summary,
-                imagePrompt: completeChapter.imagePrompt,
-                message: 'Chapter generated successfully',
-            };
-        } catch (error) {
-            console.error(
-                `Error generating chapter ${dto.chapterNumber} for story ${storyId}:`,
-                error,
-            );
-            throw error;
-        }
-    }
-
-    // Legacy Chapter Generation Method
-    async generateChapter(
-        storyId: string,
-        generateChapterDto: GenerateChapterDto,
-    ): Promise<{
-        chapter: Chapter;
-        structure: ChapterStructureResponseDto;
-        generation: ChapterGeneration;
-    }> {
-        // Get existing chapters
-        const existingChapters = await this.findChaptersByStory(storyId);
-        const nextIndex = existingChapters.length + 1;
-
-        // Collect summaries from all previous chapters if not provided
-        let previousChaptersSummaries =
-            generateChapterDto.previousChaptersSummaries || [];
-        if (
-            previousChaptersSummaries.length === 0 &&
-            existingChapters.length > 0
-        ) {
-            // Auto-generate summaries from existing chapters
-            previousChaptersSummaries = existingChapters.map(
-                (chapter, index) => {
-                    const summary = chapter.content?.substring(0, 300) || '';
-                    return `Chương ${index + 1}: ${summary}...`;
-                },
-            );
-        }
-
-        // Create story generation record for batch tracking
-        const storyGeneration = this.storyGenerationRepository.create({
-            storyId,
-            type: GenerationType.CHAPTER,
-            status: GenerationStatus.IN_PROGRESS,
-            aiProvider: generateChapterDto.aiProvider || 'gpt',
-            aiModel:
-                generateChapterDto.aiProvider === 'grok'
-                    ? 'grok-4'
-                    : 'gpt-4o-mini',
-            chapterNumber: nextIndex,
-            prompt: {
-                chapterNumber: nextIndex,
-                previousChaptersSummaries,
-                wordCount: generateChapterDto.wordCount,
-            },
-            // Store story attributes as direct columns
-            title: generateChapterDto.storyAttributes?.title,
-            synopsis: generateChapterDto.storyAttributes?.synopsis,
-            genres: generateChapterDto.storyAttributes?.genres,
-            mainCharacter: generateChapterDto.storyAttributes?.mainCharacter,
-            subCharacters: generateChapterDto.storyAttributes?.subCharacters,
-            setting: generateChapterDto.storyAttributes?.setting,
-            plotTheme: generateChapterDto.storyAttributes?.plotTheme,
-            writingStyle: generateChapterDto.storyAttributes?.writingStyle,
-            additionalContext:
-                generateChapterDto.storyAttributes?.additionalContext,
-        });
-
-        const savedStoryGeneration =
-            await this.storyGenerationRepository.save(storyGeneration);
-
-        try {
-            // Generate chapter structure using AI
-            const chapterStructure =
-                await this.storyGenerationApiService.generateChapter(
-                    generateChapterDto,
-                );
-
-            // Create chapter with generated content
-            const chapter = this.chapterRepository.create({
-                storyId,
-                index: nextIndex,
-                title: `Chương ${nextIndex}`,
-                content: chapterStructure.content || '',
-            });
-
-            const savedChapter = await this.chapterRepository.save(chapter);
-
-            // Create chapter generation record
-            const chapterGeneration = this.chapterGenerationRepository.create({
-                storyGenerationId: savedStoryGeneration.id,
-                chapterId: savedChapter.id,
-                chapterNumber: nextIndex,
-                generatedContent: chapterStructure.content,
-                structure: {
-                    openingHook: chapterStructure.openingHook,
-                    sceneSetting: chapterStructure.sceneSetting,
-                    characterIntroduction:
-                        chapterStructure.characterIntroduction,
-                    plotDevelopment: chapterStructure.plotDevelopment,
-                },
+                chapterNumber,
+                generatedContent: chapterStructureResponse.content,
+                structure: chapterStructureResponse.structure,
             });
 
             const savedChapterGeneration =
                 await this.chapterGenerationRepository.save(chapterGeneration);
 
-            // Update story generation record
-            savedStoryGeneration.status = GenerationStatus.COMPLETED;
-            savedStoryGeneration.response = {
+            storyGeneration.response = {
                 chapterId: savedChapter.id,
-                structure: savedChapterGeneration.structure,
+                chapterNumber,
+                structure: chapterStructureResponse.structure,
             };
-            await this.storyGenerationRepository.save(savedStoryGeneration);
+            await this.storyGenerationRepository.save(storyGeneration);
 
             return {
                 chapter: savedChapter,
-                structure: chapterStructure,
+                structure: chapterStructureResponse.structure,
                 generation: savedChapterGeneration,
             };
         } catch (error) {
-            // Update generation record with error
-            savedStoryGeneration.status = GenerationStatus.FAILED;
-            savedStoryGeneration.errorMessage = error.message;
-            await this.storyGenerationRepository.save(savedStoryGeneration);
+            console.error('Error generating middle chapters:', error);
             throw error;
         }
     }
+
+    // Legacy Chapter Generation Method
+    // async generateChapter(
+    //     storyId: string,
+    //     generateChapterDto: GenerateChapterDto,
+    // ): Promise<{
+    //     chapter: Chapter;
+    //     structure: ChapterStructureResponseDto;
+    //     generation: ChapterGeneration;
+    // }> {
+    //     // Get existing chapters
+    //     const existingChapters = await this.findChaptersByStory(storyId);
+    //     const nextIndex = existingChapters.length + 1;
+
+    //     // Collect summaries from all previous chapters if not provided
+    //     let previousChaptersSummaries =
+    //         generateChapterDto.previousChaptersSummaries || [];
+    //     if (
+    //         previousChaptersSummaries.length === 0 &&
+    //         existingChapters.length > 0
+    //     ) {
+    //         // Auto-generate summaries from existing chapters
+    //         previousChaptersSummaries = existingChapters.map(
+    //             (chapter, index) => {
+    //                 const summary = chapter.content?.substring(0, 300) || '';
+    //                 return `Chương ${index + 1}: ${summary}...`;
+    //             },
+    //         );
+    //     }
+
+    //     // Create story generation record for batch tracking
+    //     const storyGeneration = this.storyGenerationRepository.create({
+    //         storyId,
+    //         type: GenerationType.CHAPTER,
+    //         status: GenerationStatus.IN_PROGRESS,
+    //         aiProvider: generateChapterDto.aiProvider || 'gpt',
+    //         aiModel:
+    //             generateChapterDto.aiProvider === 'grok'
+    //                 ? 'grok-4'
+    //                 : 'gpt-4o-mini',
+    //         chapterNumber: nextIndex,
+    //         prompt: {
+    //             chapterNumber: nextIndex,
+    //             previousChaptersSummaries,
+    //             wordCount: generateChapterDto.wordCount,
+    //         },
+    //         // Store story attributes as direct columns
+    //         title: generateChapterDto.storyAttributes?.title,
+    //         synopsis: generateChapterDto.storyAttributes?.synopsis,
+    //         genres: generateChapterDto.storyAttributes?.genres,
+    //         mainCharacter: generateChapterDto.storyAttributes?.mainCharacter,
+    //         subCharacters: generateChapterDto.storyAttributes?.subCharacters,
+    //         setting: generateChapterDto.storyAttributes?.setting,
+    //         plotTheme: generateChapterDto.storyAttributes?.plotTheme,
+    //         writingStyle: generateChapterDto.storyAttributes?.writingStyle,
+    //         additionalContext:
+    //             generateChapterDto.storyAttributes?.additionalContext,
+    //     });
+
+    //     const savedStoryGeneration =
+    //         await this.storyGenerationRepository.save(storyGeneration);
+
+    //     try {
+    //         // Generate chapter structure using AI
+    //         const chapterStructure =
+    //             await this.storyGenerationApiService.generateChapter(
+    //                 generateChapterDto,
+    //             );
+
+    //         // Create chapter with generated content
+    //         const chapter = this.chapterRepository.create({
+    //             storyId,
+    //             index: nextIndex,
+    //             title: `Chương ${nextIndex}`,
+    //             content: chapterStructure.content || '',
+    //         });
+
+    //         const savedChapter = await this.chapterRepository.save(chapter);
+
+    //         // Create chapter generation record
+    //         const chapterGeneration = this.chapterGenerationRepository.create({
+    //             storyGenerationId: savedStoryGeneration.id,
+    //             chapterId: savedChapter.id,
+    //             chapterNumber: nextIndex,
+    //             generatedContent: chapterStructure.content,
+    //             structure: {
+    //                 openingHook: chapterStructure.openingHook,
+    //                 sceneSetting: chapterStructure.sceneSetting,
+    //                 characterIntroduction:
+    //                     chapterStructure.characterIntroduction,
+    //                 plotDevelopment: chapterStructure.plotDevelopment,
+    //             },
+    //         });
+
+    //         const savedChapterGeneration =
+    //             await this.chapterGenerationRepository.save(chapterGeneration);
+
+    //         // Update story generation record
+    //         savedStoryGeneration.status = GenerationStatus.COMPLETED;
+    //         savedStoryGeneration.response = {
+    //             chapterId: savedChapter.id,
+    //             structure: savedChapterGeneration.structure,
+    //         };
+    //         await this.storyGenerationRepository.save(savedStoryGeneration);
+
+    //         return {
+    //             chapter: savedChapter,
+    //             structure: chapterStructure,
+    //             generation: savedChapterGeneration,
+    //         };
+    //     } catch (error) {
+    //         // Update generation record with error
+    //         savedStoryGeneration.status = GenerationStatus.FAILED;
+    //         savedStoryGeneration.errorMessage = error.message;
+    //         await this.storyGenerationRepository.save(savedStoryGeneration);
+    //         throw error;
+    //     }
+    // }
 
     // Generation History Methods
     async getStoryGenerationHistory(

@@ -84,35 +84,12 @@ export class InitializeStoryResponseDto {
     numberOfChapters: number;
     outline: string;
 
-    message: string;
-}
-
-/**
- * Generate Single Chapter On-Demand
- * User requests to generate a specific chapter incrementally
- */
-export class GenerateChapterOnDemandDto {
-    @IsNumber()
-    chapterNumber: number; // Chapter number to generate
-
-    @IsOptional()
-    @IsNumber()
-    wordCount?: number; // Word count (default: 1300)
-
-    @IsOptional()
-    @IsString()
-    aiProvider?: 'grok' | 'gpt'; // Default: 'grok'
-}
-
-/**
- * Response: Generated chapter
- */
-export class GenerateChapterOnDemandResponseDto {
     chapterId: string;
     chapterNumber: number;
-    title: string;
-    content: string;
-    summary: string;
-    imagePrompt: string;
+    chapterTitle: string;
+    chapterContent: string;
+    chapterSummary: string;
+    chapterImagePrompt: string;
+
     message: string;
 }

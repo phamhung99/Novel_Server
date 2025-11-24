@@ -71,9 +71,6 @@ export class StoryGeneration {
     })
     costUsd: number;
 
-    @Column({ name: 'chapter_number', type: 'int' })
-    chapterNumber: number;
-
     @Column({ name: 'error_message', type: 'text', nullable: true })
     errorMessage: string;
 
@@ -116,6 +113,9 @@ export class StoryGeneration {
 
     @Column({ name: 'hidden_theme', type: 'text', nullable: true })
     hiddenTheme?: string;
+
+    @Column({ name: 'prompt_version', type: 'int', default: 1 })
+    promptVersion: number;
 
     // removed in future versions
     @Column({ name: 'plot_theme', type: 'text', nullable: true })

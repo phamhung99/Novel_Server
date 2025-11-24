@@ -1,27 +1,10 @@
-import {
-    IsString,
-    IsOptional,
-    IsNumber,
-    IsObject,
-    IsArray,
-} from 'class-validator';
+import { IsString, IsOptional, IsNumber, IsObject } from 'class-validator';
 import { StoryAttributesDto } from './generate-story-outline.dto';
 
 export class GenerateChapterDto {
-    @IsString()
-    storyId: string;
-
-    @IsNumber()
-    chapterNumber: number;
-
     @IsOptional()
     @IsObject()
     storyAttributes?: StoryAttributesDto; // User-defined story context (optional - can be fetched from DB)
-
-    @IsOptional()
-    @IsArray()
-    @IsString({ each: true })
-    previousChaptersSummaries?: string[]; // Summaries of all previous chapters for context
 
     @IsOptional()
     @IsString()
@@ -30,51 +13,34 @@ export class GenerateChapterDto {
     @IsOptional()
     @IsNumber()
     wordCount?: number; // Target word count for chapter
-}
-
-export class ChapterStructureResponseDto {
-    chapterNumber: number;
-
-    openingHook: string;
-
-    sceneSetting: string;
-
-    characterIntroduction: string;
-
-    plotDevelopment: string;
-
-    content?: string; // Full generated content
-}
-
-/**
- * Request 3: Generate complete chapter
- * Using the chapter structure, generate full chapter content + summary + image prompt
- */
-export class GenerateCompleteChapterDto {
-    @IsString()
-    storyId?: string;
-
-    @IsNumber()
-    chapterNumber: number;
-
-    @IsString()
-    chapterStructure: string; // The chapter structure from Request 2
-
-    @IsOptional()
-    @IsNumber()
-    wordCount?: number; // Target word count (e.g., 1300)
 
     @IsOptional()
     @IsString()
-    aiProvider?: 'grok' | 'gpt'; // Default: 'gpt'
+    storyPrompt?: string; // Custom user prompt for chapter generation
+
+    @IsOptional()
+    @IsString()
+    direction: string; // Additional direction for chapter generation
 }
 
-/**
- * Response 3: Complete chapter with summary and image prompt
- */
-export class CompleteChapterResponseDto {
+export interface ChapterStructure {
+    summary: string;
+    directions: string[];
+    writingStyle: string;
+    tone: string;
+    plotLogic: string;
+    emotionalMotif: string;
+    mainCharacterArc: string;
+    subCharacterArc: string;
+    antagonistAction: string;
+    emotionChart: string;
+    philosophicalSubtheme: string;
+}
+
+export interface ChapterStructureResponse {
     chapterNumber: number;
-    content: string; // Full chapter content (~1300 words)
-    summary: string; // Chapter summary (~200 words)
-    imagePrompt: string; // Image generation prompt (~200 characters)
+    title: string;
+    content: string;
+    structure: ChapterStructure;
+    raw: string;
 }
