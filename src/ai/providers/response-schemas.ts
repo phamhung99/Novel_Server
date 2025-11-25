@@ -10,108 +10,129 @@
 export const STORY_OUTLINE_SCHEMA = {
     type: 'object',
     properties: {
-        // STORY
-        title: {
-            type: 'string',
-            description: 'Story title (**Tiêu đề truyện**)',
+        story: {
+            type: 'object',
+            properties: {
+                title: {
+                    type: 'string',
+                    description: 'Story title (**Tiêu đề truyện**)',
+                },
+                synopsis: {
+                    type: 'string',
+                    description: 'Story synopsis (2-3 sentences)',
+                },
+                genres: {
+                    type: 'array',
+                    items: { type: 'string' },
+                    description: 'Array of story genres (**Thể loại truyện**)',
+                },
+                setting: {
+                    type: 'string',
+                    description: 'Story location/environment (**Bối cảnh**)',
+                },
+                mainCharacter: {
+                    type: 'string',
+                    description:
+                        'Main protagonist (**Nhân vật chính**) name and brief description',
+                },
+                subCharacters: {
+                    type: 'string',
+                    description:
+                        'Supporting characters (**Nhân vật phụ**), comma-separated',
+                },
+                antagonist: {
+                    type: 'string',
+                    description:
+                        'Antagonist of the story (**Phản diện**), may be hidden or explicit',
+                },
+                motif: {
+                    type: 'string',
+                    description:
+                        'Recurring motif/emotional symbol throughout the story (**Motif cảm xúc**)',
+                },
+                tone: {
+                    type: 'string',
+                    description:
+                        'Overall emotional tone of the story (**Tông cảm xúc nền**)',
+                },
+                writingStyle: {
+                    type: 'string',
+                    description:
+                        'Preferred writing style (**Phong cách viết**)',
+                },
+                plotLogic: {
+                    type: 'string',
+                    description:
+                        'Internal logic / story progression (**Logic phát triển**)',
+                },
+                hiddenTheme: {
+                    type: 'string',
+                    description:
+                        'Underlying theme or message (**Chủ đề tiềm ẩn**)',
+                },
+                numberOfChapters: {
+                    type: 'number',
+                    description: 'Total number of chapters',
+                },
+                outline: {
+                    type: 'string',
+                    description: 'Full story outline text',
+                },
+            },
+            required: [
+                'title',
+                'synopsis',
+                'genres',
+                'setting',
+                'mainCharacter',
+                'subCharacters',
+                'antagonist',
+                'motif',
+                'tone',
+                'writingStyle',
+                'plotLogic',
+                'hiddenTheme',
+            ],
         },
-        synopsis: {
-            type: 'string',
-            description: 'Story synopsis (2-3 sentences)',
-        },
-        genres: {
-            type: 'array',
-            items: { type: 'string' },
-            description: 'Array of story genres (**Thể loại truyện**)',
-        },
-        setting: {
-            type: 'string',
-            description: 'Story location/environment (**Bối cảnh**)',
-        },
-        mainCharacter: {
-            type: 'string',
-            description:
-                'Main protagonist (**Nhân vật chính**) name and brief description',
-        },
-        subCharacters: {
-            type: 'string',
-            description:
-                'Supporting characters (**Nhân vật phụ**), comma-separated',
-        },
-        antagonist: {
-            type: 'string',
-            description:
-                'Antagonist of the story (**Phản diện**), may be hidden or explicit',
-        },
-        motif: {
-            type: 'string',
-            description:
-                'Recurring motif/emotional symbol throughout the story (**Motif cảm xúc**)',
-        },
-        tone: {
-            type: 'string',
-            description:
-                'Overall emotional tone of the story (**Tông cảm xúc nền**)',
-        },
-        writingStyle: {
-            type: 'string',
-            description: 'Preferred writing style (**Phong cách viết**)',
-        },
-        plotLogic: {
-            type: 'string',
-            description:
-                'Internal logic / story progression (**Logic phát triển**)',
-        },
-        hiddenTheme: {
-            type: 'string',
-            description: 'Underlying theme or message (**Chủ đề tiềm ẩn**)',
-        },
-
-        // OUTPUT_CHUONG_1
-        chapterTitle: {
-            type: 'string',
-            description: 'Tiêu đề chương 1 (**Tiêu đề chương**)',
-        },
-        chapterContent: {
-            type: 'string',
-            description:
-                'Chi tiết nội dung chương 1 (~1300 từ) (**Nội dung chi tiết**)',
-        },
-        chapterSummary: {
-            type: 'string',
-            description: 'Tóm tắt chương 1 (~200 từ) (**Tóm tắt chương 1**)',
-        },
-        chapterDirections: {
-            type: 'array',
-            items: { type: 'string' },
-            description:
-                'Hai hướng phát triển chương 2, ≤12 từ mỗi hướng, dùng tên nhân vật cụ thể (**Hai hướng phát triển chương 2**)',
-        },
-        imagePrompt: {
-            type: 'string',
-            description:
-                'Prompt 20 từ tạo ảnh minh họa (**Prompt tạo ảnh minh họa**)',
+        chapter: {
+            type: 'object',
+            properties: {
+                title: {
+                    type: 'string',
+                    description: 'Tiêu đề chương 1 (**Tiêu đề chương**)',
+                },
+                content: {
+                    type: 'string',
+                    description:
+                        'Chi tiết nội dung chương 1 (~1300 từ) (**Nội dung chi tiết**)',
+                },
+                summary: {
+                    type: 'string',
+                    description:
+                        'Tóm tắt chương 1 (~200 từ) (**Tóm tắt chương 1**)',
+                },
+                directions: {
+                    type: 'array',
+                    items: { type: 'string' },
+                    description:
+                        'Hai hướng phát triển chương 2, ≤12 từ mỗi hướng, dùng tên nhân vật cụ thể (**Hai hướng phát triển chương 2**)',
+                },
+                imagePrompt: {
+                    type: 'string',
+                    description:
+                        'Prompt 20 từ tạo ảnh minh họa (**Prompt tạo ảnh minh họa**)',
+                },
+            },
+            required: [
+                'title',
+                'content',
+                'summary',
+                'directions',
+                'imagePrompt',
+            ],
         },
     },
-    required: [
-        'title',
-        'synopsis',
-        'genres',
-        'setting',
-        'mainCharacter',
-        'subCharacters',
-        'antagonist',
-        'motif',
-        'tone',
-        'writingStyle',
-        'plotLogic',
-        'hiddenTheme',
-        'chapterTitle',
-        'chapterContent',
-        'chapterSummary',
-        'chapterDirections',
-        'imagePrompt',
-    ],
+    required: ['story', 'chapter'],
 };
 
 export const CHAPTER_STRUCTURE_SCHEMA = {

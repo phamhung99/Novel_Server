@@ -19,31 +19,29 @@ import {
 
 // Internal DTOs for 3-step flow
 export interface StoryOutlineResponse {
-    // STORY
-    title: string;
-    synopsis: string;
-    genres: string[];
-
-    setting: string;
-    mainCharacter: string;
-    subCharacters: string;
-    antagonist: string;
-    motif: string;
-    tone: string;
-    writingStyle: string;
-    plotLogic: string;
-    hiddenTheme: string;
-
-    // OUTPUT_CHUONG_1
-    chapterTitle: string;
-    chapterContent: string;
-    chapterSummary: string;
-    chapterDirections: string[];
-    imagePrompt: string;
-
-    // EXTRA
-    numberOfChapters: number;
-    outline: string;
+    story: {
+        title: string;
+        synopsis: string;
+        genres: string[];
+        setting: string;
+        mainCharacter: string;
+        subCharacters: string;
+        antagonist: string;
+        motif: string;
+        tone: string;
+        writingStyle: string;
+        plotLogic: string;
+        hiddenTheme: string;
+        numberOfChapters: number;
+        outline: string;
+    };
+    chapter: {
+        title: string;
+        content: string;
+        summary: string;
+        directions: string[];
+        imagePrompt: string;
+    };
 }
 
 /**
@@ -486,145 +484,158 @@ cùng các thông tin sau ${dto.previousChapterMeta}
         numberOfChapters: number,
     ): StoryOutlineResponse {
         try {
-            console.log('content', content);
-
             const parsed = JSON.parse(content);
-            console.log('parsed', parsed);
+
+            const story = parsed.story || {};
+            const chapter = parsed.chapter || {};
 
             return {
-                title: parsed.title || 'Untitled',
-                synopsis: parsed.synopsis || '',
-                genres: Array.isArray(parsed.genres) ? parsed.genres : [],
-
-                setting: parsed.setting || '',
-                mainCharacter: parsed.mainCharacter || '',
-                subCharacters: parsed.subCharacters || '',
-                antagonist: parsed.antagonist || '',
-                motif: parsed.motif || '',
-                tone: parsed.tone || '',
-                writingStyle: parsed.writingStyle || '',
-                plotLogic: parsed.plotLogic || '',
-                hiddenTheme: parsed.hiddenTheme || '',
-
-                chapterTitle: parsed.chapterTitle || '',
-                chapterContent: parsed.chapterContent || '',
-                chapterSummary: parsed.chapterSummary || '',
-                chapterDirections: Array.isArray(parsed.chapterDirections)
-                    ? parsed.chapterDirections
-                    : [],
-                imagePrompt: parsed.imagePrompt || '',
-
-                numberOfChapters,
-                outline: parsed.outline || content,
+                story: {
+                    title: story.title || 'Untitled',
+                    synopsis: story.synopsis || '',
+                    genres: Array.isArray(story.genres) ? story.genres : [],
+                    setting: story.setting || '',
+                    mainCharacter: story.mainCharacter || '',
+                    subCharacters: story.subCharacters || '',
+                    antagonist: story.antagonist || '',
+                    motif: story.motif || '',
+                    tone: story.tone || '',
+                    writingStyle: story.writingStyle || '',
+                    plotLogic: story.plotLogic || '',
+                    hiddenTheme: story.hiddenTheme || '',
+                    numberOfChapters,
+                    outline: story.outline || content,
+                },
+                chapter: {
+                    title: chapter.title || '',
+                    content: chapter.content || '',
+                    summary: chapter.summary || '',
+                    directions: Array.isArray(chapter.directions)
+                        ? chapter.directions
+                        : [],
+                    imagePrompt: chapter.imagePrompt || '',
+                },
             };
-        } catch (jsonError) {
+        } catch (error) {
             this.logger.warn(
                 'Failed to parse JSON response, falling back to text parsing',
+                error,
             );
 
             try {
                 return {
-                    title:
-                        this.extractSection(
+                    story: {
+                        title:
+                            this.extractSection(
+                                content,
+                                'Tên truyện|Tiêu đề|Title',
+                            ) || 'Untitled',
+                        synopsis:
+                            this.extractSection(content, 'Tóm tắt|Synopsis') ||
+                            '',
+                        genres: this.extractArraySection(
                             content,
-                            'Tên truyện|Tiêu đề|Title',
-                        ) || 'Untitled',
-                    synopsis:
-                        this.extractSection(content, 'Tóm tắt|Synopsis') || '',
-
-                    genres: this.extractArraySection(
-                        content,
-                        'Thể loại|Genres',
-                    ),
-
-                    setting:
-                        this.extractSection(content, 'Bối cảnh|Setting') || '',
-                    mainCharacter:
-                        this.extractSection(
+                            'Thể loại|Genres',
+                        ),
+                        setting:
+                            this.extractSection(content, 'Bối cảnh|Setting') ||
+                            '',
+                        mainCharacter:
+                            this.extractSection(
+                                content,
+                                'Nhân vật chính|Main Character',
+                            ) || '',
+                        subCharacters:
+                            this.extractSection(
+                                content,
+                                'Nhân vật phụ|Sub Characters',
+                            ) || '',
+                        antagonist:
+                            this.extractSection(
+                                content,
+                                'Phản diện|Antagonist',
+                            ) || '',
+                        motif:
+                            this.extractSection(
+                                content,
+                                'Motif cảm xúc|Motif',
+                            ) || '',
+                        tone:
+                            this.extractSection(
+                                content,
+                                'Tông cảm xúc nền|Tone',
+                            ) || '',
+                        writingStyle:
+                            this.extractSection(
+                                content,
+                                'Phong cách viết|Writing Style',
+                            ) || '',
+                        plotLogic:
+                            this.extractSection(
+                                content,
+                                'Logic phát triển|Plot Logic',
+                            ) || '',
+                        hiddenTheme:
+                            this.extractSection(
+                                content,
+                                'Chủ đề tiềm ẩn|Hidden Theme',
+                            ) || '',
+                        numberOfChapters,
+                        outline: content,
+                    },
+                    chapter: {
+                        title:
+                            this.extractSection(
+                                content,
+                                'Tiêu đề chương|Chapter Title',
+                            ) || '',
+                        content:
+                            this.extractSection(
+                                content,
+                                'Nội dung chi tiết|Chapter Content',
+                            ) || '',
+                        summary:
+                            this.extractSection(
+                                content,
+                                'Tóm tắt chương|Chapter Summary',
+                            ) || '',
+                        directions: this.extractArraySection(
                             content,
-                            'Nhân vật chính|Main Character',
-                        ) || '',
-                    subCharacters:
-                        this.extractSection(
-                            content,
-                            'Nhân vật phụ|Sub Characters',
-                        ) || '',
-
-                    antagonist:
-                        this.extractSection(content, 'Phản diện|Antagonist') ||
-                        '',
-                    motif:
-                        this.extractSection(content, 'Motif cảm xúc|Motif') ||
-                        '',
-                    tone:
-                        this.extractSection(content, 'Tông cảm xúc nền|Tone') ||
-                        '',
-                    writingStyle:
-                        this.extractSection(
-                            content,
-                            'Phong cách viết|Writing Style',
-                        ) || '',
-                    plotLogic:
-                        this.extractSection(
-                            content,
-                            'Logic phát triển|Plot Logic',
-                        ) || '',
-                    hiddenTheme:
-                        this.extractSection(
-                            content,
-                            'Chủ đề tiềm ẩn|Hidden Theme',
-                        ) || '',
-
-                    chapterTitle:
-                        this.extractSection(
-                            content,
-                            'Tiêu đề chương|Chapter Title',
-                        ) || '',
-                    chapterContent:
-                        this.extractSection(
-                            content,
-                            'Nội dung chi tiết|Chapter Content',
-                        ) || '',
-                    chapterSummary:
-                        this.extractSection(
-                            content,
-                            'Tóm tắt chương|Chapter Summary',
-                        ) || '',
-                    chapterDirections: this.extractArraySection(
-                        content,
-                        'Hướng phát triển|Chapter Directions',
-                    ),
-                    imagePrompt:
-                        this.extractSection(
-                            content,
-                            'Prompt tạo ảnh|minh họa|Image Prompt',
-                        ) || '',
-
-                    numberOfChapters,
-                    outline: content,
+                            'Hướng phát triển|Chapter Directions',
+                        ),
+                        imagePrompt:
+                            this.extractSection(
+                                content,
+                                'Prompt tạo ảnh|minh họa|Image Prompt',
+                            ) || '',
+                    },
                 };
             } catch (error) {
                 this.logger.error('Error parsing story outline:', error);
                 return {
-                    title: 'Untitled',
-                    synopsis: '',
-                    genres: [],
-                    setting: '',
-                    mainCharacter: '',
-                    subCharacters: '',
-                    antagonist: '',
-                    motif: '',
-                    tone: '',
-                    writingStyle: '',
-                    plotLogic: '',
-                    hiddenTheme: '',
-                    chapterTitle: '',
-                    chapterContent: '',
-                    chapterSummary: '',
-                    chapterDirections: [],
-                    imagePrompt: '',
-                    numberOfChapters,
-                    outline: content,
+                    story: {
+                        title: 'Untitled',
+                        synopsis: '',
+                        genres: [],
+                        setting: '',
+                        mainCharacter: '',
+                        subCharacters: '',
+                        antagonist: '',
+                        motif: '',
+                        tone: '',
+                        writingStyle: '',
+                        plotLogic: '',
+                        hiddenTheme: '',
+                        numberOfChapters,
+                        outline: content,
+                    },
+                    chapter: {
+                        title: '',
+                        content: '',
+                        summary: '',
+                        directions: [],
+                        imagePrompt: '',
+                    },
                 };
             }
         }

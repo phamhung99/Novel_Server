@@ -330,8 +330,8 @@ export class StoryService {
 
             // Create story with generated attributes
             const story = this.storyRepository.create({
-                title: outlineResponse.title,
-                synopsis: outlineResponse.synopsis,
+                title: outlineResponse.story.title,
+                synopsis: outlineResponse.story.synopsis,
                 authorId: userId,
             });
             const savedStory = await this.storyRepository.save(story);
@@ -350,20 +350,20 @@ export class StoryService {
                     storyPrompt: dto.storyPrompt,
                     numberOfChapters: dto.numberOfChapters,
                 },
-                response: { outline: outlineResponse.outline },
+                response: { outline: outlineResponse.story.outline },
                 // Store story attributes
-                title: outlineResponse.title,
-                synopsis: outlineResponse.synopsis,
-                genres: outlineResponse.genres,
-                mainCharacter: outlineResponse.mainCharacter,
-                subCharacters: outlineResponse.subCharacters,
-                setting: outlineResponse.setting,
-                hiddenTheme: outlineResponse.hiddenTheme,
-                writingStyle: outlineResponse.writingStyle,
-                antagonist: outlineResponse.antagonist,
-                motif: outlineResponse.motif,
-                tone: outlineResponse.tone,
-                plotLogic: outlineResponse.plotLogic,
+                title: outlineResponse.story.title,
+                synopsis: outlineResponse.story.synopsis,
+                genres: outlineResponse.story.genres,
+                mainCharacter: outlineResponse.story.mainCharacter,
+                subCharacters: outlineResponse.story.subCharacters,
+                setting: outlineResponse.story.setting,
+                hiddenTheme: outlineResponse.story.hiddenTheme,
+                writingStyle: outlineResponse.story.writingStyle,
+                antagonist: outlineResponse.story.antagonist,
+                motif: outlineResponse.story.motif,
+                tone: outlineResponse.story.tone,
+                plotLogic: outlineResponse.story.plotLogic,
             });
 
             const savedStoryGeneration =
@@ -379,8 +379,8 @@ export class StoryService {
             const chapter = this.chapterRepository.create({
                 storyId: savedStory.id,
                 index: chapterNumber,
-                title: outlineResponse.title || 'chương 1',
-                content: outlineResponse.chapterContent || '',
+                title: outlineResponse.chapter.title || 'chương 1',
+                content: outlineResponse.chapter.content || '',
             });
 
             const savedChapter = await this.chapterRepository.save(chapter);
@@ -390,39 +390,42 @@ export class StoryService {
                 storyGenerationId: storyGeneration.id,
                 chapterId: savedChapter.id,
                 chapterNumber,
-                generatedContent: outlineResponse.chapterContent || '',
+                generatedContent: outlineResponse.chapter.content || '',
                 structure: {
-                    summary: outlineResponse.chapterSummary,
-                    imagePrompt: outlineResponse.imagePrompt,
-                    directions: outlineResponse.chapterDirections,
+                    summary: outlineResponse.chapter.summary,
+                    imagePrompt: outlineResponse.chapter.imagePrompt,
+                    directions: outlineResponse.chapter.directions,
                 },
             });
 
             await this.chapterGenerationRepository.save(chapterGeneration);
             return {
-                // story parts
-                storyId: savedStory.id,
-                title: outlineResponse.title,
-                synopsis: outlineResponse.synopsis,
-                genres: outlineResponse.genres,
-                mainCharacter: outlineResponse.mainCharacter,
-                subCharacters: outlineResponse.subCharacters,
-                antagonist: outlineResponse.antagonist,
-                motif: outlineResponse.motif,
-                tone: outlineResponse.tone,
-                plotLogic: outlineResponse.plotLogic,
-                setting: outlineResponse.setting,
-                hiddenTheme: outlineResponse.hiddenTheme,
-                writingStyle: outlineResponse.writingStyle,
-                numberOfChapters: dto.numberOfChapters,
-                outline: outlineResponse.outline,
-                // chapter parts
-                chapterId: savedChapter.id,
-                chapterNumber,
-                chapterTitle: savedChapter.title,
-                chapterContent: outlineResponse.chapterContent || '',
-                chapterSummary: outlineResponse.chapterSummary,
-                chapterImagePrompt: outlineResponse.imagePrompt,
+                story: {
+                    storyId: savedStory.id,
+                    title: outlineResponse.story.title,
+                    synopsis: outlineResponse.story.synopsis,
+                    genres: outlineResponse.story.genres,
+                    mainCharacter: outlineResponse.story.mainCharacter,
+                    subCharacters: outlineResponse.story.subCharacters,
+                    antagonist: outlineResponse.story.antagonist,
+                    motif: outlineResponse.story.motif,
+                    tone: outlineResponse.story.tone,
+                    plotLogic: outlineResponse.story.plotLogic,
+                    setting: outlineResponse.story.setting,
+                    hiddenTheme: outlineResponse.story.hiddenTheme,
+                    writingStyle: outlineResponse.story.writingStyle,
+                    numberOfChapters: dto.numberOfChapters,
+                    outline: outlineResponse.story.outline,
+                },
+                chapter: {
+                    id: savedChapter.id,
+                    number: chapterNumber,
+                    title: savedChapter.title,
+                    content: outlineResponse.chapter.content || '',
+                    summary: outlineResponse.chapter.summary,
+                    imagePrompt: outlineResponse.chapter.imagePrompt,
+                    directions: outlineResponse.chapter.directions,
+                },
                 message:
                     'Story outline generated successfully. Ready to generate chapters on-demand.',
             };
@@ -556,8 +559,7 @@ export class StoryService {
                 structure: chapterStructureResponse.structure,
             });
 
-            const savedChapterGeneration =
-                await this.chapterGenerationRepository.save(chapterGeneration);
+            await this.chapterGenerationRepository.save(chapterGeneration);
 
             storyGeneration.response = {
                 chapterId: savedChapter.id,
@@ -567,9 +569,13 @@ export class StoryService {
             await this.storyGenerationRepository.save(storyGeneration);
 
             return {
-                chapter: savedChapter,
+                chapterId: savedChapter.id,
+                number: chapterNumber,
+                title: chapterStructureResponse.title,
+                content: chapterStructureResponse.content,
+                summary: chapterStructureResponse.structure.summary,
                 structure: chapterStructureResponse.structure,
-                generation: savedChapterGeneration,
+                message: `Chapter ${chapterNumber} generated successfully.`,
             };
         } catch (error) {
             console.error('Error generating middle chapters:', error);
