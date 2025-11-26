@@ -21,7 +21,10 @@ import { UpdateChapterDto } from './dto/update-chapter.dto';
 import { RequestPublicationDto } from './dto/request-publication.dto';
 import { ApproveStoryDto } from './dto/approve-story.dto';
 import { RejectStoryDto } from './dto/reject-story.dto';
-import { GenerateChapterDto } from './dto/generate-chapter.dto';
+import {
+    GenerateChapterDto,
+    GenerateChapterResponseDto,
+} from './dto/generate-chapter.dto';
 import {
     InitializeStoryDto,
     InitializeStoryResponseDto,
@@ -286,7 +289,7 @@ export class StoryController {
     async generateChapterWithContext(
         @Param('storyId') storyId: string,
         @Body() generateChapterDto: GenerateChapterDto,
-    ) {
+    ): Promise<GenerateChapterResponseDto> {
         if (!storyId) {
             throw new BadRequestException('storyId is required');
         }

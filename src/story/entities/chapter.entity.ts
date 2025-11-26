@@ -6,8 +6,10 @@ import {
     UpdateDateColumn,
     ManyToOne,
     JoinColumn,
+    OneToMany,
 } from 'typeorm';
 import { Story } from './story.entity';
+import { ChapterGeneration } from './chapter-generation.entity';
 
 @Entity('chapter')
 export class Chapter {
@@ -20,6 +22,13 @@ export class Chapter {
     @ManyToOne(() => Story, (story) => story.chapters, { onDelete: 'CASCADE' })
     @JoinColumn({ name: 'story_id' })
     story: Story;
+
+    @OneToMany(
+        () => ChapterGeneration,
+        (chapterGeneration) => chapterGeneration.chapter,
+        { onDelete: 'CASCADE' },
+    )
+    chapterGenerations: ChapterGeneration[];
 
     @Column({ type: 'int' })
     index: number;

@@ -2,6 +2,8 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Dashboard from './pages/Dashboard';
 import UsersPage from './pages/UsersPage';
 import StoryUploadPage from './pages/StoryUploadPage';
+import StoryDetailsPage from './pages/StoryDetailsPage';
+import ChapterGeneratorPage from './pages/ChapterGeneratorPage';
 
 export default function App() {
     return (
@@ -16,6 +18,14 @@ export default function App() {
                     <Route
                         path="stories/upload"
                         element={<StoryUploadPage />}
+                    />
+                    <Route
+                        path="stories/details"
+                        element={<StoryDetailsPage />}
+                    />
+                    <Route
+                        path="chapter-generator"
+                        element={<ChapterGeneratorPage />}
                     />
                 </Route>
             </Routes>

@@ -84,7 +84,7 @@ export class InitializeStoryResponseDto {
     };
     chapter: {
         id: string;
-        number: number;
+        index: number;
         title: string;
         content?: string;
         summary?: string;

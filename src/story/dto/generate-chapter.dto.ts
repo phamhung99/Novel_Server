@@ -44,3 +44,13 @@ export interface ChapterStructureResponse {
     structure: ChapterStructure;
     raw: string;
 }
+
+export class GenerateChapterResponseDto {
+    chapterId: string;
+    index: number;
+    title: string;
+    content: string;
+    summary: string;
+    structure: ChapterStructure;
+    message: string;
+}

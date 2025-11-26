@@ -21,6 +21,7 @@ import { StoryStatus } from '../common/enums/story-status.enum';
 import {
     ChapterStructureResponse,
     GenerateChapterDto,
+    GenerateChapterResponseDto,
 } from './dto/generate-chapter.dto';
 import {
     InitializeStoryDto,
@@ -162,10 +163,26 @@ export class StoryService {
     }
 
     async findChaptersByStory(storyId: string): Promise<Chapter[]> {
-        return this.chapterRepository.find({
+        const chapters = await this.chapterRepository.find({
+            select: {
+                id: true,
+                index: true,
+                title: true,
+                content: true,
+                chapterGenerations: {
+                    id: true,
+                    structure: true,
+                },
+            },
             where: { storyId },
+            relations: ['chapterGenerations'],
             order: { index: 'ASC' },
         });
+
+        return chapters.map((chapter) => ({
+            ...chapter,
+            structure: chapter.chapterGenerations?.[0]?.structure || null,
+        }));
     }
 
     async findChapterById(id: string): Promise<Chapter> {
@@ -419,7 +436,7 @@ export class StoryService {
                 },
                 chapter: {
                     id: savedChapter.id,
-                    number: chapterNumber,
+                    index: chapterNumber,
                     title: savedChapter.title,
                     content: outlineResponse.chapter.content || '',
                     summary: outlineResponse.chapter.summary,
@@ -435,7 +452,10 @@ export class StoryService {
         }
     }
 
-    async generateChapters(storyId: string, dto: GenerateChapterDto) {
+    async generateChapters(
+        storyId: string,
+        dto: GenerateChapterDto,
+    ): Promise<GenerateChapterResponseDto> {
         try {
             const storyGeneration =
                 await this.storyGenerationRepository.findOne({
@@ -570,7 +590,7 @@ export class StoryService {
 
             return {
                 chapterId: savedChapter.id,
-                number: chapterNumber,
+                index: chapterNumber,
                 title: chapterStructureResponse.title,
                 content: chapterStructureResponse.content,
                 summary: chapterStructureResponse.structure.summary,
