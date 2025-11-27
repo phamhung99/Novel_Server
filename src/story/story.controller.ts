@@ -9,9 +9,9 @@ import {
     Param,
     Headers,
     BadRequestException,
-    UseInterceptors,
-    UploadedFile,
-    ParseFilePipe,
+    // UseInterceptors,
+    // UploadedFile,
+    // ParseFilePipe,
 } from '@nestjs/common';
 import { StoryService } from './story.service';
 import { CreateStoryDto } from './dto/create-story.dto';
@@ -29,64 +29,59 @@ import {
     InitializeStoryDto,
     InitializeStoryResponseDto,
 } from './dto/generate-story-outline.dto';
-import { FileInterceptor } from '@nestjs/platform-express';
-import { diskStorage } from 'multer';
-import { extname, join } from 'path';
-import { existsSync, mkdirSync } from 'fs';
-import { MAX_FILE_SIZE_UPLOAD } from 'src/common/constants/app.constant';
-import { CustomMaxFileSizeValidator } from 'src/common/validators/custom-max-file-size.validator';
-import { MimeTypeValidator } from 'src/common/validators/mime-type.validator';
-import { AllowedImageMimeTypes } from 'src/common/enums/app.enum';
-
-const tmpDir =
-    process.env.NODE_ENV === 'production' ? '/tmp' : join(process.cwd(), 'tmp');
-
-if (!existsSync(tmpDir)) mkdirSync(tmpDir);
+// import { FileInterceptor } from '@nestjs/platform-express';
+// import { diskStorage } from 'multer';
+// import { extname, join } from 'path';
+// import { existsSync, mkdirSync } from 'fs';
+// import { MAX_FILE_SIZE_UPLOAD } from 'src/common/constants/app.constant';
+// import { CustomMaxFileSizeValidator } from 'src/common/validators/custom-max-file-size.validator';
+// import { MimeTypeValidator } from 'src/common/validators/mime-type.validator';
+// import { AllowedImageMimeTypes } from 'src/common/enums/app.enum';
 
 @Controller('story')
 export class StoryController {
     constructor(private readonly storyService: StoryService) {}
 
-    @Post('upload-cover')
-    @UseInterceptors(
-        FileInterceptor('image', {
-            storage: diskStorage({
-                destination: tmpDir,
-                filename: (req, file, cb) => {
-                    const uniqueSuffix =
-                        Date.now() + '-' + Math.round(Math.random() * 1e9);
-                    cb(
-                        null,
-                        `${file.fieldname}-${uniqueSuffix}${extname(file.originalname)}`,
-                    );
-                },
-            }),
-        }),
-    )
-    async uploadCover(
-        @Headers('x-user-id') userId: string,
-        @UploadedFile(
-            new ParseFilePipe({
-                validators: [
-                    new CustomMaxFileSizeValidator(MAX_FILE_SIZE_UPLOAD),
-                    new MimeTypeValidator(AllowedImageMimeTypes),
-                ],
-                fileIsRequired: true,
-            }),
-        )
-        image: Express.Multer.File,
-    ): Promise<any> {
-        if (!userId) {
-            throw new BadRequestException('userId is required');
-        }
-        if (!image) {
-            throw new BadRequestException('No file uploaded');
-        }
-        return {
-            filename: image.filename,
-            path: image.path,
-        };
-    }
+    // @Post('upload-cover')
+    // @UseInterceptors(
+    //     FileInterceptor('image', {
+    //         storage: diskStorage({
+    //             destination: tmpDir,
+    //             filename: (req, file, cb) => {
+    //                 const uniqueSuffix =
+    //                     Date.now() + '-' + Math.round(Math.random() * 1e9);
+    //                 cb(
+    //                     null,
+    //                     `${file.fieldname}-${uniqueSuffix}${extname(file.originalname)}`,
+    //                 );
+    //             },
+    //         }),
+    //     }),
+    // )
+    // async uploadCover(
+    //     @Headers('x-user-id') userId: string,
+    //     @UploadedFile(
+    //         new ParseFilePipe({
+    //             validators: [
+    //                 new CustomMaxFileSizeValidator(MAX_FILE_SIZE_UPLOAD),
+    //                 new MimeTypeValidator(AllowedImageMimeTypes),
+    //             ],
+    //             fileIsRequired: true,
+    //         }),
+    //     )
+    //     image: Express.Multer.File,
+    // ): Promise<any> {
+    //     if (!userId) {
+    //         throw new BadRequestException('userId is required');
+    //     }
+    //     if (!image) {
+    //         throw new BadRequestException('No file uploaded');
+    //     }
+    //     return {
+    //         filename: image.filename,
+    //         path: image.path,
+    //     };
+    // }
 
     @Post()
     async createStory(
