@@ -4,7 +4,7 @@ import {
     BadRequestException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { IsNull, Not, Repository } from 'typeorm';
 import { Story } from './entities/story.entity';
 import { Chapter } from './entities/chapter.entity';
 import {
@@ -120,7 +120,7 @@ export class StoryService {
 
     async findDeletedStories(): Promise<Story[]> {
         return this.storyRepository.find({
-            where: {},
+            where: { deletedAt: Not(IsNull()) },
             withDeleted: true,
             relations: ['author', 'chapters'],
             order: { deletedAt: 'DESC' },
@@ -334,6 +334,10 @@ export class StoryService {
         // Validate numberOfChapters (max 10)
         if (dto.numberOfChapters > 10) {
             throw new BadRequestException('Maximum 10 chapters allowed');
+        }
+
+        if (dto.storyPrompt.trim().length === 0) {
+            throw new BadRequestException('Story prompt cannot be empty');
         }
 
         try {
