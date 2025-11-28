@@ -62,6 +62,9 @@ export class ChapterGeneration {
     @Column({ name: 'error_message', type: 'text', nullable: true })
     errorMessage: string;
 
+    @Column({ name: 'request_id', nullable: true })
+    requestId: string;
+
     @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
     createdAt: Date;
 

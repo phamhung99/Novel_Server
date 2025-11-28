@@ -2,6 +2,8 @@ import {
     Injectable,
     NotFoundException,
     BadRequestException,
+    HttpException,
+    HttpStatus,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { IsNull, Not, Repository } from 'typeorm';
@@ -382,6 +384,7 @@ export class StoryService {
      */
     async initializeStoryWithOutline(
         userId: string,
+        requestId: string,
         dto: InitializeStoryDto,
     ): Promise<InitializeStoryResponseDto> {
         // Validate numberOfChapters (max 10)
@@ -394,6 +397,25 @@ export class StoryService {
         }
 
         try {
+            // Create story generation record with requestId first
+            const storyGeneration = this.storyGenerationRepository.create({
+                requestId,
+                type: GenerationType.CHAPTER,
+                status: GenerationStatus.IN_PROGRESS,
+                aiProvider: dto.aiProvider || 'grok',
+                aiModel:
+                    (dto.aiProvider || 'grok') === 'grok'
+                        ? 'grok-4'
+                        : 'gpt-4o-mini',
+                prompt: {
+                    storyPrompt: dto.storyPrompt,
+                    numberOfChapters: dto.numberOfChapters,
+                },
+            });
+
+            const savedStoryGeneration =
+                await this.storyGenerationRepository.save(storyGeneration);
+
             const outlineResponse =
                 await this.storyGenerationApiService.generateStoryOutline({
                     storyPrompt: dto.storyPrompt,
@@ -410,38 +432,28 @@ export class StoryService {
             });
             const savedStory = await this.storyRepository.save(story);
 
-            // Create story generation record with outline and attributes
-            const storyGeneration = this.storyGenerationRepository.create({
-                storyId: savedStory.id,
-                type: GenerationType.CHAPTER,
-                status: GenerationStatus.IN_PROGRESS,
-                aiProvider: dto.aiProvider || 'grok',
-                aiModel:
-                    (dto.aiProvider || 'grok') === 'grok'
-                        ? 'grok-4'
-                        : 'gpt-4o-mini',
-                prompt: {
-                    storyPrompt: dto.storyPrompt,
-                    numberOfChapters: dto.numberOfChapters,
+            // Update story generation record with story reference and attributes
+            await this.storyGenerationRepository.update(
+                { id: savedStoryGeneration.id },
+                {
+                    storyId: savedStory.id,
+                    response: {
+                        outline: outlineResponse.story.outline,
+                    } as any,
+                    title: outlineResponse.story.title,
+                    synopsis: outlineResponse.story.synopsis,
+                    genres: outlineResponse.story.genres,
+                    mainCharacter: outlineResponse.story.mainCharacter,
+                    subCharacters: outlineResponse.story.subCharacters,
+                    setting: outlineResponse.story.setting,
+                    hiddenTheme: outlineResponse.story.hiddenTheme,
+                    writingStyle: outlineResponse.story.writingStyle,
+                    antagonist: outlineResponse.story.antagonist,
+                    motif: outlineResponse.story.motif,
+                    tone: outlineResponse.story.tone,
+                    plotLogic: outlineResponse.story.plotLogic,
                 },
-                response: { outline: outlineResponse.story.outline },
-                // Store story attributes
-                title: outlineResponse.story.title,
-                synopsis: outlineResponse.story.synopsis,
-                genres: outlineResponse.story.genres,
-                mainCharacter: outlineResponse.story.mainCharacter,
-                subCharacters: outlineResponse.story.subCharacters,
-                setting: outlineResponse.story.setting,
-                hiddenTheme: outlineResponse.story.hiddenTheme,
-                writingStyle: outlineResponse.story.writingStyle,
-                antagonist: outlineResponse.story.antagonist,
-                motif: outlineResponse.story.motif,
-                tone: outlineResponse.story.tone,
-                plotLogic: outlineResponse.story.plotLogic,
-            });
-
-            const savedStoryGeneration =
-                await this.storyGenerationRepository.save(storyGeneration);
+            );
 
             // Update story's generation reference
             savedStory.generation = savedStoryGeneration;
@@ -812,5 +824,114 @@ export class StoryService {
             relations: ['chapter'],
             order: { createdAt: 'DESC' },
         });
+    }
+
+    async previewStory(id: string): Promise<any> {
+        const story = await this.storyRepository.findOne({
+            where: { id },
+            relations: {
+                generation: true,
+                chapters: true,
+            },
+            select: {
+                id: true,
+                title: true,
+                synopsis: true,
+                authorId: true,
+                chapters: {
+                    id: true,
+                    index: true,
+                    title: true,
+                    content: true,
+                },
+                generation: {
+                    mainCharacter: true,
+                    subCharacters: true,
+                    antagonist: true,
+                    motif: true,
+                    tone: true,
+                    plotLogic: true,
+                    setting: true,
+                    hiddenTheme: true,
+                    writingStyle: true,
+                    genres: true,
+                    prompt: true,
+                },
+            },
+            order: {
+                chapters: {
+                    index: 'ASC',
+                },
+            },
+        });
+
+        if (!story) {
+            throw new NotFoundException(`Story with ID ${id} not found`);
+        }
+
+        const firstChapter = story.chapters?.[0];
+
+        return {
+            story: {
+                storyId: story.id,
+                title: story.title,
+                synopsis: story.synopsis,
+                genres: story.generation?.genres || [],
+                mainCharacter: story.generation?.mainCharacter || '',
+                subCharacters: story.generation?.subCharacters || [],
+                antagonist: story.generation?.antagonist || '',
+                motif: story.generation?.motif || '',
+                tone: story.generation?.tone || '',
+                plotLogic: story.generation?.plotLogic || '',
+                setting: story.generation?.setting || '',
+                hiddenTheme: story.generation?.hiddenTheme || '',
+                writingStyle: story.generation?.writingStyle || '',
+                numberOfChapters:
+                    story.generation?.prompt?.numberOfChapters || 0,
+                outline: story.generation?.response?.outline || '',
+            },
+            chapter: firstChapter
+                ? {
+                      id: firstChapter.id,
+                      index: firstChapter.index,
+                      title: firstChapter.title,
+                      content: firstChapter.content || '',
+                      summary: '',
+                      imagePrompt: '',
+                      directions: '',
+                  }
+                : null,
+        };
+    }
+
+    async getInitializationResults(requestId: string): Promise<any> {
+        const generation = await this.storyGenerationRepository.findOne({
+            where: { requestId },
+        });
+
+        if (!generation) {
+            throw new HttpException(
+                `No initialization results found for requestId ${requestId}`,
+                HttpStatus.NOT_FOUND,
+            );
+        }
+
+        const { storyId, errorMessage } = generation;
+
+        if (storyId) {
+            return this.previewStory(storyId);
+        }
+
+        if (errorMessage) {
+            throw new HttpException(
+                errorMessage,
+                HttpStatus.INTERNAL_SERVER_ERROR,
+            );
+        }
+
+        throw new HttpException(
+            'Story is still being generated. Please try again later.',
+            HttpStatus.ACCEPTED,
+        );
     }
 }

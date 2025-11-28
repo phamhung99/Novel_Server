@@ -27,7 +27,7 @@ export class StoryGeneration {
     @PrimaryGeneratedColumn('uuid')
     id: string;
 
-    @Column({ name: 'story_id' })
+    @Column({ name: 'story_id', nullable: true })
     storyId: string;
 
     @ManyToOne(() => Story, { onDelete: 'CASCADE' })
@@ -116,6 +116,9 @@ export class StoryGeneration {
 
     @Column({ name: 'prompt_version', type: 'int', default: 1 })
     promptVersion: number;
+
+    @Column({ name: 'request_id', nullable: true })
+    requestId: string;
 
     // removed in future versions
     @Column({ name: 'plot_theme', type: 'text', nullable: true })

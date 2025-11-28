@@ -269,6 +269,7 @@ export class StoryController {
     @Post('generate/initialize')
     async initializeStory(
         @Headers('x-user-id') userId: string,
+        @Headers('x-request-id') requestId: string,
         @Body() initializeStoryDto: InitializeStoryDto,
     ): Promise<InitializeStoryResponseDto> {
         if (!userId) {
@@ -276,8 +277,19 @@ export class StoryController {
         }
         return this.storyService.initializeStoryWithOutline(
             userId,
+            requestId,
             initializeStoryDto,
         );
+    }
+
+    @Get('generate/initialize/result')
+    async getInitializationResults(
+        @Headers('x-request-id') requestId: string,
+    ): Promise<InitializeStoryResponseDto[]> {
+        if (!requestId) {
+            throw new BadRequestException('requestId is required');
+        }
+        return this.storyService.getInitializationResults(requestId);
     }
 
     @Post(':storyId/generate/chapter')
