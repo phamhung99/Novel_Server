@@ -85,7 +85,60 @@ export class StoryService {
     async findStoryById(id: string): Promise<Story> {
         const story = await this.storyRepository.findOne({
             where: { id },
-            relations: ['author', 'chapters', 'generation'],
+            relations: {
+                author: true,
+                chapters: true,
+                generation: true,
+            },
+            select: {
+                id: true,
+                title: true,
+                synopsis: true,
+                type: true,
+                authorId: true,
+                status: true,
+                visibility: true,
+                views: true,
+                rating: true,
+                createdAt: true,
+                updatedAt: true,
+                deletedAt: true,
+                author: {
+                    id: true,
+                    firstName: true,
+                    lastName: true,
+                    active: true,
+                },
+                chapters: {
+                    id: true,
+                    index: true,
+                    title: true,
+                    content: true,
+                },
+                generation: {
+                    status: true,
+                    aiProvider: true,
+                    aiModel: true,
+                    prompt: true,
+                    title: true,
+                    synopsis: true,
+                    genres: true,
+                    setting: true,
+                    mainCharacter: true,
+                    subCharacters: true,
+                    antagonist: true,
+                    motif: true,
+                    tone: true,
+                    writingStyle: true,
+                    plotLogic: true,
+                    hiddenTheme: true,
+                },
+            },
+            order: {
+                chapters: {
+                    index: 'ASC',
+                },
+            },
         });
 
         if (!story) {
