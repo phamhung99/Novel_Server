@@ -3,6 +3,7 @@ export interface AuthorDto {
     firstName?: string;
     lastName?: string;
     active?: boolean;
+    username?: string;
 }
 
 export interface ChapterDto {

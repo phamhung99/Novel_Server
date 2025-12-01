@@ -1,8 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import axios from '../api/axios';
 import {
     Box,
-    Button,
     Container,
     Paper,
     Table,
@@ -24,7 +23,7 @@ import VisibilityIcon from '@mui/icons-material/Visibility';
 import DeleteIcon from '@mui/icons-material/Delete';
 import { IconButton } from '@mui/material';
 import RestoreIcon from '@mui/icons-material/Restore';
-import type { StoryDto } from '../types/app';
+import type { AuthorDto, StoryDto } from '../types/app';
 
 const ManageStories = () => {
     const [stories, setStories] = useState([]);
@@ -54,21 +53,21 @@ const ManageStories = () => {
         fetchStories();
     }, [statusFilter]);
 
-    const formatAuthor = (author) => {
+    const formatAuthor = (author: AuthorDto) => {
         if (!author) return 'N/A';
         return author.firstName || author.lastName
             ? `${author.firstName || ''} ${author.lastName || ''}`.trim()
             : author.username || 'N/A';
     };
 
-    const formatGenres = (genres) => {
+    const formatGenres = (genres: string[]) => {
         if (!genres || genres.length === 0) return 'N/A';
         return genres.map((g) => (
             <Chip key={g} label={g} size="small" sx={{ mr: 0.5 }} />
         ));
     };
 
-    const deleteStory = async (id) => {
+    const deleteStory = async (id: string) => {
         const confirmDelete = window.confirm('Xóa story này?');
         if (!confirmDelete) return;
 
@@ -81,7 +80,7 @@ const ManageStories = () => {
         }
     };
 
-    const restoreStory = async (id) => {
+    const restoreStory = async (id: string) => {
         const confirmRestore = window.confirm('Khôi phục story này?');
         if (!confirmRestore) return;
 

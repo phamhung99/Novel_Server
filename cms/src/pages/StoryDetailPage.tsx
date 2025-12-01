@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
     Box,
     Button,
@@ -52,8 +52,9 @@ const StoryDetailPage = () => {
         value: string,
     ) => {
         if (!story) return;
-        const updatedChapters = [...story.chapters];
-        updatedChapters[idx][field] = value;
+        const updatedChapters = story.chapters.map((ch, i) =>
+            i === idx ? { ...ch, [field]: value } : ch,
+        );
         setStory({ ...story, chapters: updatedChapters });
     };
 
