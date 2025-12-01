@@ -452,6 +452,7 @@ export class StoryService {
                     motif: outlineResponse.story.motif,
                     tone: outlineResponse.story.tone,
                     plotLogic: outlineResponse.story.plotLogic,
+                    status: GenerationStatus.IN_PROGRESS,
                 },
             );
 
@@ -523,6 +524,7 @@ export class StoryService {
 
     async generateChapters(
         storyId: string,
+        requestId: string,
         dto: GenerateChapterDto,
     ): Promise<GenerateChapterResponseDto> {
         try {
@@ -556,6 +558,16 @@ export class StoryService {
                     },
                 });
 
+            const preGen = this.chapterGenerationRepository.create({
+                storyGenerationId: storyGeneration.id,
+                chapterNumber: chapterNumber,
+                requestId,
+                prompt: dto.storyPrompt || '',
+            });
+
+            const savedPreGen =
+                await this.chapterGenerationRepository.save(preGen);
+
             let previousChapterMeta;
 
             if (chapterNumber === 2) {
@@ -581,9 +593,10 @@ export class StoryService {
                     : null;
             }
 
-            let chapterStructureResponse: ChapterStructureResponse;
             const totalChapters = storyGeneration.prompt.numberOfChapters;
             const penultimateChapterNumber = totalChapters - 1;
+
+            let chapterStructureResponse: ChapterStructureResponse;
 
             if (chapterNumber > 1 && chapterNumber < penultimateChapterNumber) {
                 chapterStructureResponse =
@@ -640,22 +653,15 @@ export class StoryService {
 
             const savedChapter = await this.chapterRepository.save(chapter);
 
-            const chapterGeneration = this.chapterGenerationRepository.create({
-                storyGenerationId: storyGeneration.id,
-                chapterId: savedChapter.id,
-                chapterNumber,
-                generatedContent: chapterStructureResponse.content,
-                structure: chapterStructureResponse.structure,
-            });
-
-            await this.chapterGenerationRepository.save(chapterGeneration);
-
-            storyGeneration.response = {
-                chapterId: savedChapter.id,
-                chapterNumber,
-                structure: chapterStructureResponse.structure,
-            };
-            await this.storyGenerationRepository.save(storyGeneration);
+            // Update record đã lưu requestId lúc đầu
+            await this.chapterGenerationRepository.update(
+                { id: savedPreGen.id },
+                {
+                    chapterId: savedChapter.id,
+                    generatedContent: chapterStructureResponse.content,
+                    structure: chapterStructureResponse.structure as any,
+                },
+            );
 
             return {
                 chapterId: savedChapter.id,
@@ -667,7 +673,7 @@ export class StoryService {
                 message: `Chapter ${chapterNumber} generated successfully.`,
             };
         } catch (error) {
-            console.error('Error generating middle chapters:', error);
+            console.error('Error generating chapter:', error);
             throw error;
         }
     }
@@ -933,5 +939,42 @@ export class StoryService {
             'Story is still being generated. Please try again later.',
             HttpStatus.ACCEPTED,
         );
+    }
+
+    async getGeneratedChapterResults(
+        requestId: string,
+    ): Promise<GenerateChapterResponseDto> {
+        console.log({
+            requestId,
+        });
+
+        const generation = await this.chapterGenerationRepository.findOne({
+            where: { requestId },
+            relations: ['chapter'], // chỉ join chapter thôi
+        });
+
+        if (!generation) {
+            throw new HttpException(
+                `No generation results found for requestId ${requestId}`,
+                HttpStatus.NOT_FOUND,
+            );
+        }
+
+        if (!generation.chapter) {
+            throw new HttpException(
+                'Chapter is still being generated. Please try again later.',
+                HttpStatus.ACCEPTED,
+            );
+        }
+
+        return {
+            chapterId: generation.chapter.id,
+            index: generation.chapter.index,
+            title: generation.chapter.title,
+            content: generation.chapter.content,
+            summary: generation.structure.summary,
+            structure: generation.structure || ({} as any),
+            message: `Chapter ${generation.chapter.index} generated successfully.`,
+        };
     }
 }

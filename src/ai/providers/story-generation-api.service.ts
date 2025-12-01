@@ -646,11 +646,7 @@ cùng các thông tin sau ${dto.previousChapterMeta}
         chapterNumber: number,
     ): ChapterStructureResponse {
         try {
-            console.log('content', content);
-
             const parsed = JSON.parse(content);
-            console.log('parsed', parsed);
-
             return {
                 chapterNumber,
                 title: parsed.title || '',

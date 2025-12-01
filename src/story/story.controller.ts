@@ -42,6 +42,61 @@ import {
 export class StoryController {
     constructor(private readonly storyService: StoryService) {}
 
+    // REQUEST 1: Initialize story with outline
+    @Post('generate/initialize')
+    async initializeStory(
+        @Headers('x-user-id') userId: string,
+        @Headers('x-request-id') requestId: string,
+        @Body() initializeStoryDto: InitializeStoryDto,
+    ): Promise<InitializeStoryResponseDto> {
+        if (!userId) {
+            throw new BadRequestException('userId is required');
+        }
+        return this.storyService.initializeStoryWithOutline(
+            userId,
+            requestId,
+            initializeStoryDto,
+        );
+    }
+
+    @Get('generate/initialize/result')
+    async getInitializationResults(
+        @Headers('x-request-id') requestId: string,
+    ): Promise<InitializeStoryResponseDto[]> {
+        if (!requestId) {
+            throw new BadRequestException('requestId is required');
+        }
+        return this.storyService.getInitializationResults(requestId);
+    }
+
+    @Post(':storyId/generate/chapter')
+    async generateChapterWithContext(
+        @Param('storyId') storyId: string,
+        @Headers('x-request-id') requestId: string,
+        @Body() generateChapterDto: GenerateChapterDto,
+    ): Promise<GenerateChapterResponseDto> {
+        if (!storyId) {
+            throw new BadRequestException('storyId is required');
+        }
+
+        return await this.storyService.generateChapters(
+            storyId,
+            requestId,
+            generateChapterDto,
+        );
+    }
+
+    @Get('generate/chapter/result')
+    async getGeneratedChapterResults(
+        @Headers('x-request-id') requestId: string,
+    ): Promise<GenerateChapterResponseDto> {
+        if (!requestId) {
+            throw new BadRequestException('requestId is required');
+        }
+
+        return await this.storyService.getGeneratedChapterResults(requestId);
+    }
+
     // @Post('upload-cover')
     // @UseInterceptors(
     //     FileInterceptor('image', {
@@ -263,48 +318,6 @@ export class StoryController {
     ) {
         await this.storyService.deleteChapterByIndex(storyId, index);
         return { message: 'Chapter deleted successfully' };
-    }
-
-    // REQUEST 1: Initialize story with outline
-    @Post('generate/initialize')
-    async initializeStory(
-        @Headers('x-user-id') userId: string,
-        @Headers('x-request-id') requestId: string,
-        @Body() initializeStoryDto: InitializeStoryDto,
-    ): Promise<InitializeStoryResponseDto> {
-        if (!userId) {
-            throw new BadRequestException('userId is required');
-        }
-        return this.storyService.initializeStoryWithOutline(
-            userId,
-            requestId,
-            initializeStoryDto,
-        );
-    }
-
-    @Get('generate/initialize/result')
-    async getInitializationResults(
-        @Headers('x-request-id') requestId: string,
-    ): Promise<InitializeStoryResponseDto[]> {
-        if (!requestId) {
-            throw new BadRequestException('requestId is required');
-        }
-        return this.storyService.getInitializationResults(requestId);
-    }
-
-    @Post(':storyId/generate/chapter')
-    async generateChapterWithContext(
-        @Param('storyId') storyId: string,
-        @Body() generateChapterDto: GenerateChapterDto,
-    ): Promise<GenerateChapterResponseDto> {
-        if (!storyId) {
-            throw new BadRequestException('storyId is required');
-        }
-
-        return await this.storyService.generateChapters(
-            storyId,
-            generateChapterDto,
-        );
     }
 
     // Legacy endpoint (kept for backward compatibility)
