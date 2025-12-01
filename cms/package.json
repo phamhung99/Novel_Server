@@ -6,7 +6,7 @@
     "scripts": {
         "dev": "vite",
         "start:dev": "vite",
-        "build": "tsc -b && vite build",
+        "build": "set NODE_ENV=production && tsc -b && vite build",
         "lint": "eslint .",
         "preview": "vite preview",
         "format": "prettier --write ."

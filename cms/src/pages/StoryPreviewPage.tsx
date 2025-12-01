@@ -7,8 +7,6 @@ import {
     Paper,
     TextField,
     Typography,
-    Divider,
-    MenuItem,
     CircularProgress,
 } from '@mui/material';
 import { ROUTES } from '../constants/app.constants';
@@ -44,40 +42,15 @@ type InitializeStoryResponseDto = {
     message: string;
 };
 
-type Structure = {
-    summary: string;
-    directions: string[];
-    writingStyle: string;
-    tone: string;
-    plotLogic: string;
-    emotionalMotif: string;
-    mainCharacterArc: string;
-    subCharacterArc: string;
-    antagonistAction: string;
-    emotionChart: string;
-    philosophicalSubtheme: string;
-};
-
-type GenerateChapterResponseDto = {
-    chapterId: string;
-    number: number;
-    title: string;
-    content: string;
-    summary: string;
-    structure: Structure;
-    message: string;
-};
-
 const BASE_URL = `/api/v1/story`;
 
-const StoryDetailsPage: React.FC = () => {
+const StoryPreviewPage: React.FC = () => {
     const location = useLocation();
     const navigate = useNavigate();
     const initStoryData: InitializeStoryResponseDto = location.state?.storyData;
 
     const [storyData, setStoryData] =
         useState<InitializeStoryResponseDto>(initStoryData);
-    const [chapterDirection, setChapterDirection] = useState('');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
@@ -130,7 +103,7 @@ const StoryDetailsPage: React.FC = () => {
 
             <Paper sx={{ p: 3, mb: 4 }} elevation={2}>
                 <Typography variant="h6" gutterBottom>
-                    Story Details (Editable)
+                    Story Preview (Editable)
                 </Typography>
                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                     <TextField
@@ -342,4 +315,4 @@ const StoryDetailsPage: React.FC = () => {
     );
 };
 
-export default StoryDetailsPage;
+export default StoryPreviewPage;

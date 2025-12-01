@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import {
-    Box,
     Button,
     CircularProgress,
     Container,
@@ -12,9 +11,10 @@ import {
     TextField,
     Typography,
 } from '@mui/material';
-import { ROUTES } from '../constants/app.constants';
+import { POLL_INTERVAL, ROUTES } from '../constants/app.constants';
 import axios from '../api/axios';
 import { useNavigate } from 'react-router-dom';
+import { v4 as uuidv4 } from 'uuid';
 
 const genresList = [
     'Fantasy',
@@ -39,7 +39,7 @@ const genresList = [
     'Crime',
 ];
 
-const userId = 'thieptrinh01156789';
+const userId = '1';
 const BASE_URL = `/api/v1/story`;
 
 const StoryUploadPage: React.FC = () => {
@@ -57,11 +57,42 @@ const StoryUploadPage: React.FC = () => {
 
     const navigate = useNavigate();
 
+    const pollInitializationResult = async (
+        requestId: string,
+    ): Promise<any> => {
+        const maxAttempts = 15; // ~2.5 minutes
+        let attempt = 0;
+
+        while (attempt < maxAttempts) {
+            try {
+                const res = await axios.get(
+                    `${BASE_URL}/generate/initialize/result`,
+                    {
+                        headers: { 'x-request-id': requestId },
+                    },
+                );
+
+                if (res.data.data) {
+                    return res.data.data;
+                }
+            } catch (_) {
+                // backend chưa có kết quả → bỏ qua, không crash
+            }
+
+            attempt++;
+            await new Promise((r) => setTimeout(r, POLL_INTERVAL));
+        }
+
+        throw new Error('Timeout waiting for initialization result');
+    };
+
     const initializeStory = async () => {
         try {
-            setIsLoading(true); // bật loading
+            setIsLoading(true);
 
-            const res = await axios.post(
+            const requestId = uuidv4();
+
+            axios.post(
                 `${BASE_URL}/generate/initialize`,
                 {
                     storyPrompt,
@@ -69,15 +100,20 @@ const StoryUploadPage: React.FC = () => {
                     numberOfChapters: numChapters,
                     aiProvider,
                 },
-                { headers: { 'x-user-id': userId } },
+                { headers: { 'x-user-id': userId, 'x-request-id': requestId } },
             );
 
-            navigate(ROUTES.STORY_DETAILS, {
-                state: { storyData: res.data.data },
-            });
+            const storyData = await pollInitializationResult(requestId);
+            console.log(storyData);
+
+            navigate(ROUTES.STORY_PREVIEW, { state: { storyData } });
         } catch (err: any) {
             console.error(err);
-            alert(err.response?.data?.message || 'Error initializing story');
+            alert(
+                err.response?.data?.message ||
+                    err.message ||
+                    'Error initializing story',
+            );
         } finally {
             setIsLoading(false);
         }
@@ -184,19 +220,19 @@ const StoryUploadPage: React.FC = () => {
                             value={numChapters}
                             onChange={(e) => {
                                 const value = Number(e.target.value);
-                                if (value >= 1 && value <= 12) {
+                                if (value >= 1 && value <= 10) {
                                     setNumChapters(value);
                                 }
                             }}
                             slotProps={{
                                 htmlInput: {
                                     min: 1,
-                                    max: 12,
+                                    max: 10,
                                 },
                             }}
                             fullWidth
                             margin="normal"
-                            helperText="Must be between 1 and 12"
+                            helperText="Must be between 1 and 10"
                         />
 
                         <TextField

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
 import {
     Box,
     Button,
@@ -18,6 +18,8 @@ import {
 } from '@mui/material';
 import { ExpandMore, ExpandLess } from '@mui/icons-material';
 import axios from '../api/axios';
+import { v4 as uuidv4 } from 'uuid';
+import { POLL_INTERVAL } from '../constants/app.constants';
 
 type Structure = {
     summary: string;
@@ -46,7 +48,6 @@ const BASE_URL = `/api/v1/story`;
 
 const ChapterGeneratorPage: React.FC = () => {
     const location = useLocation();
-    const navigate = useNavigate();
 
     const storyId = location.state?.storyId as string;
     const initialChapter = location.state?.chapterData;
@@ -97,6 +98,41 @@ const ChapterGeneratorPage: React.FC = () => {
         });
     };
 
+    const pollChapterResult = async (requestId: string) => {
+        return new Promise<GenerateChapterResponseDto>((resolve, reject) => {
+            let attempts = 0;
+            const maxAttempts = 25; // ~30s
+
+            const interval = setInterval(async () => {
+                attempts++;
+
+                try {
+                    const res = await axios.get(
+                        `${BASE_URL}/generate/chapter/result`,
+                        {
+                            headers: {
+                                'x-request-id': requestId,
+                            },
+                        },
+                    );
+
+                    const data = res.data?.data;
+                    if (data) {
+                        clearInterval(interval);
+                        resolve(data);
+                    }
+                } catch (_) {
+                    // server chưa có kết quả → bỏ qua
+                }
+
+                if (attempts >= maxAttempts) {
+                    clearInterval(interval);
+                    reject(new Error('Timeout waiting for result'));
+                }
+            }, POLL_INTERVAL);
+        });
+    };
+
     const generateChapter = async () => {
         const lastChapter = chapters[chapters.length - 1];
         const direction =
@@ -107,19 +143,28 @@ const ChapterGeneratorPage: React.FC = () => {
             return;
         }
 
+        const requestId = uuidv4();
+
         try {
             setLoading(true);
             setError(null);
-            const res = await axios.post(
+
+            await axios.post(
                 `${BASE_URL}/${storyId}/generate/chapter`,
                 { direction },
+                {
+                    headers: {
+                        'x-request-id': requestId,
+                    },
+                },
             );
-            const data = res.data.data as GenerateChapterResponseDto;
-            setChapters((prev) => [...prev, data]);
+
+            const result = await pollChapterResult(requestId);
+
+            setChapters((prev) => [...prev, result]);
             setChapterDirection('');
-            return data;
         } catch (err: any) {
-            setError(err.response?.data?.message || 'Error generating chapter');
+            setError(err.message || 'Error generating chapter');
         } finally {
             setLoading(false);
         }
