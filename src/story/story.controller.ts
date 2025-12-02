@@ -49,8 +49,8 @@ export class StoryController {
         @Headers('x-request-id') requestId: string,
         @Body() initializeStoryDto: InitializeStoryDto,
     ): Promise<InitializeStoryResponseDto> {
-        if (!userId) {
-            throw new BadRequestException('userId is required');
+        if (!requestId) {
+            throw new BadRequestException('requestId is required');
         }
         return this.storyService.initializeStoryWithOutline(
             userId,
@@ -75,8 +75,8 @@ export class StoryController {
         @Headers('x-request-id') requestId: string,
         @Body() generateChapterDto: GenerateChapterDto,
     ): Promise<GenerateChapterResponseDto> {
-        if (!storyId) {
-            throw new BadRequestException('storyId is required');
+        if (!requestId) {
+            throw new BadRequestException('requestId is required');
         }
 
         return await this.storyService.generateChapters(

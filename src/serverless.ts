@@ -9,6 +9,9 @@ let server: Handler;
 
 async function bootstrap() {
     const app = await NestFactory.create(AppModule);
+
+    app.enableCors();
+
     app.useGlobalPipes(
         new ValidationPipe({
             transform: true,
@@ -20,6 +23,7 @@ async function bootstrap() {
     app.setGlobalPrefix('api/v1');
     await app.init();
     const expressApp = app.getHttpAdapter().getInstance();
+
     return serverlessExpress({ app: expressApp });
 }
 

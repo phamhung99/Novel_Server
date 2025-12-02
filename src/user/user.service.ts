@@ -17,4 +17,8 @@ export class UserService extends BaseCrudService<User> {
     protected getUniqueField(): keyof User {
         return;
     }
+
+    async findByEmail(email: string): Promise<User> {
+        return this.repository.findOne({ where: { email } });
+    }
 }

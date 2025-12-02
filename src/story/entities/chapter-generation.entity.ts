@@ -15,7 +15,7 @@ export class ChapterGeneration {
     @PrimaryGeneratedColumn('uuid')
     id: string;
 
-    @Column({ name: 'story_generation_id' })
+    @Column({ name: 'story_generation_id', nullable: true })
     storyGenerationId: string;
 
     @ManyToOne(

@@ -26,8 +26,14 @@ export class User {
     @Column({ nullable: true })
     username: string;
 
-    @Column({ nullable: true })
+    @Column({ nullable: true, unique: true })
     email: string;
+
+    @Column({ nullable: true })
+    password: string;
+
+    @Column({ default: 'user', type: 'varchar' })
+    role: string;
 
     @Column({ name: 'profile_image', nullable: true })
     profileImage: string;

@@ -387,34 +387,35 @@ export class StoryService {
         requestId: string,
         dto: InitializeStoryDto,
     ): Promise<InitializeStoryResponseDto> {
-        // Validate numberOfChapters (max 10)
-        if (dto.numberOfChapters > 10) {
-            throw new BadRequestException('Maximum 10 chapters allowed');
-        }
+        const storyGeneration = this.storyGenerationRepository.create({
+            requestId,
+            type: GenerationType.CHAPTER,
+            status: GenerationStatus.IN_PROGRESS,
+            aiProvider: dto.aiProvider || 'grok',
+            aiModel:
+                (dto.aiProvider || 'grok') === 'grok'
+                    ? 'grok-4'
+                    : 'gpt-4o-mini',
+            prompt: {
+                storyPrompt: dto.storyPrompt,
+                numberOfChapters: dto.numberOfChapters,
+            },
+        });
 
-        if (dto.storyPrompt.trim().length === 0) {
-            throw new BadRequestException('Story prompt cannot be empty');
-        }
-
+        const savedStoryGeneration =
+            await this.storyGenerationRepository.save(storyGeneration);
         try {
-            // Create story generation record with requestId first
-            const storyGeneration = this.storyGenerationRepository.create({
-                requestId,
-                type: GenerationType.CHAPTER,
-                status: GenerationStatus.IN_PROGRESS,
-                aiProvider: dto.aiProvider || 'grok',
-                aiModel:
-                    (dto.aiProvider || 'grok') === 'grok'
-                        ? 'grok-4'
-                        : 'gpt-4o-mini',
-                prompt: {
-                    storyPrompt: dto.storyPrompt,
-                    numberOfChapters: dto.numberOfChapters,
-                },
-            });
+            if (!userId) {
+                throw new Error('userId is required');
+            }
 
-            const savedStoryGeneration =
-                await this.storyGenerationRepository.save(storyGeneration);
+            if (dto.numberOfChapters > 10) {
+                throw new Error('Maximum 10 chapters allowed');
+            }
+
+            if (dto.storyPrompt.trim().length === 0) {
+                throw new Error('Story prompt cannot be empty');
+            }
 
             const outlineResponse =
                 await this.storyGenerationApiService.generateStoryOutline({
@@ -518,7 +519,14 @@ export class StoryService {
             };
         } catch (error) {
             console.error('Error initializing story:', error);
-            throw error;
+
+            await this.storyGenerationRepository.update(
+                { id: savedStoryGeneration.id },
+                {
+                    status: GenerationStatus.FAILED,
+                    errorMessage: error.message || 'Failed to initialize story',
+                },
+            );
         }
     }
 
@@ -527,7 +535,24 @@ export class StoryService {
         requestId: string,
         dto: GenerateChapterDto,
     ): Promise<GenerateChapterResponseDto> {
+        let savedPreGen: any = null;
+
         try {
+            // Tạo preGen trước, để luôn có record lưu lỗi
+            savedPreGen = this.chapterGenerationRepository.create({
+                storyGenerationId: null, // tạm thời null, sẽ update sau nếu có storyGeneration
+                chapterNumber: 0, // tạm thời
+                requestId,
+                prompt: dto.storyPrompt || '',
+            });
+
+            savedPreGen =
+                await this.chapterGenerationRepository.save(savedPreGen);
+
+            if (!storyId) {
+                throw new BadRequestException('storyId is required');
+            }
+
             const storyGeneration =
                 await this.storyGenerationRepository.findOne({
                     where: { storyId },
@@ -557,16 +582,6 @@ export class StoryService {
                         storyGenerationId: storyGeneration.id,
                     },
                 });
-
-            const preGen = this.chapterGenerationRepository.create({
-                storyGenerationId: storyGeneration.id,
-                chapterNumber: chapterNumber,
-                requestId,
-                prompt: dto.storyPrompt || '',
-            });
-
-            const savedPreGen =
-                await this.chapterGenerationRepository.save(preGen);
 
             let previousChapterMeta;
 
@@ -660,6 +675,8 @@ export class StoryService {
                     chapterId: savedChapter.id,
                     generatedContent: chapterStructureResponse.content,
                     structure: chapterStructureResponse.structure as any,
+                    storyGenerationId: storyGeneration.id,
+                    chapterNumber,
                 },
             );
 
@@ -674,6 +691,18 @@ export class StoryService {
             };
         } catch (error) {
             console.error('Error generating chapter:', error);
+
+            if (savedPreGen) {
+                await this.chapterGenerationRepository.update(
+                    { id: savedPreGen.id },
+                    {
+                        errorMessage:
+                            error instanceof Error
+                                ? error.message
+                                : 'Failed to generate chapter',
+                    },
+                );
+            }
             throw error;
         }
     }
@@ -929,10 +958,7 @@ export class StoryService {
         }
 
         if (errorMessage) {
-            throw new HttpException(
-                errorMessage,
-                HttpStatus.INTERNAL_SERVER_ERROR,
-            );
+            throw new HttpException(errorMessage, HttpStatus.BAD_REQUEST);
         }
 
         throw new HttpException(
@@ -944,10 +970,6 @@ export class StoryService {
     async getGeneratedChapterResults(
         requestId: string,
     ): Promise<GenerateChapterResponseDto> {
-        console.log({
-            requestId,
-        });
-
         const generation = await this.chapterGenerationRepository.findOne({
             where: { requestId },
             relations: ['chapter'], // chỉ join chapter thôi
@@ -957,6 +979,13 @@ export class StoryService {
             throw new HttpException(
                 `No generation results found for requestId ${requestId}`,
                 HttpStatus.NOT_FOUND,
+            );
+        }
+
+        if (generation.errorMessage) {
+            throw new HttpException(
+                generation.errorMessage,
+                HttpStatus.BAD_REQUEST,
             );
         }
 
