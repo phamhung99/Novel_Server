@@ -6,34 +6,43 @@ import StoryPreviewPage from './pages/StoryPreviewPage';
 import ChapterGeneratorPage from './pages/ChapterGeneratorPage';
 import ManageStories from './pages/ManageStoriesPage';
 import StoryDetailPage from './pages/StoryDetailPage';
+import LoginPage from './pages/loginPage';
+import PrivateRoute from './utils/PrivateRoute';
 
 export default function App() {
     return (
         <BrowserRouter>
             <Routes>
-                <Route
-                    path="/"
-                    element={<Navigate to="/dashboard/users" replace />}
-                />
-                <Route path="/dashboard" element={<Dashboard />}>
-                    <Route path="users" element={<UsersPage />} />
+                <Route path="/login" element={<LoginPage />} />
+
+                <Route element={<PrivateRoute roles={['admin']} />}>
                     <Route
-                        path="stories/upload"
-                        element={<StoryUploadPage />}
+                        path="/"
+                        element={<Navigate to="/dashboard/users" replace />}
                     />
-                    <Route
-                        path="stories/preview"
-                        element={<StoryPreviewPage />}
-                    />
-                    <Route
-                        path="chapter-generator"
-                        element={<ChapterGeneratorPage />}
-                    />
-                    <Route path="stories/manage" element={<ManageStories />} />
-                    <Route
-                        path="stories/:storyId"
-                        element={<StoryDetailPage />}
-                    />
+                    <Route path="/dashboard" element={<Dashboard />}>
+                        <Route path="users" element={<UsersPage />} />
+                        <Route
+                            path="stories/upload"
+                            element={<StoryUploadPage />}
+                        />
+                        <Route
+                            path="stories/preview"
+                            element={<StoryPreviewPage />}
+                        />
+                        <Route
+                            path="chapter-generator"
+                            element={<ChapterGeneratorPage />}
+                        />
+                        <Route
+                            path="stories/manage"
+                            element={<ManageStories />}
+                        />
+                        <Route
+                            path="stories/:storyId"
+                            element={<StoryDetailPage />}
+                        />
+                    </Route>
                 </Route>
             </Routes>
         </BrowserRouter>

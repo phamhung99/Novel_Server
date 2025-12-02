@@ -126,6 +126,7 @@ const ManageStories = () => {
                         <Table>
                             <TableHead>
                                 <TableRow>
+                                    <TableCell>Id</TableCell>
                                     <TableCell>Title</TableCell>
                                     <TableCell>Author</TableCell>
                                     <TableCell>Type</TableCell>
@@ -141,6 +142,7 @@ const ManageStories = () => {
                             <TableBody>
                                 {stories.map((story: StoryDto) => (
                                     <TableRow key={story.id}>
+                                        <TableCell>{story.id}</TableCell>
                                         <TableCell>{story.title}</TableCell>
                                         <TableCell>
                                             {formatAuthor(story.author)}

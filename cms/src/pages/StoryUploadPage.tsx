@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
     Button,
     CircularProgress,
@@ -11,7 +11,11 @@ import {
     TextField,
     Typography,
 } from '@mui/material';
-import { POLL_INTERVAL, ROUTES } from '../constants/app.constants';
+import {
+    POLL_INITIALIZATION_DELAY,
+    POLL_INTERVAL,
+    ROUTES,
+} from '../constants/app.constants';
 import axios from '../api/axios';
 import { useNavigate } from 'react-router-dom';
 import { v4 as uuidv4 } from 'uuid';
@@ -39,10 +43,18 @@ const genresList = [
     'Crime',
 ];
 
-const userId = '1';
 const BASE_URL = `/api/v1/story`;
 
 const StoryUploadPage: React.FC = () => {
+    const userId = useMemo(() => {
+        try {
+            const user = JSON.parse(localStorage.getItem('user') || '{}');
+            return user.id || '';
+        } catch {
+            return '';
+        }
+    }, []);
+
     const [mode, setMode] = useState<'create' | 'load'>('create');
 
     // create params
@@ -60,6 +72,8 @@ const StoryUploadPage: React.FC = () => {
     const pollInitializationResult = async (
         requestId: string,
     ): Promise<any> => {
+        await new Promise((r) => setTimeout(r, POLL_INITIALIZATION_DELAY));
+
         const maxAttempts = 15; // ~2.5 minutes
         let attempt = 0;
 
@@ -75,8 +89,10 @@ const StoryUploadPage: React.FC = () => {
                 if (res.data.data) {
                     return res.data.data;
                 }
-            } catch (_) {
-                // backend chưa có kết quả → bỏ qua, không crash
+            } catch (error: any) {
+                if (error.response && error.response.status !== 202) {
+                    throw error;
+                }
             }
 
             attempt++;
@@ -88,6 +104,16 @@ const StoryUploadPage: React.FC = () => {
 
     const initializeStory = async () => {
         try {
+            if (!storyPrompt.trim()) {
+                alert('Please enter a story prompt');
+                return;
+            }
+
+            if (selectedGenres.length === 0) {
+                alert('Please select at least one genre');
+                return;
+            }
+
             setIsLoading(true);
 
             const requestId = uuidv4();
@@ -152,8 +178,8 @@ const StoryUploadPage: React.FC = () => {
                     fullWidth
                     margin="normal"
                 >
-                    <MenuItem value="create">Tạo mới</MenuItem>
-                    <MenuItem value="load">Tải story có sẵn</MenuItem>
+                    <MenuItem value="create">Create new</MenuItem>
+                    <MenuItem value="load">Load existing story</MenuItem>
                 </TextField>
 
                 {mode === 'load' && (

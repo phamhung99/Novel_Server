@@ -79,10 +79,6 @@ const StoryDetailPage = () => {
                     <Typography variant="h5" gutterBottom>
                         Story Info
                     </Typography>
-                    <Typography variant="body2" sx={{ opacity: 0.7, mb: 1 }}>
-                        ID: {story.id}
-                    </Typography>
-
                     <Divider sx={{ my: 2 }} />
                     <Grid container spacing={2}>
                         <Grid size={8}>

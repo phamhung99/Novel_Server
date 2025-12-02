@@ -19,7 +19,10 @@ import {
 import { ExpandMore, ExpandLess } from '@mui/icons-material';
 import axios from '../api/axios';
 import { v4 as uuidv4 } from 'uuid';
-import { POLL_INTERVAL } from '../constants/app.constants';
+import {
+    POLL_INITIALIZATION_DELAY,
+    POLL_INTERVAL,
+} from '../constants/app.constants';
 
 type Structure = {
     summary: string;
@@ -99,9 +102,11 @@ const ChapterGeneratorPage: React.FC = () => {
     };
 
     const pollChapterResult = async (requestId: string) => {
+        await new Promise((r) => setTimeout(r, POLL_INITIALIZATION_DELAY));
+
         return new Promise<GenerateChapterResponseDto>((resolve, reject) => {
             let attempts = 0;
-            const maxAttempts = 25; // ~30s
+            const maxAttempts = 25;
 
             const interval = setInterval(async () => {
                 attempts++;
@@ -121,8 +126,11 @@ const ChapterGeneratorPage: React.FC = () => {
                         clearInterval(interval);
                         resolve(data);
                     }
-                } catch (_) {
-                    // server chưa có kết quả → bỏ qua
+                } catch (error: any) {
+                    if (error.response && error.response.status !== 202) {
+                        clearInterval(interval);
+                        reject(error);
+                    }
                 }
 
                 if (attempts >= maxAttempts) {
@@ -149,7 +157,7 @@ const ChapterGeneratorPage: React.FC = () => {
             setLoading(true);
             setError(null);
 
-            await axios.post(
+            axios.post(
                 `${BASE_URL}/${storyId}/generate/chapter`,
                 { direction },
                 {
@@ -164,7 +172,11 @@ const ChapterGeneratorPage: React.FC = () => {
             setChapters((prev) => [...prev, result]);
             setChapterDirection('');
         } catch (err: any) {
-            setError(err.message || 'Error generating chapter');
+            setError(
+                err.response?.data?.message ||
+                    err.message ||
+                    'Error generating chapter',
+            );
         } finally {
             setLoading(false);
         }

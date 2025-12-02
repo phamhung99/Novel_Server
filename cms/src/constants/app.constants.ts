@@ -10,4 +10,6 @@ export const ROUTES = {
 
 export const SERVER_URL = import.meta.env.VITE_SERVER_URL;
 
-export const POLL_INTERVAL = 10000; // 10 seconds
+// in milliseconds
+export const POLL_INTERVAL = 10000;
+export const POLL_INITIALIZATION_DELAY = 20000; 
