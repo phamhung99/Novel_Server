@@ -4,11 +4,8 @@ import {
     PrimaryGeneratedColumn,
     CreateDateColumn,
     UpdateDateColumn,
-    ManyToOne,
-    JoinColumn,
     OneToMany,
 } from 'typeorm';
-import { Story } from './story.entity';
 import { ChapterGeneration } from './chapter-generation.entity';
 
 export enum GenerationType {
@@ -29,10 +26,6 @@ export class StoryGeneration {
 
     @Column({ name: 'story_id', nullable: true })
     storyId: string;
-
-    @ManyToOne(() => Story, { onDelete: 'CASCADE' })
-    @JoinColumn({ name: 'story_id' })
-    story: Story;
 
     @Column({
         type: 'enum',

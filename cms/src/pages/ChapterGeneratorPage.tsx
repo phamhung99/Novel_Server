@@ -198,6 +198,25 @@ const ChapterGeneratorPage: React.FC = () => {
         }
     };
 
+    const requestPublication = async () => {
+        try {
+            setLoading(true);
+            setError(null);
+
+            await axios.post(`${BASE_URL}/${storyId}/request-publication`);
+
+            alert('Publication request sent!');
+        } catch (err: any) {
+            console.log(err.response?.data?.message);
+
+            setError(
+                err.response?.data?.message || 'Error requesting publication',
+            );
+        } finally {
+            setLoading(false);
+        }
+    };
+
     useEffect(() => {
         const fetchChapters = async () => {
             try {
@@ -404,6 +423,20 @@ const ChapterGeneratorPage: React.FC = () => {
                         <CircularProgress size={24} />
                     ) : (
                         'Generate Chapter'
+                    )}
+                </Button>
+
+                <Button
+                    variant="outlined"
+                    color="secondary"
+                    onClick={requestPublication}
+                    disabled={loading}
+                    sx={{ width: 320 }}
+                >
+                    {loading ? (
+                        <CircularProgress size={24} />
+                    ) : (
+                        'Request Publication'
                     )}
                 </Button>
             </Box>

@@ -16,20 +16,30 @@ import {
     FormControl,
     CircularProgress,
     Chip,
+    Menu,
+    IconButton,
 } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import { ROUTES } from '../constants/app.constants';
-import VisibilityIcon from '@mui/icons-material/Visibility';
-import DeleteIcon from '@mui/icons-material/Delete';
-import { IconButton } from '@mui/material';
-import RestoreIcon from '@mui/icons-material/Restore';
 import type { AuthorDto, StoryDto } from '../types/app';
+import MoreVertIcon from '@mui/icons-material/MoreVert';
 
 const ManageStories = () => {
     const [stories, setStories] = useState([]);
     const [statusFilter, setStatusFilter] = useState('all');
     const [loading, setLoading] = useState(false);
     const navigate = useNavigate();
+
+    const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
+    const open = Boolean(anchorEl);
+
+    const handleMenuOpen = (e: React.MouseEvent<HTMLButtonElement>) => {
+        setAnchorEl(e.currentTarget);
+    };
+
+    const handleMenuClose = () => {
+        setAnchorEl(null);
+    };
 
     const fetchStories = async () => {
         setLoading(true);
@@ -90,6 +100,47 @@ const ManageStories = () => {
         } catch (err) {
             console.error(err);
             alert('Khôi phục thất bại');
+        }
+    };
+
+    const approveStory = async (id: string, note?: string) => {
+        try {
+            await axios.post(`/api/v1/story/${id}/approve`, {
+                note: note || null,
+            });
+            fetchStories();
+        } catch (err) {
+            console.error(err);
+            alert('Duyệt thất bại');
+        }
+    };
+
+    const rejectStory = async (id: string) => {
+        const reason = prompt('Nhập lý do từ chối:');
+        if (!reason?.trim()) {
+            alert('Phải nhập lý do từ chối');
+            return;
+        }
+
+        try {
+            await axios.post(`/api/v1/story/${id}/reject`, { reason });
+            fetchStories();
+        } catch (err) {
+            console.error(err);
+            alert('Từ chối thất bại');
+        }
+    };
+
+    const unpublishStory = async (id: string) => {
+        const confirmUnpublish = window.confirm('Bỏ xuất bản story này?');
+        if (!confirmUnpublish) return;
+
+        try {
+            await axios.post(`/api/v1/story/${id}/unpublish`);
+            fetchStories();
+        } catch (err) {
+            console.error(err);
+            alert('Bỏ xuất bản thất bại');
         }
     };
 
@@ -168,41 +219,83 @@ const ManageStories = () => {
                                         </TableCell>
                                         <TableCell>
                                             <IconButton
-                                                color="primary"
-                                                onClick={() =>
-                                                    navigate(
-                                                        `${ROUTES.STORY_DETAILS}/${story.id}`,
-                                                    )
-                                                }
+                                                onClick={handleMenuOpen}
                                             >
-                                                <VisibilityIcon />
+                                                <MoreVertIcon />
                                             </IconButton>
 
-                                            {story.deletedAt !== null ? (
-                                                <IconButton
-                                                    color="success"
+                                            <Menu
+                                                anchorEl={anchorEl}
+                                                open={open}
+                                                onClose={handleMenuClose}
+                                            >
+                                                <MenuItem
                                                     onClick={() =>
-                                                        restoreStory(story.id)
+                                                        navigate(
+                                                            `${ROUTES.STORY_DETAILS}/${story.id}`,
+                                                        )
                                                     }
                                                 >
-                                                    <span
-                                                        style={{
-                                                            fontWeight: 'bold',
-                                                        }}
+                                                    Xem chi tiết
+                                                </MenuItem>
+
+                                                {story.deletedAt === null ? (
+                                                    <MenuItem
+                                                        onClick={() =>
+                                                            deleteStory(
+                                                                story.id,
+                                                            )
+                                                        }
                                                     >
-                                                        <RestoreIcon />
-                                                    </span>
-                                                </IconButton>
-                                            ) : (
-                                                <IconButton
-                                                    color="error"
-                                                    onClick={() =>
-                                                        deleteStory(story.id)
-                                                    }
-                                                >
-                                                    <DeleteIcon />
-                                                </IconButton>
-                                            )}
+                                                        Xóa
+                                                    </MenuItem>
+                                                ) : (
+                                                    <MenuItem
+                                                        onClick={() =>
+                                                            restoreStory(
+                                                                story.id,
+                                                            )
+                                                        }
+                                                    >
+                                                        Khôi phục
+                                                    </MenuItem>
+                                                )}
+
+                                                {story.status === 'pending' && (
+                                                    <>
+                                                        <MenuItem
+                                                            onClick={() =>
+                                                                approveStory(
+                                                                    story.id,
+                                                                )
+                                                            }
+                                                        >
+                                                            Duyệt
+                                                        </MenuItem>
+                                                        <MenuItem
+                                                            onClick={() =>
+                                                                rejectStory(
+                                                                    story.id,
+                                                                )
+                                                            }
+                                                        >
+                                                            Từ chối
+                                                        </MenuItem>
+                                                    </>
+                                                )}
+
+                                                {story.status === 'public' && (
+                                                    <MenuItem
+                                                        onClick={() =>
+                                                            unpublishStory(
+                                                                story.id,
+                                                            )
+                                                        }
+                                                    >
+                                                        Bỏ xuất bản
+                                                    </MenuItem>
+                                                )}
+                                            </Menu>
                                         </TableCell>
                                     </TableRow>
                                 ))}
