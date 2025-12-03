@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import axios from '../api/axios';
 import {
     Box,
@@ -23,22 +23,82 @@ import { useNavigate } from 'react-router-dom';
 import { ROUTES } from '../constants/app.constants';
 import type { AuthorDto, StoryDto } from '../types/app';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
+import ConfirmDialog from '../components/ConfirmDialog';
+import ConfirmDialogWithInput from '../components/ConfirmDialogWithInput';
 
 const ManageStories = () => {
-    const [stories, setStories] = useState([]);
+    const [stories, setStories] = useState<StoryDto[]>([]);
     const [statusFilter, setStatusFilter] = useState('all');
     const [loading, setLoading] = useState(false);
     const navigate = useNavigate();
 
+    const [confirmDialog, setConfirmDialog] = useState({
+        open: false,
+        title: '',
+        content: '',
+        onConfirm: () => {},
+    });
+
+    const [inputDialog, setInputDialog] = useState({
+        open: false,
+        title: '',
+        content: '',
+        inputLabel: '',
+        onConfirm: (value: string) => {},
+    });
+
     const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
+    const [selectedStoryId, setSelectedStoryId] = useState<string | null>(null);
     const open = Boolean(anchorEl);
 
-    const handleMenuOpen = (e: React.MouseEvent<HTMLButtonElement>) => {
+    const userId = useMemo(() => {
+        try {
+            const user = JSON.parse(localStorage.getItem('user') || '{}');
+            return user.id || '';
+        } catch {
+            return '';
+        }
+    }, []);
+
+    const openConfirm = ({
+        title,
+        content,
+        onConfirm,
+    }: {
+        title: string;
+        content: string;
+        onConfirm: () => void | Promise<void>;
+    }) => {
+        setConfirmDialog({
+            open: true,
+            title,
+            content,
+            onConfirm: () => {
+                onConfirm();
+                setConfirmDialog((prev) => ({ ...prev, open: false }));
+            },
+        });
+    };
+
+    const closeConfirm = () => {
+        setConfirmDialog((prev) => ({ ...prev, open: false }));
+    };
+
+    const closeInputDialog = () => {
+        setInputDialog((prev) => ({ ...prev, open: false }));
+    };
+
+    const handleMenuOpen = (
+        e: React.MouseEvent<HTMLButtonElement>,
+        storyId: string,
+    ) => {
         setAnchorEl(e.currentTarget);
+        setSelectedStoryId(storyId);
     };
 
     const handleMenuClose = () => {
         setAnchorEl(null);
+        setSelectedStoryId(null);
     };
 
     const fetchStories = async () => {
@@ -59,6 +119,29 @@ const ManageStories = () => {
         }
     };
 
+    const openInputDialog = ({
+        title,
+        content,
+        inputLabel,
+        onConfirm,
+    }: {
+        title: string;
+        content: string;
+        inputLabel: string;
+        onConfirm: (value: string) => void | Promise<void>;
+    }) => {
+        setInputDialog({
+            open: true,
+            title,
+            content,
+            inputLabel,
+            onConfirm: async (value: string) => {
+                await onConfirm(value);
+                setInputDialog((prev) => ({ ...prev, open: false }));
+            },
+        });
+    };
+
     useEffect(() => {
         fetchStories();
     }, [statusFilter]);
@@ -77,71 +160,108 @@ const ManageStories = () => {
         ));
     };
 
-    const deleteStory = async (id: string) => {
-        const confirmDelete = window.confirm('Xóa story này?');
-        if (!confirmDelete) return;
-
-        try {
-            await axios.delete(`/api/v1/story/${id}`);
-            fetchStories();
-        } catch (err) {
-            console.error(err);
-            alert('Xóa thất bại');
-        }
+    const deleteStory = (id: string) => {
+        openConfirm({
+            title: 'Xóa story?',
+            content: 'Bạn có chắc chắn muốn xóa story này?',
+            onConfirm: async () => {
+                try {
+                    await axios.delete(`/api/v1/story/${id}`);
+                    fetchStories();
+                } catch (err) {
+                    console.error(err);
+                    alert('Xóa thất bại');
+                }
+            },
+        });
     };
 
-    const restoreStory = async (id: string) => {
-        const confirmRestore = window.confirm('Khôi phục story này?');
-        if (!confirmRestore) return;
-
-        try {
-            await axios.patch(`/api/v1/story/${id}/restore`);
-            fetchStories();
-        } catch (err) {
-            console.error(err);
-            alert('Khôi phục thất bại');
-        }
+    const restoreStory = (id: string) => {
+        openConfirm({
+            title: 'Khôi phục story?',
+            content: 'Bạn có chắc muốn khôi phục story này?',
+            onConfirm: async () => {
+                try {
+                    await axios.patch(`/api/v1/story/${id}/restore`);
+                    fetchStories();
+                } catch (err) {
+                    console.error(err);
+                    alert('Khôi phục thất bại');
+                }
+            },
+        });
     };
 
-    const approveStory = async (id: string, note?: string) => {
-        try {
-            await axios.post(`/api/v1/story/${id}/approve`, {
-                note: note || null,
-            });
-            fetchStories();
-        } catch (err) {
-            console.error(err);
-            alert('Duyệt thất bại');
-        }
+    const approveStory = (id: string) => {
+        openInputDialog({
+            title: 'Duyệt story?',
+            content: 'Bạn có thể thêm ghi chú (tùy chọn).',
+            inputLabel: 'Ghi chú',
+            onConfirm: async (note) => {
+                try {
+                    await axios.post(
+                        `/api/v1/story/${id}/approve`,
+                        { note: note || null },
+                        {
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'x-user-id': userId,
+                            },
+                        },
+                    );
+                    fetchStories();
+                } catch (err) {
+                    console.error(err);
+                    alert('Duyệt thất bại');
+                }
+            },
+        });
     };
 
-    const rejectStory = async (id: string) => {
-        const reason = prompt('Nhập lý do từ chối:');
-        if (!reason?.trim()) {
-            alert('Phải nhập lý do từ chối');
-            return;
-        }
-
-        try {
-            await axios.post(`/api/v1/story/${id}/reject`, { reason });
-            fetchStories();
-        } catch (err) {
-            console.error(err);
-            alert('Từ chối thất bại');
-        }
+    const rejectStory = (id: string) => {
+        openInputDialog({
+            title: 'Từ chối story?',
+            content: 'Nhập lý do từ chối.',
+            inputLabel: 'Lý do từ chối',
+            onConfirm: async (reason) => {
+                if (!reason?.trim()) {
+                    alert('Phải nhập lý do từ chối');
+                    return;
+                }
+                try {
+                    await axios.post(
+                        `/api/v1/story/${id}/reject`,
+                        { reason },
+                        {
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'x-user-id': userId,
+                            },
+                        },
+                    );
+                    fetchStories();
+                } catch (err) {
+                    console.error(err);
+                    alert('Từ chối thất bại');
+                }
+            },
+        });
     };
 
-    const unpublishStory = async (id: string) => {
-        const confirmUnpublish = window.confirm('Bỏ xuất bản story này?');
-        if (!confirmUnpublish) return;
-
-        try {
-            await axios.post(`/api/v1/story/${id}/unpublish`);
-            fetchStories();
-        } catch (err) {
-            console.error(err);
-            alert('Bỏ xuất bản thất bại');
-        }
+    const unpublishStory = (id: string) => {
+        openConfirm({
+            title: 'Bỏ xuất bản?',
+            content: 'Story sẽ trở về trạng thái nháp.',
+            onConfirm: async () => {
+                try {
+                    await axios.post(`/api/v1/story/${id}/unpublish`);
+                    fetchStories();
+                } catch (err) {
+                    console.error(err);
+                    alert('Bỏ xuất bản thất bại');
+                }
+            },
+        });
     };
 
     return (
@@ -219,83 +339,12 @@ const ManageStories = () => {
                                         </TableCell>
                                         <TableCell>
                                             <IconButton
-                                                onClick={handleMenuOpen}
+                                                onClick={(e) =>
+                                                    handleMenuOpen(e, story.id)
+                                                }
                                             >
                                                 <MoreVertIcon />
                                             </IconButton>
-
-                                            <Menu
-                                                anchorEl={anchorEl}
-                                                open={open}
-                                                onClose={handleMenuClose}
-                                            >
-                                                <MenuItem
-                                                    onClick={() =>
-                                                        navigate(
-                                                            `${ROUTES.STORY_DETAILS}/${story.id}`,
-                                                        )
-                                                    }
-                                                >
-                                                    Xem chi tiết
-                                                </MenuItem>
-
-                                                {story.deletedAt === null ? (
-                                                    <MenuItem
-                                                        onClick={() =>
-                                                            deleteStory(
-                                                                story.id,
-                                                            )
-                                                        }
-                                                    >
-                                                        Xóa
-                                                    </MenuItem>
-                                                ) : (
-                                                    <MenuItem
-                                                        onClick={() =>
-                                                            restoreStory(
-                                                                story.id,
-                                                            )
-                                                        }
-                                                    >
-                                                        Khôi phục
-                                                    </MenuItem>
-                                                )}
-
-                                                {story.status === 'pending' && (
-                                                    <>
-                                                        <MenuItem
-                                                            onClick={() =>
-                                                                approveStory(
-                                                                    story.id,
-                                                                )
-                                                            }
-                                                        >
-                                                            Duyệt
-                                                        </MenuItem>
-                                                        <MenuItem
-                                                            onClick={() =>
-                                                                rejectStory(
-                                                                    story.id,
-                                                                )
-                                                            }
-                                                        >
-                                                            Từ chối
-                                                        </MenuItem>
-                                                    </>
-                                                )}
-
-                                                {story.status === 'public' && (
-                                                    <MenuItem
-                                                        onClick={() =>
-                                                            unpublishStory(
-                                                                story.id,
-                                                            )
-                                                        }
-                                                    >
-                                                        Bỏ xuất bản
-                                                    </MenuItem>
-                                                )}
-                                            </Menu>
                                         </TableCell>
                                     </TableRow>
                                 ))}
@@ -304,6 +353,115 @@ const ManageStories = () => {
                     </TableContainer>
                 )}
             </Box>
+
+            <Menu anchorEl={anchorEl} open={open} onClose={handleMenuClose}>
+                {selectedStoryId &&
+                    (() => {
+                        if (!stories || stories.length === 0) return null;
+
+                        const story = stories.find(
+                            (s: StoryDto) => s.id === selectedStoryId,
+                        );
+
+                        if (!story) return null;
+
+                        const menuItems = [
+                            <MenuItem
+                                key="view-details"
+                                onClick={() => {
+                                    handleMenuClose();
+                                    navigate(
+                                        `${ROUTES.STORY_DETAILS}/${selectedStoryId}`,
+                                    );
+                                }}
+                            >
+                                Xem chi tiết
+                            </MenuItem>,
+                        ];
+
+                        if (story.deletedAt === null) {
+                            menuItems.push(
+                                <MenuItem
+                                    key="delete"
+                                    onClick={() => {
+                                        handleMenuClose();
+                                        deleteStory(selectedStoryId);
+                                    }}
+                                >
+                                    Xóa
+                                </MenuItem>,
+                            );
+                        } else {
+                            menuItems.push(
+                                <MenuItem
+                                    key="restore"
+                                    onClick={() => {
+                                        handleMenuClose();
+                                        restoreStory(selectedStoryId);
+                                    }}
+                                >
+                                    Khôi phục
+                                </MenuItem>,
+                            );
+                        }
+
+                        if (story.status === 'pending') {
+                            menuItems.push(
+                                <MenuItem
+                                    key="approve"
+                                    onClick={() => {
+                                        handleMenuClose();
+                                        approveStory(selectedStoryId);
+                                    }}
+                                >
+                                    Duyệt
+                                </MenuItem>,
+                                <MenuItem
+                                    key="reject"
+                                    onClick={() => {
+                                        handleMenuClose();
+                                        rejectStory(selectedStoryId);
+                                    }}
+                                >
+                                    Từ chối
+                                </MenuItem>,
+                            );
+                        }
+
+                        if (story.status === 'published') {
+                            menuItems.push(
+                                <MenuItem
+                                    key="unpublish"
+                                    onClick={() => {
+                                        handleMenuClose();
+                                        unpublishStory(selectedStoryId);
+                                    }}
+                                >
+                                    Bỏ xuất bản
+                                </MenuItem>,
+                            );
+                        }
+
+                        return menuItems;
+                    })()}
+            </Menu>
+
+            <ConfirmDialog
+                open={confirmDialog.open}
+                title={confirmDialog.title}
+                content={confirmDialog.content}
+                onConfirm={confirmDialog.onConfirm}
+                onClose={closeConfirm}
+            />
+
+            <ConfirmDialogWithInput
+                open={inputDialog.open}
+                title={inputDialog.title}
+                content={inputDialog.content}
+                inputLabel={inputDialog.inputLabel}
+                onConfirm={inputDialog.onConfirm}
+                onClose={closeInputDialog}
+            />
         </Container>
     );
 };
