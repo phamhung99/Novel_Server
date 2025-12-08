@@ -1,9 +1,13 @@
+import { ChapterState } from 'src/story/entities/chapter-states.entity';
+import { StoryLikes } from 'src/story/entities/story-likes.entity';
+import { StoryViews } from 'src/story/entities/story-views.entity';
 import {
     Entity,
     Column,
     PrimaryColumn,
     CreateDateColumn,
     UpdateDateColumn,
+    OneToMany,
 } from 'typeorm';
 
 @Entity('users')
@@ -46,4 +50,16 @@ export class User {
 
     @UpdateDateColumn({ name: 'updated_at', type: 'timestamptz' })
     updatedAt: Date;
+
+    @OneToMany(() => ChapterState, (chapterState) => chapterState.user)
+    chapterStates: ChapterState[];
+
+    @OneToMany(() => StoryLikes, (storyLikes) => storyLikes.user)
+    storyLikes: StoryLikes[];
+
+    @OneToMany(() => StoryViews, (storyViews) => storyViews.user)
+    storyViews: StoryViews[];
+
+    @OneToMany(() => ChapterState, (chapterState) => chapterState.user)
+    audioPreferences: ChapterState[];
 }

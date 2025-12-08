@@ -8,14 +8,34 @@ import {
     Query,
     DefaultValuePipe,
     ParseIntPipe,
+    Headers,
+    BadRequestException,
 } from '@nestjs/common';
 import { UserService } from './user.service';
 import { User } from './entities/user.entity';
 import { parseQueryOptions } from 'src/common/utils/parse-query-options.util';
+import { ERROR_MESSAGES } from 'src/common/constants/app.constant';
 
 @Controller('users')
 export class UserController {
     constructor(private readonly userService: UserService) {}
+
+    @Get('info')
+    async getUserInfo(
+        @Headers('x-user-id') userId: string,
+        @Headers('x-language') language: string,
+    ): Promise<any> {
+        if (!userId) {
+            throw new BadRequestException(ERROR_MESSAGES.USER_ID_REQUIRED);
+        }
+
+        const user = await this.userService.createOrUpdateUser({
+            userId,
+            language,
+        });
+
+        return { user };
+    }
 
     @Get()
     async getAllUsers(

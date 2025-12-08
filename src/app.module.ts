@@ -11,6 +11,7 @@ import { DashboardModule } from './dashboard/dashboard.module';
 import { PackageMiddleware } from './common/middleware/package.middleware';
 import { StoryModule } from './story/story.module';
 import { AuthModule } from './auth/auth.module';
+import { PaymentsModule } from './payments/payments.module';
 
 @Module({
     imports: [
@@ -49,6 +50,7 @@ import { AuthModule } from './auth/auth.module';
         DashboardModule,
         StoryModule,
         AuthModule,
+        PaymentsModule,
     ],
     controllers: [HealthController],
 })
