@@ -16,6 +16,10 @@ import { StoryStatus } from '../../common/enums/story-status.enum';
 import { Chapter } from './chapter.entity';
 import { StoryGeneration } from './story-generation.entity';
 import { StoryVisibility } from 'src/common/enums/story-visibility.enum';
+import { StorySource } from 'src/common/enums/app.enum';
+import { StoryLikes } from './story-likes.entity';
+import { StoryViews } from './story-views.entity';
+import { UserAudioPreference } from './user-audio-preference.entity';
 
 @Entity('story')
 export class Story {
@@ -48,9 +52,6 @@ export class Story {
     @Column({ name: 'cover_image', nullable: true })
     coverImage: string;
 
-    @Column({ type: 'int', default: 0 })
-    views: number;
-
     @Column({
         type: 'decimal',
         precision: 3,
@@ -73,6 +74,13 @@ export class Story {
         default: StoryVisibility.PRIVATE,
     })
     visibility: StoryVisibility;
+
+    @Column({
+        type: 'enum',
+        enum: StorySource,
+        default: StorySource.AI,
+    })
+    sourceType: StorySource;
 
     @Column({ name: 'approved_by', nullable: true })
     approvedBy: string;
@@ -98,4 +106,16 @@ export class Story {
     @OneToOne(() => StoryGeneration, { nullable: true })
     @JoinColumn({ name: 'generation_id' })
     generation?: StoryGeneration;
+
+    @OneToMany(() => StoryLikes, (storyLikes) => storyLikes.story)
+    likes: StoryLikes[];
+
+    @OneToMany(() => StoryViews, (storyViews) => storyViews.story)
+    views: StoryViews[];
+
+    @OneToMany(
+        () => UserAudioPreference,
+        (audioPreference) => audioPreference.story,
+    )
+    audioPreferences: UserAudioPreference[];
 }

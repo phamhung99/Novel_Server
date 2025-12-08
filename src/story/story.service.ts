@@ -100,7 +100,6 @@ export class StoryService {
                 authorId: true,
                 status: true,
                 visibility: true,
-                views: true,
                 rating: true,
                 createdAt: true,
                 updatedAt: true,

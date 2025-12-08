@@ -10,6 +10,8 @@ import {
 } from 'typeorm';
 import { Story } from './story.entity';
 import { ChapterGeneration } from './chapter-generation.entity';
+import { ChapterState } from './chapter-states.entity';
+import { ChapterAudio } from './chapter-audio.entity';
 
 @Entity('chapter')
 export class Chapter {
@@ -44,4 +46,13 @@ export class Chapter {
 
     @UpdateDateColumn({ name: 'updated_at', type: 'timestamptz' })
     updatedAt: Date;
+
+    @OneToMany(() => ChapterState, (chapterState) => chapterState.chapter)
+    chapterStates: ChapterState[];
+
+    @OneToMany(() => ChapterAudio, (chapterAudio) => chapterAudio.chapter)
+    chapterAudios: ChapterAudio[];
+
+    @OneToMany(() => ChapterAudio, (chapterAudio) => chapterAudio.chapter)
+    audioPreferences: ChapterAudio[];
 }
