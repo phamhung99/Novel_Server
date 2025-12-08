@@ -15,6 +15,10 @@ import {
     InputLabel,
     Collapse,
     IconButton,
+    FormLabel,
+    RadioGroup,
+    FormControlLabel,
+    Radio,
 } from '@mui/material';
 import { ExpandMore, ExpandLess } from '@mui/icons-material';
 import axios from '../api/axios';
@@ -64,7 +68,11 @@ const ChapterGeneratorPage: React.FC = () => {
     const [loading, setLoading] = useState<boolean>(false);
     const [error, setError] = useState<string | null>(null);
 
-    const [chapterDirection, setChapterDirection] = useState<string>('');
+    const [directionMode, setDirectionMode] = useState<'select' | 'custom'>(
+        'select',
+    );
+    const [selectedDirection, setSelectedDirection] = useState<string>('');
+    const [customDirection, setCustomDirection] = useState<string>('');
 
     const toggleChapter = (idx: number) => {
         setExpanded((prev) => {
@@ -143,11 +151,15 @@ const ChapterGeneratorPage: React.FC = () => {
 
     const generateChapter = async () => {
         const lastChapter = chapters[chapters.length - 1];
+
+        // Lấy direction dựa trên mode
         const direction =
-            chapterDirection.trim() || lastChapter?.structure?.directions?.[0];
+            directionMode === 'custom'
+                ? customDirection.trim()
+                : selectedDirection || lastChapter?.structure?.directions?.[0];
 
         if (!direction) {
-            setError('Please select chapter direction');
+            setError('Please select or enter a chapter direction');
             return;
         }
 
@@ -170,7 +182,9 @@ const ChapterGeneratorPage: React.FC = () => {
             const result = await pollChapterResult(requestId);
 
             setChapters((prev) => [...prev, result]);
-            setChapterDirection('');
+            setSelectedDirection('');
+            setCustomDirection('');
+            setDirectionMode('select'); // Reset về select mode
         } catch (err: any) {
             setError(
                 err.response?.data?.message ||
@@ -391,28 +405,69 @@ const ChapterGeneratorPage: React.FC = () => {
                     gap: 2,
                 }}
             >
-                <FormControl sx={{ minWidth: 320 }}>
-                    <InputLabel id="chapter-direction-label">
-                        Chapter Direction
-                    </InputLabel>
-                    <Select
-                        labelId="chapter-direction-label"
-                        value={chapterDirection}
-                        label="Chapter Direction"
-                        onChange={(e) => setChapterDirection(e.target.value)}
-                    >
-                        {chapters[
-                            chapters.length - 1
-                        ]?.structure?.directions?.map(
-                            (dir: string, i: number) => (
-                                <MenuItem key={i} value={dir}>
-                                    {dir}
-                                </MenuItem>
-                            ),
-                        )}
-                    </Select>
-                </FormControl>
+                <Paper sx={{ p: 3, width: '100%', maxWidth: 500 }}>
+                    <FormControl component="fieldset" sx={{ mb: 2 }}>
+                        <FormLabel component="legend">
+                            Direction Input Mode
+                        </FormLabel>
+                        <RadioGroup
+                            row
+                            value={directionMode}
+                            onChange={(e) =>
+                                setDirectionMode(
+                                    e.target.value as 'select' | 'custom',
+                                )
+                            }
+                        >
+                            <FormControlLabel
+                                value="select"
+                                control={<Radio />}
+                                label="Select from list"
+                            />
+                            <FormControlLabel
+                                value="custom"
+                                control={<Radio />}
+                                label="Enter custom direction"
+                            />
+                        </RadioGroup>
+                    </FormControl>
 
+                    {directionMode === 'select' ? (
+                        <FormControl fullWidth>
+                            <InputLabel id="chapter-direction-label">
+                                Chapter Direction
+                            </InputLabel>
+                            <Select
+                                labelId="chapter-direction-label"
+                                value={selectedDirection}
+                                label="Chapter Direction"
+                                onChange={(e) =>
+                                    setSelectedDirection(e.target.value)
+                                }
+                            >
+                                {chapters[
+                                    chapters.length - 1
+                                ]?.structure?.directions?.map(
+                                    (dir: string, i: number) => (
+                                        <MenuItem key={i} value={dir}>
+                                            {dir}
+                                        </MenuItem>
+                                    ),
+                                )}
+                            </Select>
+                        </FormControl>
+                    ) : (
+                        <TextField
+                            fullWidth
+                            label="Custom Direction"
+                            multiline
+                            minRows={3}
+                            value={customDirection}
+                            onChange={(e) => setCustomDirection(e.target.value)}
+                            placeholder="Enter your custom direction for the next chapter..."
+                        />
+                    )}
+                </Paper>
                 <Button
                     variant="contained"
                     onClick={generateChapter}
