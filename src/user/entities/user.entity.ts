@@ -15,12 +15,6 @@ export class User {
     @PrimaryColumn()
     id: string;
 
-    @Column({ name: 'first_name', nullable: true })
-    firstName: string;
-
-    @Column({ name: 'last_name', nullable: true })
-    lastName: string;
-
     @Column({ nullable: true })
     country: string;
 
@@ -42,8 +36,8 @@ export class User {
     @Column({ name: 'profile_image', nullable: true })
     profileImage: string;
 
-    @Column({ name: 'active', type: 'bool', default: true })
-    active: boolean;
+    @Column({ name: 'deleted_at', type: 'timestamptz', nullable: true })
+    deletedAt: Date;
 
     @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
     createdAt: Date;

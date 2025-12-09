@@ -10,15 +10,38 @@ import {
     ParseIntPipe,
     Headers,
     BadRequestException,
+    Post,
 } from '@nestjs/common';
 import { UserService } from './user.service';
 import { User } from './entities/user.entity';
 import { parseQueryOptions } from 'src/common/utils/parse-query-options.util';
 import { ERROR_MESSAGES } from 'src/common/constants/app.constant';
+import { excludeFields } from 'src/common/utils/exclude-fields';
+import { StoryCategory } from 'src/common/enums/app.enum';
+import { UpdateUserGenresDto } from './dto/update-user-genres.dto';
 
 @Controller('users')
 export class UserController {
     constructor(private readonly userService: UserService) {}
+
+    @Get('categories')
+    async getSelectedCategories(
+        @Headers('x-user-id') userId: string,
+    ): Promise<StoryCategory[]> {
+        return this.userService.getSelectedGenres(userId);
+    }
+
+    @Post('categories')
+    async updateSelectedCategories(
+        @Headers('x-user-id') userId: string,
+        @Body() body: UpdateUserGenresDto,
+    ): Promise<StoryCategory[]> {
+        if (!Array.isArray(body.genres)) {
+            throw new BadRequestException('genres must be an array');
+        }
+
+        return this.userService.updateSelectedGenres(userId, body.genres);
+    }
 
     @Get('info')
     async getUserInfo(
@@ -34,7 +57,25 @@ export class UserController {
             language,
         });
 
-        return { user };
+        const cleanedUser = excludeFields(user, ['password']);
+
+        return {
+            user: {
+                ...cleanedUser,
+                subscription: {
+                    isSubUser: false,
+                    basePlanId: null,
+                },
+                wallet: {
+                    totalCoins: 80,
+                    permanentCoins: 0,
+                    temporaryCoins: [
+                        { amount: 50, expiresAt: '2025-12-31T23:59:59Z' },
+                        { amount: 30, expiresAt: '2026-01-15T23:59:59Z' },
+                    ],
+                },
+            },
+        };
     }
 
     @Get()
@@ -49,14 +90,11 @@ export class UserController {
     ) {
         const validKeys: (keyof User)[] = [
             'id',
-            'firstName',
-            'lastName',
             'country',
             'ipCountryCode',
             'username',
             'email',
             'profileImage',
-            'active',
             'createdAt',
             'updatedAt',
         ];

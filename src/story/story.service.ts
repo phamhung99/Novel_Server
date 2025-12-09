@@ -106,9 +106,8 @@ export class StoryService {
                 deletedAt: true,
                 author: {
                     id: true,
-                    firstName: true,
-                    lastName: true,
-                    active: true,
+                    username: true,
+                    deletedAt: true,
                 },
                 chapters: {
                     id: true,

@@ -29,6 +29,7 @@ import {
     InitializeStoryDto,
     InitializeStoryResponseDto,
 } from './dto/generate-story-outline.dto';
+import { StoryCategory } from 'src/common/enums/app.enum';
 // import { FileInterceptor } from '@nestjs/platform-express';
 // import { diskStorage } from 'multer';
 // import { extname, join } from 'path';
@@ -41,6 +42,11 @@ import {
 @Controller('story')
 export class StoryController {
     constructor(private readonly storyService: StoryService) {}
+    @Get('categories')
+    getAllCategories(): string[] {
+        const storyCategoriesArray: string[] = Object.values(StoryCategory);
+        return storyCategoriesArray;
+    }
 
     // REQUEST 1: Initialize story with outline
     @Post('generate/initialize')
