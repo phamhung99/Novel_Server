@@ -11,6 +11,7 @@ import { UserGenres } from './entities/user-genres.entity';
 import { ERROR_MESSAGES } from 'src/common/constants/app.constant';
 import { StoryCategory } from 'src/common/enums/app.enum';
 import { ReadingHistory } from './entities/reading-history.entity';
+import { StoryStatus } from 'src/common/enums/story-status.enum';
 
 @Injectable()
 export class UserService extends BaseCrudService<User> {
@@ -116,6 +117,7 @@ export class UserService extends BaseCrudService<User> {
                     's.coverImage AS "coverImage"',
                     's.rating AS "rating"',
                     's.type AS "type"',
+                    's.status AS "status"',
                     'string_to_array(s.genres, \',\') AS "genres"',
 
                     'a.id AS "authorId"',
@@ -136,6 +138,9 @@ export class UserService extends BaseCrudService<User> {
                 ) AS chapters`,
                 ])
                 .where('rh.user_id = :userId', { userId })
+                .andWhere('s.status = :status', {
+                    status: StoryStatus.PUBLISHED,
+                })
                 .groupBy('s.id')
                 .addGroupBy('a.id')
                 .addGroupBy('rh.lastReadAt')
