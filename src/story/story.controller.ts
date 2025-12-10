@@ -30,6 +30,7 @@ import {
     InitializeStoryResponseDto,
 } from './dto/generate-story-outline.dto';
 import { StoryCategory } from 'src/common/enums/app.enum';
+import { ERROR_MESSAGES } from 'src/common/constants/app.constant';
 // import { FileInterceptor } from '@nestjs/platform-express';
 // import { diskStorage } from 'multer';
 // import { extname, join } from 'path';
@@ -176,9 +177,23 @@ export class StoryController {
     }
 
     @Get(':id')
-    async getStoryById(@Param('id') id: string) {
+    async getStoryById(
+        @Param('id') id: string,
+        @Headers('x-user-id') userId: string,
+    ) {
+        if (!id) {
+            throw new BadRequestException(ERROR_MESSAGES.STORY_ID_REQUIRED);
+        }
+
+        if (!userId) {
+            throw new BadRequestException(ERROR_MESSAGES.USER_ID_REQUIRED);
+        }
+
         const story = await this.storyService.findStoryById(id);
-        await this.storyService.incrementViews(id);
+        await this.storyService.incrementViews({
+            storyId: id,
+            userId,
+        });
         return story;
     }
 

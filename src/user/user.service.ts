@@ -10,6 +10,7 @@ import { BaseCrudService } from 'src/common/services/base-crud.service';
 import { UserGenres } from './entities/user-genres.entity';
 import { ERROR_MESSAGES } from 'src/common/constants/app.constant';
 import { StoryCategory } from 'src/common/enums/app.enum';
+import { ReadingHistory } from './entities/reading-history.entity';
 
 @Injectable()
 export class UserService extends BaseCrudService<User> {
@@ -18,6 +19,8 @@ export class UserService extends BaseCrudService<User> {
         @InjectRepository(UserGenres)
         private readonly userGenresRepo: Repository<UserGenres>,
         private readonly dataSource: DataSource,
+        @InjectRepository(ReadingHistory)
+        private readonly readingHistoryRepo: Repository<ReadingHistory>,
     ) {
         super(userRepo);
     }
@@ -87,5 +90,77 @@ export class UserService extends BaseCrudService<User> {
         });
 
         return genres;
+    }
+
+    async getRecentStories(
+        userId: string,
+        { page = 1, limit = 20 }: { page?: number; limit?: number } = {},
+    ) {
+        try {
+            const offset = (page - 1) * limit;
+
+            const qb = this.dataSource
+                .getRepository(ReadingHistory)
+                .createQueryBuilder('rh')
+                .innerJoin('rh.story', 's')
+                .leftJoin('s.author', 'a')
+                .leftJoin('s.likes', 'likes', 'likes.userId = :userId', {
+                    userId,
+                })
+                .leftJoin('story_summary', 'ss', 'ss.story_id = s.id')
+                .leftJoin('s.chapters', 'c')
+                .select([
+                    's.id AS "storyId"',
+                    's.title AS "title"',
+                    's.synopsis AS "synopsis"',
+                    's.coverImage AS "coverImage"',
+                    's.rating AS "rating"',
+                    's.type AS "type"',
+                    'string_to_array(s.genres, \',\') AS "genres"',
+
+                    'a.id AS "authorId"',
+                    'a.username AS "authorUsername"',
+                    'a.profileImage AS "profileImage"',
+
+                    'rh.lastReadAt AS "lastReadAt"',
+                    'rh.lastReadChapter AS "lastReadChapter"',
+
+                    'CASE WHEN likes.id IS NULL THEN false ELSE true END AS "isLike"',
+
+                    'ss.likes_count AS "likesCount"',
+                    'ss.views_count AS "viewsCount"',
+
+                    `json_agg(
+                    json_build_object('id', c.id, 'title', c.title, 'index', c.index)
+                    ORDER BY c.index ASC
+                ) AS chapters`,
+                ])
+                .where('rh.user_id = :userId', { userId })
+                .groupBy('s.id')
+                .addGroupBy('a.id')
+                .addGroupBy('rh.lastReadAt')
+                .addGroupBy('rh.lastReadChapter')
+                .addGroupBy('likes.id')
+                .addGroupBy('ss.likes_count')
+                .addGroupBy('ss.views_count')
+                .orderBy('rh.lastReadAt', 'DESC')
+                .offset(offset)
+                .limit(limit);
+
+            const [items, total] = await Promise.all([
+                qb.getRawMany(),
+                qb.getCount(),
+            ]);
+
+            return {
+                page,
+                limit,
+                total,
+                items,
+            };
+        } catch (error) {
+            console.error('Failed to get recent stories:', error);
+            throw new BadRequestException('Cannot fetch recent stories');
+        }
     }
 }

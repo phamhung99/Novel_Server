@@ -24,6 +24,18 @@ import { UpdateUserGenresDto } from './dto/update-user-genres.dto';
 export class UserController {
     constructor(private readonly userService: UserService) {}
 
+    @Get('recent-story')
+    async getRecentStories(
+        @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit: number,
+        @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
+        @Headers('x-user-id') userId: string,
+    ) {
+        return await this.userService.getRecentStories(userId, {
+            limit,
+            page,
+        });
+    }
+
     @Get('categories')
     async getSelectedCategories(
         @Headers('x-user-id') userId: string,

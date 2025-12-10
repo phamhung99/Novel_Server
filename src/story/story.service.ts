@@ -6,7 +6,7 @@ import {
     HttpStatus,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { IsNull, Not, Repository } from 'typeorm';
+import { DataSource, IsNull, MoreThan, Not, Repository } from 'typeorm';
 import { Story } from './entities/story.entity';
 import { Chapter } from './entities/chapter.entity';
 import {
@@ -32,6 +32,10 @@ import {
 import { StoryGenerationApiService } from '../ai/providers/story-generation-api.service';
 import { StoryVisibility } from 'src/common/enums/story-visibility.enum';
 import { excludeFields } from 'src/common/utils/exclude-fields';
+import { StoryViews } from './entities/story-views.entity';
+import { StorySummary } from './entities/story-summary.entity';
+import { get24hAgo, getStartOfDay } from 'src/common/utils/date.utils';
+import { UserService } from 'src/user/user.service';
 
 @Injectable()
 export class StoryService {
@@ -45,6 +49,12 @@ export class StoryService {
         @InjectRepository(ChapterGeneration)
         private chapterGenerationRepository: Repository<ChapterGeneration>,
         private storyGenerationApiService: StoryGenerationApiService,
+        @InjectRepository(StoryViews)
+        private storyViewsRepository: Repository<StoryViews>,
+        @InjectRepository(StorySummary)
+        private storySummaryRepository: Repository<StorySummary>,
+        private dataSource: DataSource,
+        private userService: UserService,
     ) {}
 
     async createStory(
@@ -180,8 +190,50 @@ export class StoryService {
         });
     }
 
-    async incrementViews(id: string): Promise<void> {
-        await this.storyRepository.increment({ id }, 'views', 1);
+    async incrementViews({
+        storyId,
+        userId,
+    }: {
+        storyId: string;
+        userId: string;
+    }): Promise<void> {
+        await this.userService.findById(userId);
+
+        await this.dataSource.transaction(async (manager) => {
+            const now = new Date();
+            const startOfToday = getStartOfDay(now);
+
+            const existed = await manager.findOne(StoryViews, {
+                where: {
+                    story: { id: storyId },
+                    user: { id: userId },
+                    viewedAt: MoreThan(startOfToday),
+                },
+            });
+
+            if (existed) {
+                await manager.update(
+                    StoryViews,
+                    { id: existed.id },
+                    { viewedAt: now },
+                );
+            } else {
+                // Chưa xem hôm nay => insert mới
+                await manager.insert(StoryViews, {
+                    story: { id: storyId },
+                    user: { id: userId },
+                    viewedAt: now,
+                });
+
+                // Increment StorySummary chỉ 1 lần/ngày/người
+                await manager.increment(
+                    StorySummary,
+                    { storyId },
+                    'viewsCount',
+                    1,
+                );
+            }
+        });
     }
 
     async updateRating(id: string, rating: number): Promise<void> {
@@ -427,6 +479,7 @@ export class StoryService {
             const story = this.storyRepository.create({
                 title: outlineResponse.story.title,
                 synopsis: outlineResponse.story.synopsis,
+                genres: outlineResponse.story.genres,
                 authorId: userId,
             });
             const savedStory = await this.storyRepository.save(story);

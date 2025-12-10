@@ -28,6 +28,8 @@ export const ERROR_MESSAGES = {
     FAILED_TO_PARSE_FILE: 'Failed to parse the uploaded file.',
     AI_RESPONSE_MISSING_CONTENT: 'AI response missing content',
 
+    STORY_ID_REQUIRED: 'storyId is required',
+
     // Common
     CONTENT_GENERATE_ERROR: 'An error occurred, please try again later.',
     USER_NOT_FOUND: 'User not found',
