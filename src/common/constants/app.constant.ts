@@ -38,6 +38,14 @@ export const ERROR_MESSAGES = {
         'Your prompt violated our safety policies. Please try with another prompt.',
     COMIC_GENERATED_ALL_RETRY_ATTEMPT_FAILED: 'All retry attempts failed.',
     COMIC_GENERATED_DAILY_LIMIT_REACHED: 'Daily comic generation limit reached',
-    SAME_PROMPT_COOLDOWN_MESSAGE: (seconds: number) =>
-        `You have already submitted the same prompt recently. Please wait ${seconds} seconds before making another request with the same prompt.`,
+
+    FOREIGN_KEY_VIOLATION:
+        'Cannot perform this operation due to existing references.',
+    DUPLICATE_RECORD: 'A record with this value already exists.',
+    INVALID_UUID: 'Invalid UUID format provided',
+    NOT_FOUND: 'The requested resource was not found.',
+    UNKNOWN_ERROR_OCCURRED:
+        'The server is undergoing maintenance. Please try again later.',
+    GENERATED_ALL_RETRY_ATTEMPT_FAILED: 'All retry attempts failed.',
+    GENERATED_DAILY_LIMIT_REACHED: 'Daily generation limit reached',
 } as const;

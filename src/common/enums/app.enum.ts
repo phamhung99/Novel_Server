@@ -63,3 +63,27 @@ export enum StoryCategory {
     FOOD = 'food',
     HEALTH = 'health',
 }
+
+export enum ErrorCode {
+    // 4000–4099: Validation & Client Input Errors
+    INVALID_UUID = 4000,
+    EMAIL_ALREADY_EXISTS = 4001,
+    DUPLICATE_RECORD = 4002,
+    FOREIGN_KEY_VIOLATION = 4003,
+    REQUIRED_FIELD_MISSING = 4004,
+    NOT_FOUND = 4005,
+    USER_TOKEN_NOT_ENOUGH = 4006,
+
+    // 4100–4199: Authentication & Authorization Errors
+    INVALID_TOKEN = 4100,
+    TOKEN_EXPIRED = 4101,
+    TOKEN_NOT_ACTIVE = 4102,
+
+    // 4200–4299: Subscription & Payment Errors
+    SUBSCRIPTION_NOT_ACTIVE = 4200,
+    SUBSCRIPTION_EXPIRED = 4201,
+
+    // 5000–5099: Internal & Server Errors
+    DATABASE_ERROR = 5000,
+    INTERNAL_SERVER_ERROR = 5001,
+}
