@@ -1091,6 +1091,7 @@ export class StoryService {
             .leftJoin('s.likes', 'likes', 'likes.userId = :userId', { userId })
             .leftJoin('story_summary', 'ss', 'ss.story_id = s.id')
             .leftJoin('s.chapters', 'c')
+            .leftJoin('s.categories', 'cat')
             .select([
                 's.id AS "storyId"',
                 's.title AS "title"',
@@ -1099,7 +1100,7 @@ export class StoryService {
                 's.rating AS "rating"',
                 's.type AS "type"',
                 's.status AS "status"',
-                'string_to_array(s.genres, \',\') AS "genres"',
+                `json_agg(DISTINCT jsonb_build_object('id', cat.id, 'name', cat.name)) AS "categories"`,
 
                 'a.id AS "authorId"',
                 'a.username AS "authorUsername"',
