@@ -43,6 +43,7 @@ import { PaymentsModule } from './payments/payments.module';
                 ),
                 retryDelay: configService.get<number>('database.retryDelay'),
                 ssl: configService.get('database.ssl'),
+                logging: ['schema', 'error', 'warn'],
             }),
         }),
         AiModule,

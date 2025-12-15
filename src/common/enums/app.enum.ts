@@ -87,3 +87,8 @@ export enum ErrorCode {
     DATABASE_ERROR = 5000,
     INTERNAL_SERVER_ERROR = 5001,
 }
+
+export enum LibraryType {
+    CREATED = 'created',
+    LIKED = 'liked',
+}

@@ -1,10 +1,20 @@
-import { Entity, PrimaryColumn } from 'typeorm';
+import { Entity, PrimaryColumn, ManyToOne, JoinColumn } from 'typeorm';
+import { User } from './user.entity';
+import { Category } from 'src/story/entities/categories.entity';
 
 @Entity('user_genres')
 export class UserGenres {
-    @PrimaryColumn({ name: 'user_id' })
+    @PrimaryColumn({ name: 'user_id', type: 'uuid' })
     userId: string;
 
-    @PrimaryColumn()
-    genre: string;
+    @PrimaryColumn({ name: 'category_id', type: 'uuid' })
+    categoryId: string;
+
+    @ManyToOne(() => User, (user) => user.userGenres)
+    @JoinColumn({ name: 'user_id' })
+    user: User;
+
+    @ManyToOne(() => Category, (category) => category.userGenres)
+    @JoinColumn({ name: 'category_id' })
+    category: Category;
 }

@@ -64,10 +64,10 @@ export class UserService extends BaseCrudService<User> {
 
         const userGenres = await this.userGenresRepo.find({
             where: { userId },
-            select: ['genre'],
+            select: ['category'],
         });
 
-        return userGenres.map((ug) => ug.genre as StoryCategory);
+        return userGenres.map((ug) => ug.category.id as StoryCategory);
     }
 
     async updateSelectedGenres(

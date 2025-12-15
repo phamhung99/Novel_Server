@@ -6,7 +6,7 @@ import {
     HttpStatus,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, IsNull, MoreThan, Not, Repository } from 'typeorm';
+import { DataSource, In, IsNull, MoreThan, Not, Repository } from 'typeorm';
 import { Story } from './entities/story.entity';
 import { Chapter } from './entities/chapter.entity';
 import {
@@ -34,8 +34,10 @@ import { StoryVisibility } from 'src/common/enums/story-visibility.enum';
 import { excludeFields } from 'src/common/utils/exclude-fields';
 import { StoryViews } from './entities/story-views.entity';
 import { StorySummary } from './entities/story-summary.entity';
-import { get24hAgo, getStartOfDay } from 'src/common/utils/date.utils';
+import { getStartOfDay } from 'src/common/utils/date.utils';
 import { UserService } from 'src/user/user.service';
+import { LibraryType } from 'src/common/enums/app.enum';
+import { Category } from './entities/categories.entity';
 
 @Injectable()
 export class StoryService {
@@ -55,6 +57,8 @@ export class StoryService {
         private storySummaryRepository: Repository<StorySummary>,
         private dataSource: DataSource,
         private userService: UserService,
+        @InjectRepository(Category)
+        private categoryRepository: Repository<Category>,
     ) {}
 
     async createStory(
@@ -197,8 +201,6 @@ export class StoryService {
         storyId: string;
         userId: string;
     }): Promise<void> {
-        await this.userService.findById(userId);
-
         await this.dataSource.transaction(async (manager) => {
             const now = new Date();
             const startOfToday = getStartOfDay(now);
@@ -225,13 +227,24 @@ export class StoryService {
                     viewedAt: now,
                 });
 
+                const summary = await manager.findOne(StorySummary, {
+                    where: { storyId },
+                });
+
                 // Increment StorySummary chỉ 1 lần/ngày/người
-                await manager.increment(
-                    StorySummary,
-                    { storyId },
-                    'viewsCount',
-                    1,
-                );
+                if (summary) {
+                    await manager.increment(
+                        StorySummary,
+                        { storyId },
+                        'viewsCount',
+                        1,
+                    );
+                } else {
+                    await manager.insert(StorySummary, {
+                        storyId,
+                        viewsCount: 1,
+                    });
+                }
             }
         });
     }
@@ -475,13 +488,19 @@ export class StoryService {
                     aiProvider: dto.aiProvider || 'grok',
                 });
 
-            // Create story with generated attributes
+            // Lấy category từ DB theo tên hoặc id (tùy dto gửi)
+            const categories = await this.categoryRepository.find({
+                where: { name: In(dto.genres) }, // hoặc { id: In(dto.genreIds) } nếu gửi id
+            });
+
+            // Tạo story và gắn category
             const story = this.storyRepository.create({
                 title: outlineResponse.story.title,
                 synopsis: outlineResponse.story.synopsis,
-                genres: outlineResponse.story.genres,
                 authorId: userId,
+                categories, // <-- map tới category có sẵn
             });
+
             const savedStory = await this.storyRepository.save(story);
 
             // Update story generation record with story reference and attributes
@@ -1056,5 +1075,94 @@ export class StoryService {
             structure: generation.structure || ({} as any),
             message: `Chapter ${generation.chapter.index} generated successfully.`,
         };
+    }
+
+    async getUserLibrary(
+        userId: string,
+        type: LibraryType,
+        { page = 1, limit = 20 }: { page?: number; limit?: number } = {},
+    ) {
+        const offset = (page - 1) * limit;
+
+        const qb = this.dataSource
+            .getRepository(Story)
+            .createQueryBuilder('s')
+            .leftJoin('s.author', 'a')
+            .leftJoin('s.likes', 'likes', 'likes.userId = :userId', { userId })
+            .leftJoin('story_summary', 'ss', 'ss.story_id = s.id')
+            .leftJoin('s.chapters', 'c')
+            .select([
+                's.id AS "storyId"',
+                's.title AS "title"',
+                's.synopsis AS "synopsis"',
+                's.coverImage AS "coverImage"',
+                's.rating AS "rating"',
+                's.type AS "type"',
+                's.status AS "status"',
+                'string_to_array(s.genres, \',\') AS "genres"',
+
+                'a.id AS "authorId"',
+                'a.username AS "authorUsername"',
+                'a.profileImage AS "profileImage"',
+
+                'CASE WHEN likes.id IS NULL THEN false ELSE true END AS "isLike"',
+
+                'ss.likes_count AS "likesCount"',
+                'ss.views_count AS "viewsCount"',
+
+                `json_agg(
+                    json_build_object('id', c.id, 'title', c.title, 'index', c.index)
+                    ORDER BY c.index ASC
+                ) AS chapters`,
+            ])
+            .groupBy('s.id')
+            .addGroupBy('a.id')
+            .addGroupBy('likes.id')
+            .addGroupBy('ss.likes_count')
+            .addGroupBy('ss.views_count');
+
+        if (type === LibraryType.CREATED) {
+            qb.where('s.author_id = :userId', { userId });
+            qb.orderBy('s.created_at', 'DESC');
+        } else if (type === LibraryType.LIKED) {
+            qb.innerJoin(
+                'story_likes',
+                'sl',
+                'sl.story_id = s.id AND sl.user_id = :userId',
+                { userId },
+            );
+            qb.addGroupBy('sl.created_at');
+            qb.orderBy('sl.created_at', 'DESC');
+        } else {
+            throw new BadRequestException('Invalid type parameter');
+        }
+
+        qb.offset(offset).limit(limit);
+
+        const [items, total] = await Promise.all([
+            qb.getRawMany(),
+            qb.getCount(),
+        ]);
+
+        return { page, limit, total, items };
+    }
+
+    async getAllCategories(): Promise<
+        Pick<Category, 'id' | 'name' | 'displayOrder' | 'isActive'>[]
+    > {
+        return this.categoryRepository.find({
+            select: {
+                id: true,
+                name: true,
+                displayOrder: true,
+                isActive: true,
+            },
+            where: {
+                isActive: true,
+            },
+            order: {
+                displayOrder: 'ASC',
+            },
+        });
     }
 }

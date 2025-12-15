@@ -9,9 +9,7 @@ import {
     Param,
     Headers,
     BadRequestException,
-    // UseInterceptors,
-    // UploadedFile,
-    // ParseFilePipe,
+    Query,
 } from '@nestjs/common';
 import { StoryService } from './story.service';
 import { CreateStoryDto } from './dto/create-story.dto';
@@ -29,8 +27,11 @@ import {
     InitializeStoryDto,
     InitializeStoryResponseDto,
 } from './dto/generate-story-outline.dto';
-import { StoryCategory } from 'src/common/enums/app.enum';
+import { LibraryType } from 'src/common/enums/app.enum';
 import { ERROR_MESSAGES } from 'src/common/constants/app.constant';
+import { StoryStatus } from 'src/common/enums/story-status.enum';
+import { UserService } from 'src/user/user.service';
+import { Category } from './entities/categories.entity';
 // import { FileInterceptor } from '@nestjs/platform-express';
 // import { diskStorage } from 'multer';
 // import { extname, join } from 'path';
@@ -42,11 +43,22 @@ import { ERROR_MESSAGES } from 'src/common/constants/app.constant';
 
 @Controller('story')
 export class StoryController {
-    constructor(private readonly storyService: StoryService) {}
+    constructor(
+        private readonly storyService: StoryService,
+        private readonly userService: UserService,
+    ) {}
+
+    @Get('/library')
+    async getUserLibrary(
+        @Headers('x-user-id') userId: string,
+        @Query('type') type: LibraryType,
+    ) {
+        return this.storyService.getUserLibrary(userId, type);
+    }
+
     @Get('categories')
-    getAllCategories(): string[] {
-        const storyCategoriesArray: string[] = Object.values(StoryCategory);
-        return storyCategoriesArray;
+    getAllCategories() {
+        return this.storyService.getAllCategories();
     }
 
     // REQUEST 1: Initialize story with outline
@@ -109,7 +121,6 @@ export class StoryController {
     //     FileInterceptor('image', {
     //         storage: diskStorage({
     //             destination: tmpDir,
-    //             filename: (req, file, cb) => {
     //                 const uniqueSuffix =
     //                     Date.now() + '-' + Math.round(Math.random() * 1e9);
     //                 cb(
@@ -189,11 +200,18 @@ export class StoryController {
             throw new BadRequestException(ERROR_MESSAGES.USER_ID_REQUIRED);
         }
 
+        const user = await this.userService.findById(userId);
+        if (!user) {
+            throw new BadRequestException(ERROR_MESSAGES.USER_NOT_FOUND);
+        }
+
         const story = await this.storyService.findStoryById(id);
-        await this.storyService.incrementViews({
-            storyId: id,
-            userId,
-        });
+        if (story.status === StoryStatus.PUBLISHED) {
+            await this.storyService.incrementViews({
+                storyId: id,
+                userId,
+            });
+        }
         return story;
     }
 

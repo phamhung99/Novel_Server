@@ -9,6 +9,7 @@ import {
     UpdateDateColumn,
     OneToMany,
 } from 'typeorm';
+import { UserGenres } from './user-genres.entity';
 
 @Entity('users')
 export class User {
@@ -56,4 +57,7 @@ export class User {
 
     @OneToMany(() => ChapterState, (chapterState) => chapterState.user)
     audioPreferences: ChapterState[];
+
+    @OneToMany(() => UserGenres, (userGenres) => userGenres.user)
+    userGenres: UserGenres[];
 }

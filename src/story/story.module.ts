@@ -10,6 +10,7 @@ import { AiModule } from '../ai/ai.module';
 import { StoryViews } from './entities/story-views.entity';
 import { StorySummary } from './entities/story-summary.entity';
 import { UserModule } from 'src/user/user.module';
+import { Category } from './entities/categories.entity';
 
 @Module({
     imports: [
@@ -20,6 +21,7 @@ import { UserModule } from 'src/user/user.module';
             ChapterGeneration,
             StoryViews,
             StorySummary,
+            Category,
         ]),
         AiModule,
         UserModule,
