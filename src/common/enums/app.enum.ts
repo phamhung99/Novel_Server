@@ -47,23 +47,6 @@ export enum IapPeriodType {
     YEAR = 'year',
 }
 
-export enum StoryCategory {
-    TECHNOLOGY = 'technology',
-    SPORTS = 'sports',
-    MUSIC = 'music',
-    ART = 'art',
-    LITERATURE = 'literature',
-    SCIENCE = 'science',
-    FANTASY = 'fantasy',
-    HORROR = 'horror',
-    ROMANCE = 'romance',
-    HISTORY = 'history',
-    EDUCATION = 'education',
-    TRAVEL = 'travel',
-    FOOD = 'food',
-    HEALTH = 'health',
-}
-
 export enum ErrorCode {
     // 4000–4099: Validation & Client Input Errors
     INVALID_UUID = 4000,

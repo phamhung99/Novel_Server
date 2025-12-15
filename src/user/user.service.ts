@@ -7,9 +7,8 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 import { User } from './entities/user.entity';
 import { BaseCrudService } from 'src/common/services/base-crud.service';
-import { UserGenres } from './entities/user-genres.entity';
+import { UserCategoryPreference } from './entities/user-category-preference.entity';
 import { ERROR_MESSAGES } from 'src/common/constants/app.constant';
-import { StoryCategory } from 'src/common/enums/app.enum';
 import { ReadingHistory } from './entities/reading-history.entity';
 import { StoryStatus } from 'src/common/enums/story-status.enum';
 
@@ -17,8 +16,8 @@ import { StoryStatus } from 'src/common/enums/story-status.enum';
 export class UserService extends BaseCrudService<User> {
     constructor(
         @InjectRepository(User) userRepo: Repository<User>,
-        @InjectRepository(UserGenres)
-        private readonly userGenresRepo: Repository<UserGenres>,
+        @InjectRepository(UserCategoryPreference)
+        private readonly userCategoryPreferenceRepo: Repository<UserCategoryPreference>,
         private readonly dataSource: DataSource,
         @InjectRepository(ReadingHistory)
         private readonly readingHistoryRepo: Repository<ReadingHistory>,
@@ -56,41 +55,50 @@ export class UserService extends BaseCrudService<User> {
         return user;
     }
 
-    async getSelectedGenres(userId: string): Promise<StoryCategory[]> {
+    async getSelectedCategories(userId: string): Promise<string[]> {
         const user = await this.repository.findOne({ where: { id: userId } });
         if (!user) {
             throw new NotFoundException(ERROR_MESSAGES.USER_NOT_FOUND);
         }
 
-        const userGenres = await this.userGenresRepo.find({
-            where: { userId },
-            select: ['category'],
-        });
+        const userCategoryPreferences =
+            await this.userCategoryPreferenceRepo.find({
+                where: { userId },
+                select: {
+                    category: {
+                        id: true,
+                    },
+                },
+                relations: ['category'],
+            });
 
-        return userGenres.map((ug) => ug.category.id as StoryCategory);
+        return userCategoryPreferences.map((ucp) => ucp.category.id);
     }
 
-    async updateSelectedGenres(
+    async updateSelectedCategories(
         userId: string,
-        genres: StoryCategory[],
-    ): Promise<StoryCategory[]> {
-        if (!Array.isArray(genres)) {
-            throw new BadRequestException('genres must be an array');
+        categoryIds: string[],
+    ): Promise<void> {
+        if (!Array.isArray(categoryIds)) {
+            throw new BadRequestException('categoryIds must be an array');
         }
 
-        // Transaction: xóa cũ + insert mới
         await this.dataSource.transaction(async (manager) => {
-            await manager.delete(UserGenres, { userId });
+            // Xóa tất cả category cũ của user
+            await manager.delete(UserCategoryPreference, { userId });
 
-            if (genres.length) {
-                const userGenres = genres.map((genre) =>
-                    manager.create(UserGenres, { userId, genre }),
+            if (categoryIds.length) {
+                const userCategoryPreferences = categoryIds.map((categoryId) =>
+                    manager.create(UserCategoryPreference, {
+                        userId,
+                        categoryId,
+                    }),
                 );
-                await manager.save(userGenres);
+                await manager.save(userCategoryPreferences);
             }
         });
 
-        return genres;
+        return;
     }
 
     async getRecentStories(

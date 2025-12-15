@@ -9,7 +9,7 @@ import {
     ManyToMany,
 } from 'typeorm';
 import { Story } from './story.entity';
-import { UserGenres } from 'src/user/entities/user-genres.entity';
+import { UserCategoryPreference } from 'src/user/entities/user-category-preference.entity';
 
 @Entity('categories')
 export class Category {
@@ -42,6 +42,9 @@ export class Category {
     @ManyToMany(() => Story, (story) => story.categories)
     stories: Story[];
 
-    @OneToMany(() => UserGenres, (userGenres) => userGenres.category)
-    userGenres: UserGenres[];
+    @OneToMany(
+        () => UserCategoryPreference,
+        (userCategoryPreference) => userCategoryPreference.category,
+    )
+    userCategoryPreferences: UserCategoryPreference[];
 }

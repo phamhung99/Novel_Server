@@ -17,7 +17,6 @@ import { User } from './entities/user.entity';
 import { parseQueryOptions } from 'src/common/utils/parse-query-options.util';
 import { ERROR_MESSAGES } from 'src/common/constants/app.constant';
 import { excludeFields } from 'src/common/utils/exclude-fields';
-import { StoryCategory } from 'src/common/enums/app.enum';
 import { UpdateUserGenresDto } from './dto/update-user-genres.dto';
 
 @Controller('users')
@@ -39,20 +38,23 @@ export class UserController {
     @Get('categories')
     async getSelectedCategories(
         @Headers('x-user-id') userId: string,
-    ): Promise<StoryCategory[]> {
-        return this.userService.getSelectedGenres(userId);
+    ): Promise<string[]> {
+        return this.userService.getSelectedCategories(userId);
     }
 
     @Post('categories')
     async updateSelectedCategories(
         @Headers('x-user-id') userId: string,
         @Body() body: UpdateUserGenresDto,
-    ): Promise<StoryCategory[]> {
-        if (!Array.isArray(body.genres)) {
+    ): Promise<void> {
+        if (!Array.isArray(body.categoryIds)) {
             throw new BadRequestException('genres must be an array');
         }
 
-        return this.userService.updateSelectedGenres(userId, body.genres);
+        return this.userService.updateSelectedCategories(
+            userId,
+            body.categoryIds,
+        );
     }
 
     @Get('info')
