@@ -136,16 +136,7 @@ export class StoryService {
                     prompt: true,
                     title: true,
                     synopsis: true,
-                    genres: true,
-                    setting: true,
-                    mainCharacter: true,
-                    subCharacters: true,
-                    antagonist: true,
-                    motif: true,
-                    tone: true,
-                    writingStyle: true,
-                    plotLogic: true,
-                    hiddenTheme: true,
+                    metadata: true,
                 },
             },
             order: {
@@ -472,6 +463,11 @@ export class StoryService {
                 throw new Error('userId is required');
             }
 
+            const user = await this.userService.findById(userId);
+            if (!user) {
+                throw new Error('User not found');
+            }
+
             if (dto.numberOfChapters > 10) {
                 throw new Error('Maximum 10 chapters allowed');
             }
@@ -495,8 +491,8 @@ export class StoryService {
 
             // Tạo story và gắn category
             const story = this.storyRepository.create({
-                title: outlineResponse.story.title,
-                synopsis: outlineResponse.story.synopsis,
+                title: outlineResponse.title,
+                synopsis: outlineResponse.synopsis,
                 authorId: userId,
                 categories, // <-- map tới category có sẵn
             });
@@ -509,20 +505,14 @@ export class StoryService {
                 {
                     storyId: savedStory.id,
                     response: {
-                        outline: outlineResponse.story.outline,
+                        outline: outlineResponse.outline,
                     } as any,
-                    title: outlineResponse.story.title,
-                    synopsis: outlineResponse.story.synopsis,
-                    genres: outlineResponse.story.genres,
-                    mainCharacter: outlineResponse.story.mainCharacter,
-                    subCharacters: outlineResponse.story.subCharacters,
-                    setting: outlineResponse.story.setting,
-                    hiddenTheme: outlineResponse.story.hiddenTheme,
-                    writingStyle: outlineResponse.story.writingStyle,
-                    antagonist: outlineResponse.story.antagonist,
-                    motif: outlineResponse.story.motif,
-                    tone: outlineResponse.story.tone,
-                    plotLogic: outlineResponse.story.plotLogic,
+                    title: outlineResponse.title,
+                    synopsis: outlineResponse.synopsis,
+                    metadata: {
+                        coverImage: outlineResponse.coverImage,
+                        storyContext: outlineResponse.storyContext,
+                    } as any,
                     status: GenerationStatus.IN_PROGRESS,
                 },
             );
@@ -531,59 +521,12 @@ export class StoryService {
             savedStory.generation = savedStoryGeneration;
             await this.storyRepository.save(savedStory);
 
-            const chapterNumber = 1;
-
-            // Save chapter
-            const chapter = this.chapterRepository.create({
-                storyId: savedStory.id,
-                index: chapterNumber,
-                title: outlineResponse.chapter.title || 'chương 1',
-                content: outlineResponse.chapter.content || '',
-            });
-
-            const savedChapter = await this.chapterRepository.save(chapter);
-
-            // Create chapter generation record
-            const chapterGeneration = this.chapterGenerationRepository.create({
-                storyGenerationId: storyGeneration.id,
-                chapterId: savedChapter.id,
-                chapterNumber,
-                generatedContent: outlineResponse.chapter.content || '',
-                structure: {
-                    summary: outlineResponse.chapter.summary,
-                    imagePrompt: outlineResponse.chapter.imagePrompt,
-                    directions: outlineResponse.chapter.directions,
-                },
-            });
-
-            await this.chapterGenerationRepository.save(chapterGeneration);
             return {
-                story: {
-                    storyId: savedStory.id,
-                    title: outlineResponse.story.title,
-                    synopsis: outlineResponse.story.synopsis,
-                    genres: outlineResponse.story.genres,
-                    mainCharacter: outlineResponse.story.mainCharacter,
-                    subCharacters: outlineResponse.story.subCharacters,
-                    antagonist: outlineResponse.story.antagonist,
-                    motif: outlineResponse.story.motif,
-                    tone: outlineResponse.story.tone,
-                    plotLogic: outlineResponse.story.plotLogic,
-                    setting: outlineResponse.story.setting,
-                    hiddenTheme: outlineResponse.story.hiddenTheme,
-                    writingStyle: outlineResponse.story.writingStyle,
-                    numberOfChapters: dto.numberOfChapters,
-                    outline: outlineResponse.story.outline,
-                },
-                chapter: {
-                    id: savedChapter.id,
-                    index: chapterNumber,
-                    title: savedChapter.title,
-                    content: outlineResponse.chapter.content || '',
-                    summary: outlineResponse.chapter.summary,
-                    imagePrompt: outlineResponse.chapter.imagePrompt,
-                    directions: outlineResponse.chapter.directions,
-                },
+                title: story.title,
+                synopsis: story.synopsis,
+                coverImage: outlineResponse.coverImage,
+                storyContext: outlineResponse.storyContext,
+                outline: outlineResponse.outline,
                 message:
                     'Story outline generated successfully. Ready to generate chapters on-demand.',
             };
@@ -656,18 +599,18 @@ export class StoryService {
             let previousChapterMeta;
 
             if (chapterNumber === 2) {
-                previousChapterMeta = JSON.stringify({
-                    genres: storyGeneration.genres,
-                    mainCharacter: storyGeneration.mainCharacter,
-                    subCharacters: storyGeneration.subCharacters,
-                    setting: storyGeneration.setting,
-                    hiddenTheme: storyGeneration.hiddenTheme,
-                    writingStyle: storyGeneration.writingStyle,
-                    antagonist: storyGeneration.antagonist,
-                    motif: storyGeneration.motif,
-                    tone: storyGeneration.tone,
-                    plotLogic: storyGeneration.plotLogic,
-                });
+                // previousChapterMeta = JSON.stringify({
+                //     genres: storyGeneration.genres,
+                //     mainCharacter: storyGeneration.mainCharacter,
+                //     subCharacters: storyGeneration.subCharacters,
+                //     setting: storyGeneration.setting,
+                //     hiddenTheme: storyGeneration.hiddenTheme,
+                //     writingStyle: storyGeneration.writingStyle,
+                //     antagonist: storyGeneration.antagonist,
+                //     motif: storyGeneration.motif,
+                //     tone: storyGeneration.tone,
+                //     plotLogic: storyGeneration.plotLogic,
+                // });
             } else {
                 previousChapterMeta = lastChapterGeneration
                     ? JSON.stringify(
@@ -950,17 +893,8 @@ export class StoryService {
                     content: true,
                 },
                 generation: {
-                    mainCharacter: true,
-                    subCharacters: true,
-                    antagonist: true,
-                    motif: true,
-                    tone: true,
-                    plotLogic: true,
-                    setting: true,
-                    hiddenTheme: true,
-                    writingStyle: true,
-                    genres: true,
                     prompt: true,
+                    metadata: true,
                 },
             },
             order: {
@@ -981,16 +915,6 @@ export class StoryService {
                 storyId: story.id,
                 title: story.title,
                 synopsis: story.synopsis,
-                genres: story.generation?.genres || [],
-                mainCharacter: story.generation?.mainCharacter || '',
-                subCharacters: story.generation?.subCharacters || [],
-                antagonist: story.generation?.antagonist || '',
-                motif: story.generation?.motif || '',
-                tone: story.generation?.tone || '',
-                plotLogic: story.generation?.plotLogic || '',
-                setting: story.generation?.setting || '',
-                hiddenTheme: story.generation?.hiddenTheme || '',
-                writingStyle: story.generation?.writingStyle || '',
                 numberOfChapters:
                     story.generation?.prompt?.numberOfChapters || 0,
                 outline: story.generation?.response?.outline || '',
@@ -1022,6 +946,8 @@ export class StoryService {
         }
 
         const { storyId, errorMessage } = generation;
+
+        console.log('generation', generation);
 
         if (storyId) {
             return this.previewStory(storyId);
@@ -1156,7 +1082,6 @@ export class StoryService {
                 id: true,
                 name: true,
                 displayOrder: true,
-                isActive: true,
             },
             where: {
                 isActive: true,

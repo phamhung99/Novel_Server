@@ -70,56 +70,17 @@ export class StoryGeneration {
     @Column({ type: 'jsonb', nullable: true })
     metadata: Record<string, any>;
 
-    // Story Attributes
     @Column({ nullable: true })
     title?: string;
 
     @Column({ type: 'text', nullable: true })
     synopsis?: string;
 
-    @Column({ type: 'simple-array', nullable: true })
-    genres?: string[];
-
-    @Column({ nullable: true })
-    setting?: string;
-
-    @Column({ name: 'main_character', nullable: true })
-    mainCharacter?: string;
-
-    @Column({ name: 'sub_characters', type: 'text', nullable: true })
-    subCharacters?: string;
-
-    @Column({ nullable: true })
-    antagonist?: string;
-
-    @Column({ nullable: true })
-    motif?: string;
-
-    @Column({ nullable: true })
-    tone?: string;
-
-    @Column({ name: 'writing_style', nullable: true })
-    writingStyle?: string;
-
-    @Column({ name: 'plot_logic', nullable: true })
-    plotLogic?: string;
-
-    @Column({ name: 'hidden_theme', type: 'text', nullable: true })
-    hiddenTheme?: string;
-
     @Column({ name: 'prompt_version', type: 'int', default: 1 })
     promptVersion: number;
 
-    @Column({ name: 'request_id', nullable: true })
+    @Column({ name: 'request_id', nullable: true, unique: true })
     requestId: string;
-
-    // removed in future versions
-    @Column({ name: 'plot_theme', type: 'text', nullable: true })
-    plotTheme?: string;
-
-    // removed in future versions
-    @Column({ name: 'additional_context', type: 'text', nullable: true })
-    additionalContext?: string;
 
     @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
     createdAt: Date;

@@ -65,31 +65,10 @@ export class InitializeStoryDto {
  * Response: Story initialization with outline
  */
 export class InitializeStoryResponseDto {
-    story: {
-        storyId: string;
-        title: string;
-        synopsis: string;
-        genres: string[];
-        mainCharacter: string;
-        subCharacters: string;
-        antagonist?: string;
-        motif?: string;
-        tone?: string;
-        plotLogic?: string;
-        setting?: string;
-        hiddenTheme?: string;
-        writingStyle?: string;
-        numberOfChapters: number;
-        outline?: string;
-    };
-    chapter: {
-        id: string;
-        index: number;
-        title: string;
-        content?: string;
-        summary?: string;
-        imagePrompt?: string;
-        directions?: string[];
-    };
+    title: string;
+    synopsis: string;
+    coverImage: string;
+    storyContext: any;
+    outline: string;
     message: string;
 }

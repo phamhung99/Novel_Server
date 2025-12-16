@@ -36,9 +36,7 @@ export class UserController {
     }
 
     @Get('categories')
-    async getSelectedCategories(
-        @Headers('x-user-id') userId: string,
-    ): Promise<string[]> {
+    async getSelectedCategories(@Headers('x-user-id') userId: string) {
         return this.userService.getSelectedCategories(userId);
     }
 

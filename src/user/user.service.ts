@@ -55,7 +55,7 @@ export class UserService extends BaseCrudService<User> {
         return user;
     }
 
-    async getSelectedCategories(userId: string): Promise<string[]> {
+    async getSelectedCategories(userId: string) {
         const user = await this.repository.findOne({ where: { id: userId } });
         if (!user) {
             throw new NotFoundException(ERROR_MESSAGES.USER_NOT_FOUND);
@@ -67,12 +67,14 @@ export class UserService extends BaseCrudService<User> {
                 select: {
                     category: {
                         id: true,
+                        name: true,
+                        displayOrder: true,
                     },
                 },
                 relations: ['category'],
             });
 
-        return userCategoryPreferences.map((ucp) => ucp.category.id);
+        return userCategoryPreferences.map((ucp) => ucp.category);
     }
 
     async updateSelectedCategories(

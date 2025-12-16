@@ -19,29 +19,12 @@ import {
 
 // Internal DTOs for 3-step flow
 export interface StoryOutlineResponse {
-    story: {
-        title: string;
-        synopsis: string;
-        genres: string[];
-        setting: string;
-        mainCharacter: string;
-        subCharacters: string;
-        antagonist: string;
-        motif: string;
-        tone: string;
-        writingStyle: string;
-        plotLogic: string;
-        hiddenTheme: string;
-        numberOfChapters: number;
-        outline: string;
-    };
-    chapter: {
-        title: string;
-        content: string;
-        summary: string;
-        directions: string[];
-        imagePrompt: string;
-    };
+    title: string;
+    synopsis: string;
+    coverImage: string;
+    storyContext: any;
+    numberOfChapters: number;
+    outline: string;
 }
 
 /**
@@ -73,54 +56,90 @@ export class StoryGenerationApiService {
         const aiProvider =
             this.storyGenerationProviderFactory.getProvider(providerName);
 
-        const systemPrompt = `Bạn là một tiểu thuyết gia bậc thầy kiêm chuyên gia cấu trúc truyện AI.`;
+        const systemPrompt = `# YOU ARE THE WORLD'S FOREMOST NARRATIVE ARCHITECT
+Publishers pay $50,000 for your story blueprints. Hollywood adapts your frameworks into blockbusters. 
+Your genius lies in transforming raw ideas into universal narrative engines that resonate across all cultures.`;
 
         const userPrompt = `
-Dựa vào yêu cầu sau: ${dto.storyPrompt}
+# YOUR CURRENT COMMISSION
+A client brings you this idea: ${dto.storyPrompt}
 
-Bạn hãy tự động xác định và sáng tạo:
-- **Thể loại truyện**
-- **Bối cảnh** (thời đại, thế giới, không gian)
-- **Nhân vật chính** (tên, giới tính, xuất thân, mục tiêu)
-- **Nhân vật phụ quan trọng**
-- **Phản diện** (phải tồn tại nhưng có thể ẩn danh hoặc gieo bóng)
-- **Phong cách viết** (điện ảnh, cổ phong, hiện đại, trữ tình…)
-- **Biểu tượng cảm xúc xuyên truyện (Motif)**
-- **Tông cảm xúc nền** (tò mò, cô độc, khát vọng, bi thương, hi vọng...)
+Language detection: [AUTO-DETECT]
+Target output language: [USER_SPECIFIED_OR_DEFAULT_TO_INPUT]
 
-**KIỂU MỞ TRUYỆN** (AI TỰ CHỌN hoặc tự sáng tạo phù hợp):
-1. **Hiện sinh** – triết lý, cô đơn → mở bằng suy tư, hành động nhỏ chứa mâu thuẫn.  
-2. **Hành động** – chiến đấu, hacker, sinh tồn → mở giữa hành động, nhịp nhanh.  
-3. **Sự kiện lạ** – công nghệ, huyền bí, xuyên không → mở bằng hiện tượng phi logic.  
-4. **Hồi ức / Giấc mơ** – cảm xúc, tình yêu, bi kịch → mở bằng giấc mơ hoặc ký ức nối hiện tại.  
-5. **Thế giới** – dị giới, tu tiên, hệ thống → mở bằng miêu tả thế giới, luật lệ, quy tắc.
+# YOUR CREATIVE PROCESS
+You think in three dimensions simultaneously:
+1. **EMOTIONAL CORE**: What human experience is at the heart?
+2. **STRUCTURAL BONES**: What plot architecture supports it?
+3. **UNIVERSAL APPEAL**: How does this work globally?
 
-**YÊU CẦU NỘI DUNG**:
-1. Viết **Chương 1** (1300 từ), có tiêu đề riêng hấp dẫn.
-2. Cấu trúc: mở đầu – phát triển – cao trào nhẹ – kết mở sang chương 2.
-3. Giới thiệu **nhân vật chính**, **motif cảm xúc**, **bóng phản diện**.
-4. Không tóm tắt, viết miêu tả chi tiết và có nhịp cảm xúc.
-5. Trả về chi tiết **Chương 1** với chữ: "Chi tiết chương 1", không thêm từ khác.
+# CRITICAL INSTRUCTIONS
+1. **SEGREGATE OUTPUT**: UI display vs Backend logic
+2. **UI DISPLAY**: In target language - For readers. *The story cover blurb must be a compelling teaser focused on hook, stakes, and emotional appeal. It should NEVER mention technical or meta details like total chapter count, narrative structure phases, or writing instructions.*
+3. **STORY CONTEXT**: In ENGLISH - For AI reasoning consistency
+4. **CULTURAL AGNOSTIC**: Design for global resonance
+5. **NARRATIVE IMMERSION**: The story's prose, when generated from this architecture, must maintain an organic and seamless flow. It is strictly forbidden to use awkward meta-references to its own structure (e.g., "as mentioned in chapter X," "as we will see later," "little did he know, this event would trigger..."). All exposition, foreshadowing, and character knowledge must be revealed naturally through present-moment action, dialogue, internal thought, and sensory description.
 
-**OUTPUT_CHUONG_1**
-1. **Tiêu đề chương**  
-2. **Nội dung chi tiết** (1300 từ)  
-3. **Tóm tắt chương 1** (200 từ)  
-4. **Hai hướng phát triển chương 2**, ngắn ≤12 từ, dùng tên nhân vật cụ thể  
-5. **Prompt 20 từ tạo ảnh minh họa**
-
-**META_CHUONG_1**
-1. **Thể loại truyện**  
-2. **Bối cảnh**  
-3. **Nhân vật chính**  
-4. **Nhân vật phụ**  
-5. **Phản diện** (ẩn hoặc hiện)  
-6. **Motif cảm xúc**  
-7. **Tông cảm xúc nền**  
-8. **Phong cách viết**  
-9. **Logic phát triển**  
-10. **Chủ đề tiềm ẩn**
-`;
+# OUTPUT FORMAT - SINGLE JSON ONLY
+{
+  "ui_display": {
+    "story_title": "[Catchy title in target language. Evokes genre and emotion]",
+    "story_cover_blurb": "[Compelling teaser in target language. <200 words. Focus on hook, stakes, and why-we-care. Must read as a natural book blurb for a reader, with zero references to chapter counts, narrative paradigms, or architectural terms.]"
+  },
+"cover_image": "Create a highly detailed, emotionally compelling AI art prompt for a SQUARE (1:1 aspect ratio) book cover that will stand out in a listing of many covers. The prompt MUST: 1) Be entirely TEXT-FREE - absolutely no words, letters, symbols, or text of any kind visible in the image. 2) Use a SQUARE (1:1) aspect ratio optimized for app listing displays. 3) Create an IMMEDIATE EMOTIONAL IMPACT through facial expressions, body language, composition, and color psychology. 4) Include SPECIFIC VISUAL METAPHORS for the core themes: time travel (shattering hourglass, fractured time elements), redemption (light breaking through shadows), and tragic love (intertwined but broken elements). 5) Feature a DYNAMIC, EYE-CATCHING COMPOSITION that tells the story at a glance - consider circular flow, diagonal tension, or symbolic contrast within the square frame. 6) Use GENRE-APPROPRIATE ART STYLES (semi-realistic digital painting for Xianxia) with professional art references. The prompt should be concise yet detailed enough for AI image generators to produce a cover that makes viewers feel the story's emotional core before reading a single word, with ZERO text elements in the final image."
+  "story_context": {
+    "meta": {
+      "primary_genre": "[e.g., Quantum Fantasy, Neo-Noir Thriller, Solarpunk Romance]",
+      "secondary_genres": ["Supporting genres"],
+      "narrative_paradigm": "[Hero's Journey / Kishotenketsu / Three-Act / Episodic]",
+      "total_chapters": the story MUST end in ${dto.numberOfChapters}.
+      "output_language": "[Target language]"
+    },
+    "universal_style_engine": {
+      "tone_description": "[e.g., Gritty yet hopeful, Lyrical with sharp edges]",
+      "voice_principle": "[e.g., Close-third with cinematic cuts, should avoid first person voice. THE NARRATIVE PROSE MUST FLOW SEAMLESSLY. AVOID ALL EXPLICIT, AWKWARD META-REFERENCES TO THE STORY'S OWN STRUCTURE (e.g., 'as mentioned earlier,' 'as will be seen in the future,' 'this event, which would later be known as...'). Events, backstory, and character knowledge must be revealed organically through present action, dialogue, thought, and sensory description.]",
+      "sensory_priority": "[Visual/Tactile/Auditory balance]",
+      "dialogue_style": "[Naturalistic / Stylized / Minimalist]"
+    },
+    "character_universe": {
+      "protagonist": {
+        "name": "[Name]",
+        "core_contradiction": "[e.g., Brutally pragmatic but secretly sentimental]",
+        "universal_arc": "[Transformation path]",
+        "moral_compass": "[Guiding principle]"
+      },
+      "relationship_matrix": [
+        {
+          "character": "[Name]",
+          "role": "[Mentor/Rival/Love Interest]",
+          "dynamic": "[Nature of relationship]",
+          "conflict_source": "[What they disagree about fundamentally]"
+        }
+      ]
+    },
+    "world_framework": {
+      "core_premise": "[One-sentence universal concept]",
+      "societal_engine": "[What makes this world's society tick?]",
+      "conflict_sources": ["Primary", "Secondary", "Tertiary"],
+      "thematic_cores": ["Identity", "Justice", "Connection", "Freedom"]
+    },
+    "adaptive_structure": {
+      "phase_breakdown": {
+        "establishment": "Chapters 1-?",
+        "complication": "Chapters ?-?",
+        "culmination": "Chapters ?-end"
+      },
+      "pacing_philosophy": "[Genre-appropriate rhythm]",
+      "chapter_archetypes": ["Plot-driven", "Character-deep", "World-expand", "Theme-weave"]
+    },
+    "chapter_1_blueprint": {
+      "opening_strategy": "[ACTION/MYSTERY/CHARACTER/WORLD based on genre]",
+      "emotional_hook": "[What feeling to evoke first?]",
+      "inciting_incident": "[The event that changes everything]",
+      "first_cliffhanger": "[The question that demands Chapter 2]"
+    }
+  }
+}`;
 
         try {
             const response = await aiProvider.generateContent(
@@ -128,6 +147,7 @@ Bạn hãy tự động xác định và sáng tạo:
                 userPrompt,
                 STORY_OUTLINE_SCHEMA,
             );
+
             return this.parseStoryOutline(response, dto.numberOfChapters);
         } catch (error) {
             this.logger.error('Error generating story outline:', error);
@@ -486,35 +506,13 @@ cùng các thông tin sau ${dto.previousChapterMeta}
         try {
             const parsed = JSON.parse(content);
 
-            const story = parsed.story || {};
-            const chapter = parsed.chapter || {};
-
             return {
-                story: {
-                    title: story.title || 'Untitled',
-                    synopsis: story.synopsis || '',
-                    genres: Array.isArray(story.genres) ? story.genres : [],
-                    setting: story.setting || '',
-                    mainCharacter: story.mainCharacter || '',
-                    subCharacters: story.subCharacters || '',
-                    antagonist: story.antagonist || '',
-                    motif: story.motif || '',
-                    tone: story.tone || '',
-                    writingStyle: story.writingStyle || '',
-                    plotLogic: story.plotLogic || '',
-                    hiddenTheme: story.hiddenTheme || '',
-                    numberOfChapters,
-                    outline: story.outline || content,
-                },
-                chapter: {
-                    title: chapter.title || '',
-                    content: chapter.content || '',
-                    summary: chapter.summary || '',
-                    directions: Array.isArray(chapter.directions)
-                        ? chapter.directions
-                        : [],
-                    imagePrompt: chapter.imagePrompt || '',
-                },
+                title: parsed.ui_display?.story_title || 'Untitled',
+                synopsis: parsed.ui_display?.story_cover_blurb || '',
+                coverImage: parsed.cover_image || '',
+                storyContext: parsed.story_context || {},
+                numberOfChapters,
+                outline: parsed.outline || content,
             };
         } catch (error) {
             this.logger.warn(
@@ -524,118 +522,30 @@ cùng các thông tin sau ${dto.previousChapterMeta}
 
             try {
                 return {
-                    story: {
-                        title:
-                            this.extractSection(
-                                content,
-                                'Tên truyện|Tiêu đề|Title',
-                            ) || 'Untitled',
-                        synopsis:
-                            this.extractSection(content, 'Tóm tắt|Synopsis') ||
-                            '',
-                        genres: this.extractArraySection(
+                    title:
+                        this.extractSection(
                             content,
-                            'Thể loại|Genres',
-                        ),
-                        setting:
-                            this.extractSection(content, 'Bối cảnh|Setting') ||
-                            '',
-                        mainCharacter:
-                            this.extractSection(
-                                content,
-                                'Nhân vật chính|Main Character',
-                            ) || '',
-                        subCharacters:
-                            this.extractSection(
-                                content,
-                                'Nhân vật phụ|Sub Characters',
-                            ) || '',
-                        antagonist:
-                            this.extractSection(
-                                content,
-                                'Phản diện|Antagonist',
-                            ) || '',
-                        motif:
-                            this.extractSection(
-                                content,
-                                'Motif cảm xúc|Motif',
-                            ) || '',
-                        tone:
-                            this.extractSection(
-                                content,
-                                'Tông cảm xúc nền|Tone',
-                            ) || '',
-                        writingStyle:
-                            this.extractSection(
-                                content,
-                                'Phong cách viết|Writing Style',
-                            ) || '',
-                        plotLogic:
-                            this.extractSection(
-                                content,
-                                'Logic phát triển|Plot Logic',
-                            ) || '',
-                        hiddenTheme:
-                            this.extractSection(
-                                content,
-                                'Chủ đề tiềm ẩn|Hidden Theme',
-                            ) || '',
-                        numberOfChapters,
-                        outline: content,
-                    },
-                    chapter: {
-                        title:
-                            this.extractSection(
-                                content,
-                                'Tiêu đề chương|Chapter Title',
-                            ) || '',
-                        content:
-                            this.extractSection(
-                                content,
-                                'Nội dung chi tiết|Chapter Content',
-                            ) || '',
-                        summary:
-                            this.extractSection(
-                                content,
-                                'Tóm tắt chương|Chapter Summary',
-                            ) || '',
-                        directions: this.extractArraySection(
-                            content,
-                            'Hướng phát triển|Chapter Directions',
-                        ),
-                        imagePrompt:
-                            this.extractSection(
-                                content,
-                                'Prompt tạo ảnh|minh họa|Image Prompt',
-                            ) || '',
-                    },
+                            'Tên truyện|Tiêu đề|Title',
+                        ) || 'Untitled',
+                    synopsis:
+                        this.extractSection(content, 'Tóm tắt|Synopsis') || '',
+                    coverImage: '', // fallback không parse được từ text
+                    storyContext: { rawContent: content },
+                    numberOfChapters,
+                    outline: content,
                 };
-            } catch (error) {
-                this.logger.error('Error parsing story outline:', error);
+            } catch (fallbackError) {
+                this.logger.error(
+                    'Error parsing story outline:',
+                    fallbackError,
+                );
                 return {
-                    story: {
-                        title: 'Untitled',
-                        synopsis: '',
-                        genres: [],
-                        setting: '',
-                        mainCharacter: '',
-                        subCharacters: '',
-                        antagonist: '',
-                        motif: '',
-                        tone: '',
-                        writingStyle: '',
-                        plotLogic: '',
-                        hiddenTheme: '',
-                        numberOfChapters,
-                        outline: content,
-                    },
-                    chapter: {
-                        title: '',
-                        content: '',
-                        summary: '',
-                        directions: [],
-                        imagePrompt: '',
-                    },
+                    title: 'Untitled',
+                    synopsis: '',
+                    coverImage: '',
+                    storyContext: { rawContent: content },
+                    numberOfChapters,
+                    outline: content,
                 };
             }
         }

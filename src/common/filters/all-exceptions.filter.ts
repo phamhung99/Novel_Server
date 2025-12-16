@@ -297,7 +297,19 @@ export class AllExceptionsFilter implements ExceptionFilter {
             }),
         };
 
-        this.logger[logLevel](logMessage, logContext);
+        switch (logLevel) {
+            case 'error':
+                this.logger.error(logMessage, logContext.stack, logContext);
+                break;
+            case 'warn':
+                this.logger.warn(logMessage, logContext);
+                break;
+            case 'info':
+                this.logger.log(logMessage, logContext);
+                break;
+            default:
+                this.logger.log(logMessage, logContext);
+        }
 
         if (process.env.NODE_ENV === 'development') {
             this.logger.debug('Full exception details', {
