@@ -9,6 +9,7 @@ import {
 } from 'typeorm';
 import { StoryGeneration } from './story-generation.entity';
 import { Chapter } from './chapter.entity';
+import { GenerationStatus } from 'src/common/enums/app.enum';
 
 @Entity('chapter_generation')
 export class ChapterGeneration {
@@ -37,6 +38,13 @@ export class ChapterGeneration {
 
     @Column({ name: 'chapter_number', type: 'int' })
     chapterNumber: number;
+
+    @Column({
+        type: 'enum',
+        enum: GenerationStatus,
+        default: GenerationStatus.PENDING,
+    })
+    status: GenerationStatus;
 
     @Column({ name: 'prompt', type: 'text', nullable: true })
     prompt: string;

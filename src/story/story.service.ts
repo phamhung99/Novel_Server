@@ -12,7 +12,6 @@ import { Chapter } from './entities/chapter.entity';
 import {
     StoryGeneration,
     GenerationType,
-    GenerationStatus,
 } from './entities/story-generation.entity';
 import { ChapterGeneration } from './entities/chapter-generation.entity';
 import { CreateStoryDto } from './dto/create-story.dto';
@@ -36,7 +35,7 @@ import { StoryViews } from './entities/story-views.entity';
 import { StorySummary } from './entities/story-summary.entity';
 import { getStartOfDay } from 'src/common/utils/date.utils';
 import { UserService } from 'src/user/user.service';
-import { LibraryType } from 'src/common/enums/app.enum';
+import { GenerationStatus, LibraryType } from 'src/common/enums/app.enum';
 import { Category } from './entities/categories.entity';
 
 @Injectable()
@@ -441,6 +440,11 @@ export class StoryService {
         requestId: string,
         dto: InitializeStoryDto,
     ): Promise<InitializeStoryResponseDto> {
+        const exists = await this.storyGenerationRepository.findOne({
+            where: { requestId },
+        });
+        if (exists) throw new BadRequestException('Duplicate request');
+
         const storyGeneration = this.storyGenerationRepository.create({
             requestId,
             type: GenerationType.CHAPTER,
@@ -466,10 +470,6 @@ export class StoryService {
             const user = await this.userService.findById(userId);
             if (!user) {
                 throw new Error('User not found');
-            }
-
-            if (dto.numberOfChapters > 10) {
-                throw new Error('Maximum 10 chapters allowed');
             }
 
             if (dto.storyPrompt.trim().length === 0) {
@@ -513,7 +513,7 @@ export class StoryService {
                         coverImage: outlineResponse.coverImage,
                         storyContext: outlineResponse.storyContext,
                     } as any,
-                    status: GenerationStatus.IN_PROGRESS,
+                    status: GenerationStatus.COMPLETED,
                 },
             );
 
@@ -522,6 +522,7 @@ export class StoryService {
             await this.storyRepository.save(savedStory);
 
             return {
+                id: savedStory.id,
                 title: story.title,
                 synopsis: story.synopsis,
                 coverImage: outlineResponse.coverImage,
@@ -540,6 +541,15 @@ export class StoryService {
                     errorMessage: error.message || 'Failed to initialize story',
                 },
             );
+
+            throw new HttpException(
+                {
+                    statusCode: HttpStatus.BAD_REQUEST,
+                    message: error.message || 'Story initialization failed',
+                    error: 'Story initialization failed',
+                },
+                HttpStatus.BAD_REQUEST,
+            );
         }
     }
 
@@ -547,16 +557,22 @@ export class StoryService {
         storyId: string,
         requestId: string,
         dto: GenerateChapterDto,
-    ): Promise<GenerateChapterResponseDto> {
+    ): Promise<GenerateChapterResponseDto | any> {
         let savedPreGen: any = null;
 
         try {
+            const exists = await this.chapterGenerationRepository.findOne({
+                where: { requestId },
+            });
+            if (exists) throw new BadRequestException('Duplicate request');
+
             // Tạo preGen trước, để luôn có record lưu lỗi
             savedPreGen = this.chapterGenerationRepository.create({
                 storyGenerationId: null, // tạm thời null, sẽ update sau nếu có storyGeneration
                 chapterNumber: 0, // tạm thời
                 requestId,
-                prompt: dto.storyPrompt || '',
+                prompt: dto.direction || '',
+                status: GenerationStatus.IN_PROGRESS,
             });
 
             savedPreGen =
@@ -579,97 +595,78 @@ export class StoryService {
 
             const existingChapters = await this.findChaptersByStory(storyId);
 
-            if (existingChapters.length === 0) {
-                throw new BadRequestException(
-                    'No previous chapters found. Initialize story first.',
+            const chapterNumber = existingChapters.length + 1;
+            const isFirstChapter = chapterNumber === 1;
+
+            let lastChapter = null;
+            let lastChapterGeneration = null;
+            let previousChapterMetadata = null;
+
+            if (!isFirstChapter) {
+                lastChapter = existingChapters[existingChapters.length - 1];
+
+                lastChapterGeneration =
+                    await this.chapterGenerationRepository.findOne({
+                        where: {
+                            chapterId: lastChapter.id,
+                            storyGenerationId: storyGeneration.id,
+                        },
+                    });
+
+                previousChapterMetadata = JSON.stringify(
+                    lastChapterGeneration?.structure ?? '',
                 );
             }
-
-            const lastChapter = existingChapters[existingChapters.length - 1];
-            const chapterNumber = lastChapter.index + 1;
-
-            const lastChapterGeneration =
-                await this.chapterGenerationRepository.findOne({
-                    where: {
-                        chapterId: lastChapter.id,
-                        storyGenerationId: storyGeneration.id,
-                    },
-                });
-
-            let previousChapterMeta;
-
-            if (chapterNumber === 2) {
-                // previousChapterMeta = JSON.stringify({
-                //     genres: storyGeneration.genres,
-                //     mainCharacter: storyGeneration.mainCharacter,
-                //     subCharacters: storyGeneration.subCharacters,
-                //     setting: storyGeneration.setting,
-                //     hiddenTheme: storyGeneration.hiddenTheme,
-                //     writingStyle: storyGeneration.writingStyle,
-                //     antagonist: storyGeneration.antagonist,
-                //     motif: storyGeneration.motif,
-                //     tone: storyGeneration.tone,
-                //     plotLogic: storyGeneration.plotLogic,
-                // });
-            } else {
-                previousChapterMeta = lastChapterGeneration
-                    ? JSON.stringify(
-                          excludeFields(lastChapterGeneration.structure, [
-                              'summary',
-                          ]),
-                      )
-                    : null;
-            }
-
             const totalChapters = storyGeneration.prompt.numberOfChapters;
-            const penultimateChapterNumber = totalChapters - 1;
 
             let chapterStructureResponse: ChapterStructureResponse;
 
-            if (chapterNumber > 1 && chapterNumber < penultimateChapterNumber) {
+            const storyMetadata = JSON.stringify(
+                storyGeneration.metadata?.storyContext ?? '',
+            );
+
+            const storyPrompt = storyGeneration.prompt.storyPrompt || '';
+
+            if (isFirstChapter) {
                 chapterStructureResponse =
-                    await this.storyGenerationApiService.generateMiddleChapters(
-                        {
-                            storyId,
-                            chapterNumber,
-                            previousChapterSummary:
-                                lastChapterGeneration?.structure.summary || '',
-                            aiProvider: dto.aiProvider || 'grok',
-                            storyPrompt: dto.storyPrompt || '',
-                            direction: dto.direction || '',
-                            previousChapterMeta,
-                        },
-                    );
-            } else if (chapterNumber === penultimateChapterNumber) {
-                chapterStructureResponse =
-                    await this.storyGenerationApiService.generatePenultimateChapter(
-                        {
-                            storyId,
-                            chapterNumber,
-                            previousChapterSummary:
-                                lastChapterGeneration?.structure.summary || '',
-                            aiProvider: dto.aiProvider || 'grok',
-                            storyPrompt: dto.storyPrompt || '',
-                            direction: dto.direction || '',
-                            previousChapterMeta,
-                        },
-                    );
-            } else if (chapterNumber === totalChapters) {
-                chapterStructureResponse =
-                    await this.storyGenerationApiService.generateFinalChapter({
+                    await this.storyGenerationApiService.generateFirstChapter({
                         storyId,
                         chapterNumber,
-                        previousChapterSummary:
-                            lastChapterGeneration?.structure.summary || '',
                         aiProvider: dto.aiProvider || 'grok',
-                        storyPrompt: dto.storyPrompt || '',
                         direction: dto.direction || '',
-                        previousChapterMeta,
+                        storyMetadata,
                     });
+            } else if (chapterNumber > 1 && chapterNumber < totalChapters) {
+                chapterStructureResponse =
+                    await this.storyGenerationApiService.generateRemainChapters(
+                        {
+                            storyId,
+                            chapterNumber,
+                            aiProvider: dto.aiProvider || 'grok',
+                            direction: dto.direction || '',
+                            storyMetadata,
+                            previousChapterMetadata,
+                            storyPrompt: storyPrompt,
+                        },
+                    );
             } else {
                 throw new BadRequestException(
                     'All chapters have already been generated.',
                 );
+            }
+
+            // Generate chapter summary every 5 chapters
+            if (chapterNumber % 5 === 0) {
+                chapterStructureResponse.structure.chapterSummary =
+                    await this.storyGenerationApiService.generateChapterSummary(
+                        {
+                            storyId,
+                            aiProvider: dto.aiProvider || 'grok',
+                            chapterSummary:
+                                chapterStructureResponse.structure.summary,
+                            storyMetadata,
+                        },
+                    );
             }
 
             const chapter = this.chapterRepository.create({
@@ -690,6 +687,7 @@ export class StoryService {
                     structure: chapterStructureResponse.structure as any,
                     storyGenerationId: storyGeneration.id,
                     chapterNumber,
+                    status: GenerationStatus.COMPLETED,
                 },
             );
 
@@ -713,10 +711,19 @@ export class StoryService {
                             error instanceof Error
                                 ? error.message
                                 : 'Failed to generate chapter',
+                        status: GenerationStatus.FAILED,
                     },
                 );
             }
-            throw error;
+
+            throw new HttpException(
+                {
+                    statusCode: HttpStatus.BAD_REQUEST,
+                    message: error.message || 'Chapter generation failed',
+                    error: 'Chapter initialization failed',
+                },
+                HttpStatus.BAD_REQUEST,
+            );
         }
     }
 

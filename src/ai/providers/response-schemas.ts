@@ -11,109 +11,366 @@
 export const STORY_OUTLINE_SCHEMA = {
     type: 'object',
     properties: {
-        ui_display: {
+        uiDisplay: {
             type: 'object',
             properties: {
-                story_title: { type: 'string' },
-                story_cover_blurb: { type: 'string' },
+                storyTitle: {
+                    type: 'string',
+                    description:
+                        '[Catchy title in target language. Evokes genre and emotion]',
+                },
+                storyCoverBlurb: {
+                    type: 'string',
+                    description:
+                        '[Compelling teaser in target language. <200 words. Focus on hook, stakes, and why-we-care. Must read as a natural book blurb for a reader, with zero references to chapter counts, narrative paradigms, or architectural terms.]',
+                },
             },
-            required: ['story_title', 'story_cover_blurb'],
+            required: ['storyTitle', 'storyCoverBlurb'],
         },
 
-        cover_image: { type: 'string' },
+        coverImage: {
+            type: 'string',
+            description:
+                "Create a highly detailed, emotionally compelling AI art prompt for a SQUARE (1:1 aspect ratio) book cover that will stand out in a listing of many covers. The prompt MUST: 1) Be entirely TEXT-FREE - absolutely no words, letters, symbols, or text of any kind visible in the image. 2) Use a SQUARE (1:1) aspect ratio optimized for app listing displays. 3) Create an IMMEDIATE EMOTIONAL IMPACT through facial expressions, body language, composition, and color psychology. 4) Include SPECIFIC VISUAL METAPHORS for the core themes: time travel (shattering hourglass, fractured time elements), redemption (light breaking through shadows), and tragic love (intertwined but broken elements). 5) Feature a DYNAMIC, EYE-CATCHING COMPOSITION that tells the story at a glance - consider circular flow, diagonal tension, or symbolic contrast within the square frame. 6) Use GENRE-APPROPRIATE ART STYLES (semi-realistic digital painting for Xianxia) with professional art references. The prompt should be concise yet detailed enough for AI image generators to produce a cover that makes viewers feel the story's emotional core before reading a single word, with ZERO text elements in the final image.",
+        },
 
-        story_context: {
+        storyContext: {
             type: 'object',
+            properties: {
+                meta: {
+                    type: 'object',
+                    properties: {
+                        primaryGenre: {
+                            type: 'string',
+                            description:
+                                '[e.g., Quantum Fantasy, Neo-Noir Thriller, Solarpunk Romance]',
+                        },
+                        secondaryGenres: {
+                            type: 'array',
+                            items: {
+                                type: 'string',
+                                description: '[Supporting genres]',
+                            },
+                        },
+                        narrativeParadigm: {
+                            type: 'string',
+                            description:
+                                "[Hero's Journey / Kishotenketsu / Three-Act / Episodic]",
+                        },
+                        totalChapters: {
+                            type: 'integer',
+                            description:
+                                'the story MUST end in ${dto.numberOfChapters}.',
+                        },
+                        outputLanguage: {
+                            type: 'string',
+                            description: '[Target language]',
+                        },
+                        universalStyleEngine: {
+                            type: 'object',
+                            properties: {
+                                toneDescription: {
+                                    type: 'string',
+                                    description:
+                                        '[e.g., Gritty yet hopeful, Lyrical with sharp edges]',
+                                },
+                                voicePrinciple: {
+                                    type: 'string',
+                                    description:
+                                        '[e.g., Close-third with cinematic cuts, should avoid first person voice. THE NARRATIVE PROSE MUST FLOW SEAMLESSLY. AVOID ALL EXPLICIT, AWKWARD META-REFERENCES TO THE STORY\'S OWN STRUCTURE (e.g., "as mentioned earlier," "as will be seen in the future," "this event, which would later be known as..."). Events, backstory, and character knowledge must be revealed organically through present action, dialogue, thought, and sensory description.]',
+                                },
+                                sensoryPriority: {
+                                    type: 'string',
+                                    description:
+                                        '[Visual/Tactile/Auditory balance]',
+                                },
+                                dialogueStyle: {
+                                    type: 'string',
+                                    description:
+                                        '[Naturalistic / Stylized / Minimalist]',
+                                },
+                            },
+                        },
+                        characterUniverse: {
+                            type: 'object',
+                            properties: {
+                                protagonist: {
+                                    type: 'object',
+                                    properties: {
+                                        name: {
+                                            type: 'string',
+                                            description: '[Name]',
+                                        },
+                                        coreContradiction: {
+                                            type: 'string',
+                                            description:
+                                                '[e.g., Brutally pragmatic but secretly sentimental]',
+                                        },
+                                        universalArc: {
+                                            type: 'string',
+                                            description:
+                                                '[Transformation path]',
+                                        },
+                                        moralCompass: {
+                                            type: 'string',
+                                            description: '[Guiding principle]',
+                                        },
+                                    },
+                                },
+                                relationshipMatrix: {
+                                    type: 'array',
+                                    items: {
+                                        type: 'object',
+                                        properties: {
+                                            character: {
+                                                type: 'string',
+                                                description: '[Name]',
+                                            },
+                                            role: {
+                                                type: 'string',
+                                                description:
+                                                    '[Mentor/Rival/Love Interest]',
+                                            },
+                                            dynamic: {
+                                                type: 'string',
+                                                description:
+                                                    '[Nature of relationship]',
+                                            },
+                                            conflictSource: {
+                                                type: 'string',
+                                                description:
+                                                    '[What they disagree about fundamentally]',
+                                            },
+                                        },
+                                    },
+                                },
+                            },
+                        },
+                        worldFramework: {
+                            type: 'object',
+                            properties: {
+                                corePremise: {
+                                    type: 'string',
+                                    description:
+                                        '[One-sentence universal concept]',
+                                },
+                                societalEngine: {
+                                    type: 'string',
+                                    description:
+                                        "[What makes this world's society tick?]",
+                                },
+                                conflictSources: {
+                                    type: 'array',
+                                    items: {
+                                        type: 'string',
+                                        description:
+                                            '[Primary, Secondary, Tertiary]',
+                                    },
+                                },
+                                thematicCores: {
+                                    type: 'array',
+                                    items: {
+                                        type: 'string',
+                                        description:
+                                            '[Identity, Justice, Connection, Freedom]',
+                                    },
+                                },
+                            },
+                        },
+                        adaptiveStructure: {
+                            type: 'object',
+                            properties: {
+                                phaseBreakdown: {
+                                    type: 'object',
+                                    properties: {
+                                        establishment: {
+                                            type: 'string',
+                                            description: 'Chapters 1-?',
+                                        },
+                                        complication: {
+                                            type: 'string',
+                                            description: 'Chapters ?-?',
+                                        },
+                                        culmination: {
+                                            type: 'string',
+                                            description: 'Chapters ?-end',
+                                        },
+                                    },
+                                },
+                                pacingPhilosophy: {
+                                    type: 'string',
+                                    description: '[Genre-appropriate rhythm]',
+                                },
+                                chapterArchetypes: {
+                                    type: 'array',
+                                    items: {
+                                        type: 'string',
+                                        description:
+                                            '[Plot-driven, Character-deep, World-expand, Theme-weave]',
+                                    },
+                                },
+                            },
+                        },
+                        chapter1Blueprint: {
+                            type: 'object',
+                            properties: {
+                                openingStrategy: {
+                                    type: 'string',
+                                    description:
+                                        '[ACTION/MYSTERY/CHARACTER/WORLD based on genre]',
+                                },
+                                emotionalHook: {
+                                    type: 'string',
+                                    description:
+                                        '[What feeling to evoke first?]',
+                                },
+                                incitingIncident: {
+                                    type: 'string',
+                                    description:
+                                        '[The event that changes everything]',
+                                },
+                                firstCliffhanger: {
+                                    type: 'string',
+                                    description:
+                                        '[The question that demands Chapter 2]',
+                                },
+                            },
+                        },
+                    },
+                },
+            },
             additionalProperties: true,
         },
     },
-
-    required: ['ui_display', 'cover_image', 'story_context'],
+    required: ['uiDisplay', 'coverImage', 'storyContext'],
 };
 
 export const CHAPTER_STRUCTURE_SCHEMA = {
     type: 'object',
     properties: {
-        title: {
-            type: 'string',
-            description: 'Tiêu đề chương (**1. Tiêu đề chương**)',
-        },
-        content: {
-            type: 'string',
-            description:
-                'Nội dung chi tiết chương (~1300 từ) (**2. Nội dung chi tiết**)',
-        },
-        summary: {
-            type: 'string',
-            description:
-                'Tóm tắt TRUYỆN ĐẾN HIỆN TẠI (≤250 từ). PHẢI tổng hợp từ phần A ("Tóm tắt trước đó") + phần B ("Nội dung chương hiện tại"). Không tự tạo thêm thông tin. (**3. Tóm tắt truyện đến hiện tại**)',
-        },
-        directions: {
-            type: 'array',
-            items: { type: 'string' },
-            description:
-                'Hai hướng phát triển cho chương sau, ≤12 từ mỗi hướng (**4. Hai hướng phát triển chương sau**)',
+        display: {
+            type: 'object',
+            properties: {
+                chapterTitle: {
+                    type: 'string',
+                    description:
+                        "[Evocative title in {{meta.outputLanguage}}. Hint at chapter's emotional core]",
+                },
+                content: {
+                    type: 'string',
+                    description:
+                        '[Full chapter text in {{meta.outputLanguage}}. Use \\n\\n for paragraph breaks. NO meta-commentary]',
+                },
+            },
+            required: ['chapterTitle', 'content'],
         },
 
-        // STORY DEVELOPMENT METADATA
-        writingStyle: {
-            type: 'string',
-            description: 'Phong cách viết của chương (**1. Phong cách viết**)',
-        },
-        tone: {
-            type: 'string',
-            description: 'Ba cảm xúc chính của chương (**2. Tông cảm xúc**)',
-        },
-        plotLogic: {
-            type: 'string',
-            description:
-                'Logic triển khai cốt truyện trong chương (**3. Logic phát triển**)',
-        },
-        emotionalMotif: {
-            type: 'string',
-            description:
-                'Motif cảm xúc tại thời điểm hiện tại (**4. Motif cảm xúc**)',
-        },
-        mainCharacterArc: {
-            type: 'string',
-            description:
-                'Biến chuyển nội tâm nhân vật chính trong chương (**5. Nhân vật chính**)',
-        },
-        subCharacterArc: {
-            type: 'string',
-            description:
-                'Thay đổi vai trò / cảm xúc của nhân vật phụ (**6. Nhân vật phụ**)',
-        },
-        antagonistAction: {
-            type: 'string',
-            description:
-                'Chiến lược hoặc hành động của phản diện trong chương (**7. Phản diện**)',
-        },
-        emotionChart: {
-            type: 'string',
-            description:
-                'Biểu đồ cảm xúc: khởi đầu → đỉnh → kết (**8. Biểu đồ cảm xúc**)',
-        },
-        philosophicalSubtheme: {
-            type: 'string',
-            description:
-                'Chủ đề triết lý phụ lồng trong chương (**9. Chủ đề triết lý phụ**)',
+        continuitySnapshot: {
+            type: 'object',
+            properties: {
+                chapterNumber: {
+                    type: 'number',
+                    description: 'Chapter index number',
+                },
+                chapterSummary: {
+                    type: 'string',
+                    description:
+                        '[3-4 sentence ENGLISH summary focusing on plot advancement and character changes]',
+                },
+
+                characterStatus: {
+                    type: 'object',
+                    properties: {
+                        protagonist: {
+                            type: 'string',
+                            description:
+                                "[ENGLISH: Protagonist's current emotional/physical state]",
+                        },
+                        keyRelationships: {
+                            type: 'string',
+                            description:
+                                '[ENGLISH: Current state of important relationships]',
+                        },
+                        inventoryChanges: {
+                            type: 'string',
+                            description:
+                                '[ENGLISH: Important items gained/lost, if any]',
+                        },
+                    },
+                },
+
+                plotAdvancements: {
+                    type: 'array',
+                    items: {
+                        type: 'string',
+                        description:
+                            '[ENGLISH: Plot or mystery advancement introduced this chapter]',
+                    },
+                },
+
+                nextOptions: {
+                    type: 'array',
+                    description: '[Choices presented in outputLanguage]',
+                    items: {
+                        type: 'object',
+                        properties: {
+                            label: {
+                                type: 'string',
+                                description:
+                                    '[Choice label in outputLanguage. Clear action-oriented phrasing]',
+                            },
+                            immediateRisk: {
+                                type: 'string',
+                                description:
+                                    '[What could go wrong immediately?]',
+                            },
+                            immediateSafety: {
+                                type: 'string',
+                                description: '[What does this avoid?]',
+                            },
+                            longTermPotential: {
+                                type: 'string',
+                                description: '[Where could this lead?]',
+                            },
+                            longTermCost: {
+                                type: 'string',
+                                description:
+                                    '[What opportunity might be lost?]',
+                            },
+                        },
+                        additionalProperties: false,
+                    },
+                },
+
+                continuityCheckpoints: {
+                    type: 'object',
+                    properties: {
+                        toneConsistency: {
+                            type: 'string',
+                            description:
+                                '[ENGLISH: Confirmation that tone matches Story Bible]',
+                        },
+                        characterConsistency: {
+                            type: 'string',
+                            description:
+                                '[ENGLISH: Confirmation characters act according to their archetypes]',
+                        },
+                        worldRulesMaintained: {
+                            type: 'string',
+                            description:
+                                '[ENGLISH: Confirmation world rules were followed]',
+                        },
+                        foreshadowingPlanted: {
+                            type: 'string',
+                            description:
+                                '[ENGLISH: Any foreshadowing elements planted for future]',
+                        },
+                    },
+                },
+            },
+            required: ['chapterNumber', 'chapterSummary'],
         },
     },
-    required: [
-        'chapterTitle',
-        'chapterContent',
-        'chapterSummary',
-        'chapterDirections',
 
-        'writingStyle',
-        'tone',
-        'plotLogic',
-        'emotionalMotif',
-        'mainCharacterArc',
-        'subCharacterArc',
-        'antagonistAction',
-        'emotionChart',
-        'philosophicalSubtheme',
-    ],
+    required: ['display', 'continuitySnapshot'],
 };

@@ -69,6 +69,29 @@ export class GrokApiService implements IStoryGenerationProvider {
         }
     }
 
+    async generateImage(
+        prompt: string,
+        size: '256x256' | '512x512' | '1024x1024' = '512x512',
+    ): Promise<string> {
+        try {
+            const requestBody = {
+                prompt,
+                n: 1,
+                size,
+            };
+
+            const response = await this.client.post(
+                '/images/generations',
+                requestBody,
+            );
+
+            return response.data.data[0].url;
+        } catch (error) {
+            this.logger.error('Error generating image with Grok API:', error);
+            throw error;
+        }
+    }
+
     getProviderName(): string {
         return this.providerName;
     }

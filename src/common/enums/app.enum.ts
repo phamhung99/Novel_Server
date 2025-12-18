@@ -56,6 +56,7 @@ export enum ErrorCode {
     REQUIRED_FIELD_MISSING = 4004,
     NOT_FOUND = 4005,
     USER_TOKEN_NOT_ENOUGH = 4006,
+    DUPLICATE_REQUEST_ID = 4007,
 
     // 4100–4199: Authentication & Authorization Errors
     INVALID_TOKEN = 4100,
@@ -74,4 +75,11 @@ export enum ErrorCode {
 export enum LibraryType {
     CREATED = 'created',
     LIKED = 'liked',
+}
+
+export enum GenerationStatus {
+    PENDING = 'pending',
+    IN_PROGRESS = 'in_progress',
+    COMPLETED = 'completed',
+    FAILED = 'failed',
 }

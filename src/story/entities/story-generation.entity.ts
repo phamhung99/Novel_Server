@@ -7,16 +7,10 @@ import {
     OneToMany,
 } from 'typeorm';
 import { ChapterGeneration } from './chapter-generation.entity';
+import { GenerationStatus } from 'src/common/enums/app.enum';
 
 export enum GenerationType {
     CHAPTER = 'chapter',
-}
-
-export enum GenerationStatus {
-    PENDING = 'pending',
-    IN_PROGRESS = 'in_progress',
-    COMPLETED = 'completed',
-    FAILED = 'failed',
 }
 
 @Entity('story_generation')

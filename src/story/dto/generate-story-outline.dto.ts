@@ -65,6 +65,7 @@ export class InitializeStoryDto {
  * Response: Story initialization with outline
  */
 export class InitializeStoryResponseDto {
+    id: string;
     title: string;
     synopsis: string;
     coverImage: string;

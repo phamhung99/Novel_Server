@@ -42,10 +42,22 @@ export class StoryGenerationApiService {
         private storyGenerationRepository: Repository<StoryGeneration>,
     ) {}
 
-    /**
-     * STEP 1: Generate story outline/framework
-     * Internal method for 3-step async process
-     */
+    async generateCoverImage(prompt: string): Promise<string> {
+        const providerName = 'gpt'; // Currently only GPT provider supports image generation
+        const aiProvider =
+            this.storyGenerationProviderFactory.getProvider(providerName);
+
+        try {
+            const imageUrl = await aiProvider.generateImage(prompt);
+            return imageUrl;
+        } catch (error) {
+            this.logger.error('Error generating cover image:', error);
+            throw new BadRequestException(
+                `Failed to generate cover image: ${error.message}`,
+            );
+        }
+    }
+
     async generateStoryOutline(dto: {
         storyPrompt: string;
         genres: string[];
@@ -79,67 +91,7 @@ You think in three dimensions simultaneously:
 3. **STORY CONTEXT**: In ENGLISH - For AI reasoning consistency
 4. **CULTURAL AGNOSTIC**: Design for global resonance
 5. **NARRATIVE IMMERSION**: The story's prose, when generated from this architecture, must maintain an organic and seamless flow. It is strictly forbidden to use awkward meta-references to its own structure (e.g., "as mentioned in chapter X," "as we will see later," "little did he know, this event would trigger..."). All exposition, foreshadowing, and character knowledge must be revealed naturally through present-moment action, dialogue, internal thought, and sensory description.
-
-# OUTPUT FORMAT - SINGLE JSON ONLY
-{
-  "ui_display": {
-    "story_title": "[Catchy title in target language. Evokes genre and emotion]",
-    "story_cover_blurb": "[Compelling teaser in target language. <200 words. Focus on hook, stakes, and why-we-care. Must read as a natural book blurb for a reader, with zero references to chapter counts, narrative paradigms, or architectural terms.]"
-  },
-"cover_image": "Create a highly detailed, emotionally compelling AI art prompt for a SQUARE (1:1 aspect ratio) book cover that will stand out in a listing of many covers. The prompt MUST: 1) Be entirely TEXT-FREE - absolutely no words, letters, symbols, or text of any kind visible in the image. 2) Use a SQUARE (1:1) aspect ratio optimized for app listing displays. 3) Create an IMMEDIATE EMOTIONAL IMPACT through facial expressions, body language, composition, and color psychology. 4) Include SPECIFIC VISUAL METAPHORS for the core themes: time travel (shattering hourglass, fractured time elements), redemption (light breaking through shadows), and tragic love (intertwined but broken elements). 5) Feature a DYNAMIC, EYE-CATCHING COMPOSITION that tells the story at a glance - consider circular flow, diagonal tension, or symbolic contrast within the square frame. 6) Use GENRE-APPROPRIATE ART STYLES (semi-realistic digital painting for Xianxia) with professional art references. The prompt should be concise yet detailed enough for AI image generators to produce a cover that makes viewers feel the story's emotional core before reading a single word, with ZERO text elements in the final image."
-  "story_context": {
-    "meta": {
-      "primary_genre": "[e.g., Quantum Fantasy, Neo-Noir Thriller, Solarpunk Romance]",
-      "secondary_genres": ["Supporting genres"],
-      "narrative_paradigm": "[Hero's Journey / Kishotenketsu / Three-Act / Episodic]",
-      "total_chapters": the story MUST end in ${dto.numberOfChapters}.
-      "output_language": "[Target language]"
-    },
-    "universal_style_engine": {
-      "tone_description": "[e.g., Gritty yet hopeful, Lyrical with sharp edges]",
-      "voice_principle": "[e.g., Close-third with cinematic cuts, should avoid first person voice. THE NARRATIVE PROSE MUST FLOW SEAMLESSLY. AVOID ALL EXPLICIT, AWKWARD META-REFERENCES TO THE STORY'S OWN STRUCTURE (e.g., 'as mentioned earlier,' 'as will be seen in the future,' 'this event, which would later be known as...'). Events, backstory, and character knowledge must be revealed organically through present action, dialogue, thought, and sensory description.]",
-      "sensory_priority": "[Visual/Tactile/Auditory balance]",
-      "dialogue_style": "[Naturalistic / Stylized / Minimalist]"
-    },
-    "character_universe": {
-      "protagonist": {
-        "name": "[Name]",
-        "core_contradiction": "[e.g., Brutally pragmatic but secretly sentimental]",
-        "universal_arc": "[Transformation path]",
-        "moral_compass": "[Guiding principle]"
-      },
-      "relationship_matrix": [
-        {
-          "character": "[Name]",
-          "role": "[Mentor/Rival/Love Interest]",
-          "dynamic": "[Nature of relationship]",
-          "conflict_source": "[What they disagree about fundamentally]"
-        }
-      ]
-    },
-    "world_framework": {
-      "core_premise": "[One-sentence universal concept]",
-      "societal_engine": "[What makes this world's society tick?]",
-      "conflict_sources": ["Primary", "Secondary", "Tertiary"],
-      "thematic_cores": ["Identity", "Justice", "Connection", "Freedom"]
-    },
-    "adaptive_structure": {
-      "phase_breakdown": {
-        "establishment": "Chapters 1-?",
-        "complication": "Chapters ?-?",
-        "culmination": "Chapters ?-end"
-      },
-      "pacing_philosophy": "[Genre-appropriate rhythm]",
-      "chapter_archetypes": ["Plot-driven", "Character-deep", "World-expand", "Theme-weave"]
-    },
-    "chapter_1_blueprint": {
-      "opening_strategy": "[ACTION/MYSTERY/CHARACTER/WORLD based on genre]",
-      "emotional_hook": "[What feeling to evoke first?]",
-      "inciting_incident": "[The event that changes everything]",
-      "first_cliffhanger": "[The question that demands Chapter 2]"
-    }
-  }
-}`;
+`;
 
         try {
             const response = await aiProvider.generateContent(
@@ -157,56 +109,122 @@ You think in three dimensions simultaneously:
         }
     }
 
-    /**
-     * STEP 2: Generate chapter structure
-     * Internal method for 3-step async process
-     */
-    async generateMiddleChapters(dto: {
+    async generateFirstChapter(dto: {
         storyId: string;
         chapterNumber: number;
-        previousChapterSummary: string;
+        storyMetadata: string;
         aiProvider: string;
-        storyPrompt: string;
         direction: string;
-        previousChapterMeta: string;
     }): Promise<ChapterStructureResponse> {
         const providerName = dto.aiProvider || 'grok';
         const aiProvider =
             this.storyGenerationProviderFactory.getProvider(providerName);
 
-        const summaryWordLimit = 200 + (dto.chapterNumber - 1) * 50;
+        const systemPrompt = `# YOU ARE A WORLD-CLASS NOVELIST SPECIALIZING IN UNFORGETTABLE OPENINGS
+Your first chapters have launched 37 bestselling careers. Literary agents say: "If she writes the opening, the book sells."
+Critics describe your style as "a literary gut-punch followed by a slow-burn addiction."
+`;
 
-        const systemPrompt = `Bạn là một tiểu thuyết gia bậc thầy kiêm chuyên gia cấu trúc truyện AI.`;
+        const userPrompt = `# YOUR CURRENT ASSIGNMENT
+Write Chapter 1 of a novel based on this Story Bible: 
 
-        const userPrompt = `Dựa trên dữ liệu: ${dto.storyPrompt}
-Tóm tắt nội dung câu chuyện trước đó: ${dto.previousChapterSummary || 'Không có dữ liệu trước đó.'}
+## STORY BIBLE ${dto.storyMetadata}
 
-Viết Chương ${dto.chapterNumber} (1300 từ) tiếp tục phong cách và cảm xúc theo hướng ${dto.direction}.
-cùng các thông tin sau ${dto.previousChapterMeta}
+YOUR OPENING MANIFESTO
+FIRST SENTENCE: Must make the reader FEEL something immediately
+FIRST PAGE: Must make the reader CARE about someone
+FIRST CHAPTER: Must make the reader NEED to know what happens next
 
-**YÊU CẦU NỘI DUNG**
-1. Tiếp nối logic chương trước. Đảm bảo tính logic về mặt không gian, thời gian, địa điểm và nhân vật.
-2. Cho nhân vật đối mặt thử thách (thể chất, tâm lý hoặc triết lý).
-3. Phản diện nếu đã xuất hiện thì có đối đầu hoặc tương phản gián tiếp. Nếu chưa xuất hiện thì dần xuất hiện rõ rệt.
-4. Motif cảm xúc được tái hiện hoặc biến đổi.
-5. Kết chương bằng cao trào hoặc tiết lộ.
+ABSOLUTE PROHIBITIONS
+NO waking up scenes
 
-**OUTPUT_CHUONG_${dto.chapterNumber}**
-1. **Tiêu đề chương**
-2. **Nội dung chi tiết** (1300 từ)
-3. **Tóm tắt TRUYỆN ĐẾN HIỆN TẠI** (≤ ${summaryWordLimit} từ) - PHẢI tổng hợp từ: (A) "Tóm tắt nội dung câu chuyện trước đó" + (B) "Nội dung chương ${dto.chapterNumber} vừa viết"
-4. **Hai hướng phát triển chương sau** - ngắn gọn, không quá 12 từ
+NO breakfast routines
 
-**META_CHUONG_${dto.chapterNumber}**
-1. **Phong cách viết**
-2. **Tông cảm xúc** (3 cảm xúc chính)
-3. **Logic phát triển**
-4. **Motif cảm xúc** (trạng thái hiện tại)
-5. **Nhân vật chính** (biến chuyển nội tâm)
-6. **Nhân vật phụ** (thay đổi vai trò / cảm xúc)
-7. **Phản diện** (chiến lược / hành động)
-8. **Biểu đồ cảm xúc** [khởi đầu → đỉnh → kết]
-9. **Chủ đề triết lý phụ**`;
+NO mirror descriptions
+
+NO weather openings (unless thematically essential)
+
+NO info-dumping history lessons
+
+EXECUTION FRAMEWORK
+STEP 1: ACTIVATE THE BLUEPRINT
+Check chapter1Blueprint from Story Bible
+
+Implement the specified opening strategy exactly
+
+Respect all universalStyleEngine rules (tone, voice, sensoryPriority)
+STEP 2: CHARACTER INTRODUCTION THROUGH ACTION
+Show, never tell:
+
+Don't say "he was brave" → Show him doing something brave despite fear
+
+Don't say "she was lonely" → Show her rituals of solitude
+
+Don't say "they were powerful" → Show others reacting to them
+
+CONNECTION RULE: THE ORIGIN-SETTING BRIDGE Establish a critical resonance between the protagonist's Background (Origin) and the Current Conflict (Setting). This bridge must rely on two pillars:
+1. Domain Expertise Transfer: The protagonist's unique skills/obsessions from their previous life/phase must be the exact tools needed to solve the new world's problems (e.g., A CEO managing a Kingdom, a Hacker decoding Magic).
+2. Thematic Irony: Place the protagonist in a situation that directly challenges their past beliefs, arrogance, or regrets. They must become what they once mocked, feared, or failed to understand.
+
+STEP 3: WORLD-BUILDING THROUGH IMMERSION
+Let the reader discover:
+
+Society through conflicts and norms
+
+Technology/magic through usage and limitations
+
+History through consequences and relics
+
+STEP 4: THE HOOK & ESCALATION
+Minute 1: Establish normal (with tension underneath)
+
+Minute 5: Disrupt normal (inciting incident)
+
+Minute 10: Force choice (protagonist must act)
+
+Minute 15: Raise stakes (consequences appear)
+
+Ending: Cliffhanger that poses NEW, URGENT question
+
+TECHNICAL SPECIFICATIONS
+Length: 1500 words
+
+Language: Strictly {{meta.outputLanguage}} from Story Bible
+
+Pacing: Follow pacing_philosophy from Story Bible
+
+Sensory: Implement sensoryPriority balance from Story Bible
+
+CRITICAL RULES
+Chapter content must be written in {{meta.outputLanguage}}
+
+Continuity snapshot must be written in ENGLISH for AI processing
+
+Do NOT include full chapter content in the continuity snapshot - only summaries
+
+End with a compelling cliffhanger that creates demand for Chapter 2
+
+Follow all genre conventions specified in the Story Bible
+
+VALIDATION CHECKLIST (INTERNAL)
+Before output, verify:
+
+Chapter follows chapter1Blueprint from Story Bible
+
+Language is correct {{meta.outputLanguage}}
+
+Tone matches tone_description from Story Bible
+
+Characters act according to their archetypes
+
+World-building is immersive, not expository
+
+Ending has a strong cliffhanger
+
+Continuity snapshot is comprehensive but concise (ENGLISH only)
+
+Return ONLY the JSON object. No additional text.
+`;
 
         try {
             const response = await aiProvider.generateContent(
@@ -223,53 +241,104 @@ cùng các thông tin sau ${dto.previousChapterMeta}
         }
     }
 
-    async generatePenultimateChapter(dto: {
+    async generateRemainChapters(dto: {
         storyId: string;
         chapterNumber: number;
-        previousChapterSummary: string;
         aiProvider: string;
-        storyPrompt: string;
         direction: string;
-        previousChapterMeta: string;
+        storyPrompt: string;
+        storyMetadata: string;
+        previousChapterMetadata: string;
     }): Promise<ChapterStructureResponse> {
         const providerName = dto.aiProvider || 'grok';
         const aiProvider =
             this.storyGenerationProviderFactory.getProvider(providerName);
 
-        const summaryWordLimit = 200 + (dto.chapterNumber - 1) * 50;
+        const systemPrompt = `# YOU ARE A GENRE STEWARD & SERIAL STORYTELLER
+Your dual mission: 
+1. Continue the story respecting user choices
+2. Maintain absolute genre authenticity across the entire narrative`;
 
-        const systemPrompt = `Bạn là một tiểu thuyết gia bậc thầy kiêm chuyên gia cấu trúc truyện AI.`;
+        const userPrompt = `## INPUT REQUIREMENTS
+You need these 3 inputs:
+**1. ORIGINAL STORY BIBLE:** ${dto.storyMetadata}
+2. PREVIOUS CHAPTER CONTINUITY SNAPSHOT (from previous chapter output): ${dto.previousChapterMetadata}
+3. USER'S CHOICE FOR THIS CHAPTER: ${dto.direction}
+WRITING INSTRUCTIONS
+A. UNDERSTAND CURRENT STATE
+Read the continuity_snapshot to understand where the story left off
 
-        const userPrompt = `Dựa trên dữ liệu: ${dto.storyPrompt}
-Tóm tắt nội dung câu chuyện trước đó: ${dto.previousChapterSummary || 'Không có dữ liệu trước đó.'}
+Note: This contains ONLY summaries, not the full chapter text
 
-Viết Chương ${dto.chapterNumber} (1300 từ) tiếp tục phong cách và cảm xúc theo hướng ${dto.direction}.
-cùng các thông tin sau ${dto.previousChapterMeta}
+Current chapter number: ${dto.chapterNumber}
 
-**YÊU CẦU NỘI DUNG**
-1. Tiếp nối logic chương trước. Đảm bảo tính logic về mặt không gian, thời gian, địa điểm và nhân vật.
-2. Cho nhân vật đối mặt thử thách (thể chất, tâm lý hoặc triết lý).
-3. Phản diện nếu đã xuất hiện thì có đối đầu hoặc tương phản gián tiếp. Nếu chưa xuất hiện thì dần xuất hiện rõ rệt.
-4. Motif cảm xúc được tái hiện hoặc biến đổi.
-5. Kết chương bằng cao trào hoặc tiết lộ.
-6. Chương này là chương trước chương kết thúc của câu chuyện. Hãy chuẩn bị cho sự kết thúc câu chuyện ở chương sau (chương cuối cùng) để đảm bảo cái kết ở chương sau không gây cảm giác đột ngột cho người đọc.
+B. EXECUTE USER'S CHOICE
+The protagonist will attempt: "{{SELECTED_OPTION_LABEL_FROM_PREVIOUS_NEXT_OPTIONS}}"
 
-**OUTPUT_CHUONG_${dto.chapterNumber}**
-1. **Tiêu đề chương**
-2. **Nội dung chi tiết** (1300 từ)
-3. **Tóm tắt TRUYỆN ĐẾN HIỆN TẠI** (≤ ${summaryWordLimit} từ) - PHẢI tổng hợp từ: (A) "Tóm tắt nội dung câu chuyện trước đó" + (B) "Nội dung chương ${dto.chapterNumber} vừa viết"
-4. **Hai hướng phát triển chương sau** - ngắn gọn, không quá 12 từ
+Show the attempt, complications, and realistic consequences
 
-**META_CHUONG_${dto.chapterNumber}**
-1. **Phong cách viết**
-2. **Tông cảm xúc** (3 cảm xúc chính)
-3. **Logic phát triển**
-4. **Motif cảm xúc** (trạng thái hiện tại)
-5. **Nhân vật chính** (biến chuyển nội tâm)
-6. **Nhân vật phụ** (thay đổi vai trò / cảm xúc)
-7. **Phản diện** (chiến lược / hành động)
-8. **Biểu đồ cảm xúc** [khởi đầu → đỉnh → kết]
-9. **Chủ đề triết lý phụ**`;
+Filter this through the protagonist's established personality from Story Bible
+
+C. FOLLOW STORY BIBLE RULES
+Tone: Must match tone_description from Story Bible
+
+Style: Must follow linguistic_signature rules
+
+Characters: Must act according to their archetypes
+
+World: Must respect established world rules
+
+D. CHAPTER STRUCTURE
+Opening (200 words): Re-establish context naturally from where previous chapter ended
+
+Development (600 words): Protagonist executes the chosen option, encounters obstacles
+
+Crisis (400 words): Situation worsens or reveals unexpected complications
+
+Cliffhanger (300 words): New urgent question or revelation that demands next chapter
+
+E. TECHNICAL REQUIREMENTS
+Length: 1500 words
+
+Language: {{meta.output_language}} from Story Bible
+
+Ending: Must have compelling cliffhanger
+
+Pacing: Consider current story phase (Setup/Development/Climax)
+
+CRITICAL RULES
+Chapter content: Written in {{meta.output_language}}
+
+Continuity snapshot: Written in ENGLISH only
+
+No full text: Do NOT include previous chapter content in output
+
+Continuity: Must be consistent with all previous continuity snapshots
+
+Cliffhanger required: Chapter must end with new compelling question
+
+**CORE MANDATE**: The entire narrative must be designed as an inexorable march toward the user's stated goal. While not every chapter needs to show direct 
+progress in conquest or romance, each chapter should meaningfully contribute to the protagonist's overall power, influence, relationships, or strategic position. 
+Character development, political intrigue, and world-building chapters are essential but must ultimately serve the core objectives, creating a cohesive narrative 
+where even detours feel purposeful and lead back to the main path. User's goal: ${dto.storyPrompt}
+
+VALIDATION (INTERNAL AI CHECK)
+Before output, ask:
+
+Is this consistent with previous continuity_snapshot data?
+
+Does the protagonist's action match the user's chosen option?
+
+Are Story Bible rules followed (tone, style, characters, world)?
+
+Is the ending cliffhanger compelling?
+
+Is continuity snapshot in ENGLISH only?
+
+Is chapter content in correct language?
+
+Return ONLY the JSON object. No additional text or commentary.
+`;
 
         try {
             const response = await aiProvider.generateContent(
@@ -286,61 +355,82 @@ cùng các thông tin sau ${dto.previousChapterMeta}
         }
     }
 
-    async generateFinalChapter(dto: {
+    async generateChapterSummary(dto: {
         storyId: string;
-        chapterNumber: number;
-        previousChapterSummary: string;
         aiProvider: string;
-        storyPrompt: string;
-        direction: string;
-        previousChapterMeta: string;
-    }): Promise<ChapterStructureResponse> {
+        chapterSummary: string;
+        storyMetadata: string;
+    }): Promise<string> {
         const providerName = dto.aiProvider || 'grok';
         const aiProvider =
             this.storyGenerationProviderFactory.getProvider(providerName);
 
-        const summaryWordLimit = 200 + (dto.chapterNumber - 1) * 50;
+        const systemPrompt = `CORE PURPOSE
+Generate concise English narrative summaries for every 5-chapter batch to preserve plot continuity while minimizing token usage for subsequent AI story generation.`;
 
-        const systemPrompt = `Bạn là một tiểu thuyết gia bậc thầy kiêm chuyên gia cấu trúc truyện AI.`;
+        const userPrompt = `INPUT REQUIREMENTS
+Chapter Batch: ${dto.chapterSummary}
+Story Architecture: ${dto.storyMetadata}
+"
+SUMMARIZATION GUIDELINES
+1. CONTENT EXTRACTION PRIORITIES
+Plot-Advancing Events: Major battles, political decisions, strategic moves
 
-        const userPrompt = `Dựa trên dữ liệu: ${dto.storyPrompt}
-Tóm tắt nội dung câu chuyện trước đó: ${dto.previousChapterSummary || 'Không có dữ liệu trước đó.'}
+Status Changes: Gains/losses of territory, resources, allies, romantic interests
 
-Viết Chương ${dto.chapterNumber} (1300 từ) tiếp tục phong cách và cảm xúc theo hướng ${dto.direction}.
-cùng các thông tin sau ${dto.previousChapterMeta}
+Character Development: Pivotal decisions, moral turning points, relationship shifts
 
-**YÊU CẦU NỘI DUNG**
-1. Tiếp nối logic chương trước. Đảm bảo tính logic về mặt không gian, thời gian, địa điểm và nhân vật.
-2. Cho nhân vật đối mặt thử thách (thể chất, tâm lý hoặc triết lý).
-3. Phản diện nếu đã xuất hiện thì có đối đầu hoặc tương phản gián tiếp. Nếu chưa xuất hiện thì dần xuất hiện rõ rệt.
-4. Motif cảm xúc được tái hiện hoặc biến đổi.
-5. Kết chương bằng cao trào hoặc tiết lộ.
-6. Chương này là chương kết thúc của câu chuyện. Hãy kết thúc câu chuyện nhưng đảm bảo cái kết ở chương này không gây cảm giác đột ngột cho người đọc.
+Power Dynamics: Changes in protagonist's influence, authority, or strategic position
 
-**OUTPUT_CHUONG_${dto.chapterNumber}**
-1. **Tiêu đề chương**
-2. **Nội dung chi tiết** (1300 từ)
-3. **Tóm tắt TRUYỆN ĐẾN HIỆN TẠI** (≤ ${summaryWordLimit} từ) - PHẢI tổng hợp từ: (A) "Tóm tắt nội dung câu chuyện trước đó" + (B) "Nội dung chương ${dto.chapterNumber} vừa viết"
-4. **Hai hướng phát triển chương sau** - ngắn gọn, không quá 12 từ
+2. CONTENT CONDENSATION RULES
+Remove: Detailed environmental descriptions, elaborate costume details, minor character interactions without plot impact
 
-**META_CHUONG_${dto.chapterNumber}**
-1. **Phong cách viết**
-2. **Tông cảm xúc** (3 cảm xúc chính)
-3. **Logic phát triển**
-4. **Motif cảm xúc** (trạng thái hiện tại)
-5. **Nhân vật chính** (biến chuyển nội tâm)
-6. **Nhân vật phụ** (thay đổi vai trò / cảm xúc)
-7. **Phản diện** (chiến lược / hành động)
-8. **Biểu đồ cảm xúc** [khởi đầu → đỉnh → kết]
-9. **Chủ đề triết lý phụ**`;
+Reduce: Extended internal monologues to their core emotional/decision point
+
+Compress: Multi-scene sequences into their narrative function (e.g., ""a series of diplomatic meetings secured three key alliances"")
+
+Abstract: World-building details to their plot relevance only
+
+3. SUMMARY STRUCTURE TEMPLATE
+text
+Beginning State: [Protagonist's situation at chapter start]
+
+Key Developments:
+1. [Most significant event with direct consequence]
+2. [Secondary important development]
+3. [Relationship/romantic progression if applicable]
+
+Status Change: [How protagonist's position changed overall]
+
+Emerging Threat/Opportunity: [What new situation requires attention]
+4. LANGUAGE SPECIFICATIONS
+Output Language: English only
+
+Tense: Past tense, third-person objective
+
+Voice: Clinical narrative reporting (not literary)
+
+Style: Factual, emotion-neutral, plot-focused
+
+Prohibited: Meta-references (""as mentioned earlier""), authorial commentary, chapter number citations
+
+5. QUALITY CONTROLS
+Length: Strict 150-200 word range
+
+Density: Must contain 3-5 plot-significant data points
+
+Forward Momentum: Each summary should clearly enable the next 5-chapter continuation
+
+Architecture Alignment: Verify events serve story's core objectives from original blueprint"
+`;
 
         try {
             const response = await aiProvider.generateContent(
                 systemPrompt,
                 userPrompt,
-                CHAPTER_STRUCTURE_SCHEMA,
             );
-            return this.parseChapterStructure(response, dto.chapterNumber);
+
+            return response;
         } catch (error) {
             this.logger.error('Error generating chapter structure:', error);
             throw new BadRequestException(
@@ -507,10 +597,10 @@ cùng các thông tin sau ${dto.previousChapterMeta}
             const parsed = JSON.parse(content);
 
             return {
-                title: parsed.ui_display?.story_title || 'Untitled',
-                synopsis: parsed.ui_display?.story_cover_blurb || '',
-                coverImage: parsed.cover_image || '',
-                storyContext: parsed.story_context || {},
+                title: parsed.uiDisplay?.storyTitle || 'Untitled',
+                synopsis: parsed.uiDisplay?.storyCoverBlurb || '',
+                coverImage: parsed.coverImage || '',
+                storyContext: parsed.storyContext || {},
                 numberOfChapters,
                 outline: parsed.outline || content,
             };
@@ -557,65 +647,37 @@ cùng các thông tin sau ${dto.previousChapterMeta}
     ): ChapterStructureResponse {
         try {
             const parsed = JSON.parse(content);
+
             return {
                 chapterNumber,
-                title: parsed.title || '',
-                content: parsed.content || '',
-                structure: {
-                    summary: parsed.summary || '',
-                    directions: Array.isArray(parsed.directions)
-                        ? parsed.directions
-                        : [],
 
-                    writingStyle: parsed.writingStyle || '',
-                    tone: parsed.tone || '',
-                    plotLogic: parsed.plotLogic || '',
-                    emotionalMotif: parsed.emotionalMotif || '',
-                    mainCharacterArc: parsed.mainCharacterArc || '',
-                    subCharacterArc: parsed.subCharacterArc || '',
-                    antagonistAction: parsed.antagonistAction || '',
-                    emotionChart: parsed.emotionChart || '',
-                    philosophicalSubtheme: parsed.philosophicalSubtheme || '',
-                },
+                title: parsed.display?.chapterTitle || '',
+                content: parsed.display?.content || '',
+
+                structure: parsed.continuitySnapshot || {},
                 raw: content,
             };
         } catch (jsonError) {
             this.logger.warn(
                 'Failed to parse JSON response, falling back to text parsing',
+                jsonError,
             );
 
             try {
                 const extract = (label: string) =>
-                    this.extractSection(content, label);
+                    this.extractSection(content, label) || '';
 
                 return {
                     chapterNumber,
 
-                    title: extract('Tiêu đề chương|Title'),
-                    content: extract('Nội dung chi tiết|Content'),
-                    structure: {
-                        summary: extract('Tóm tắt truyện đến hiện tại|Summary'),
-                        directions: extract('Hướng phát triển|Directions')
-                            .split('\n')
-                            .map((s) => s.trim())
-                            .filter(Boolean),
+                    title: extract('Tiêu đề chương|Chapter Title'),
+                    content: extract('Nội dung|Content'),
 
-                        writingStyle: extract('Phong cách viết|Writing Style'),
-                        tone: extract('Tông cảm xúc|Tone'),
-                        plotLogic: extract('Logic phát triển|Plot Logic'),
-                        emotionalMotif: extract(
-                            'Motif cảm xúc|Emotional Motif',
-                        ),
-                        mainCharacterArc: extract(
-                            'Nhân vật chính|Main Character',
-                        ),
-                        subCharacterArc: extract('Nhân vật phụ|Sub Character'),
-                        antagonistAction: extract('Phản diện|Antagonist'),
-                        emotionChart: extract('Biểu đồ cảm xúc|Emotion Chart'),
-                        philosophicalSubtheme: extract(
-                            'Chủ đề triết lý|Philosophical Subtheme',
-                        ),
+                    structure: {
+                        chapterNumber,
+                        rawContent: content,
                     },
+
                     raw: content,
                 };
             } catch (error) {
@@ -626,25 +688,14 @@ cùng các thông tin sau ${dto.previousChapterMeta}
                     title: '',
                     content: '',
                     structure: {
-                        summary: '',
-                        directions: [],
-
-                        writingStyle: '',
-                        tone: '',
-                        plotLogic: '',
-                        emotionalMotif: '',
-                        mainCharacterArc: '',
-                        subCharacterArc: '',
-                        antagonistAction: '',
-                        emotionChart: '',
-                        philosophicalSubtheme: '',
+                        chapterNumber,
+                        rawContent: content,
                     },
                     raw: content,
                 };
             }
         }
     }
-
     /**
      * Parse complete chapter response from AI
      * Expects structured JSON response with content, summary, and imagePrompt

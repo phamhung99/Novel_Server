@@ -132,9 +132,18 @@ export class AllExceptionsFilter implements ExceptionFilter {
 
         // Handle unique constraint violations
         if (pgError?.code === '23505') {
-            const detail = pgError.detail || '';
+            const constraint = pgError.constraint || '';
 
-            if (detail.includes('email')) {
+            if (constraint.includes('request_id')) {
+                return {
+                    statusCode: HttpStatus.CONFLICT,
+                    error: 'Duplicate Request',
+                    message: 'This request has already been processed',
+                    code: ErrorCode.DUPLICATE_REQUEST_ID,
+                };
+            }
+
+            if (constraint.includes('email')) {
                 return {
                     statusCode,
                     error,

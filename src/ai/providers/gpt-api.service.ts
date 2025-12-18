@@ -13,6 +13,7 @@ export class GptApiService implements IStoryGenerationProvider {
     private client: AxiosInstance;
     private readonly apiKey: string;
     private readonly modelName = 'gpt-4o-mini';
+    private readonly imageModelName = 'dall-e-2';
     private readonly providerName = 'gpt';
 
     constructor(private configService: ConfigService) {
@@ -63,6 +64,27 @@ export class GptApiService implements IStoryGenerationProvider {
             return response.data.choices[0].message.content;
         } catch (error) {
             this.logger.error('Error calling OpenAI API:', error);
+            throw error;
+        }
+    }
+
+    async generateImage(
+        prompt: string,
+        size: '1024x1024' | '512x512' | '256x256' = '1024x1024',
+    ): Promise<string> {
+        try {
+            const response = await this.client.post('/images/generations', {
+                model: this.imageModelName,
+                prompt,
+                size,
+            });
+
+            return response.data.data[0].url;
+        } catch (error) {
+            this.logger.error(
+                'Error generating image with OpenAI DALL·E:',
+                error,
+            );
             throw error;
         }
     }

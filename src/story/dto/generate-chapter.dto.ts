@@ -41,7 +41,7 @@ export interface ChapterStructureResponse {
     chapterNumber: number;
     title: string;
     content: string;
-    structure: ChapterStructure;
+    structure: any;
     raw: string;
 }
 
