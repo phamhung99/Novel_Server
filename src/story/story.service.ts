@@ -37,6 +37,8 @@ import { getStartOfDay } from 'src/common/utils/date.utils';
 import { UserService } from 'src/user/user.service';
 import { GenerationStatus, LibraryType } from 'src/common/enums/app.enum';
 import { Category } from './entities/categories.entity';
+import { DoSpacesService } from 'src/upload/do-spaces.service';
+import { DEFAULT_COVER_IMAGE_URL } from 'src/common/constants/app.constant';
 
 @Injectable()
 export class StoryService {
@@ -58,6 +60,7 @@ export class StoryService {
         private userService: UserService,
         @InjectRepository(Category)
         private categoryRepository: Repository<Category>,
+        private doSpacesService: DoSpacesService,
     ) {}
 
     async createStory(
@@ -120,13 +123,12 @@ export class StoryService {
                 author: {
                     id: true,
                     username: true,
-                    deletedAt: true,
+                    profileImage: true,
                 },
                 chapters: {
                     id: true,
                     index: true,
                     title: true,
-                    content: true,
                 },
                 generation: {
                     status: true,
@@ -438,6 +440,7 @@ export class StoryService {
     async initializeStoryWithOutline(
         userId: string,
         requestId: string,
+        skipImage: boolean,
         dto: InitializeStoryDto,
     ): Promise<InitializeStoryResponseDto> {
         const exists = await this.storyGenerationRepository.findOne({
@@ -489,12 +492,29 @@ export class StoryService {
                 where: { name: In(dto.genres) }, // hoặc { id: In(dto.genreIds) } nếu gửi id
             });
 
+            let coverImageKey: string | null = null;
+
+            if (!skipImage) {
+                const tempImageUrl =
+                    await this.storyGenerationApiService.generateCoverImage(
+                        outlineResponse.coverImage,
+                    );
+
+                coverImageKey =
+                    await this.doSpacesService.uploadFromStream(tempImageUrl);
+            }
+
+            const coverImageUrl = skipImage
+                ? DEFAULT_COVER_IMAGE_URL
+                : await this.doSpacesService.getImageUrl(coverImageKey);
+
             // Tạo story và gắn category
             const story = this.storyRepository.create({
                 title: outlineResponse.title,
                 synopsis: outlineResponse.synopsis,
                 authorId: userId,
-                categories, // <-- map tới category có sẵn
+                categories,
+                coverImage: coverImageKey,
             });
 
             const savedStory = await this.storyRepository.save(story);
@@ -525,7 +545,7 @@ export class StoryService {
                 id: savedStory.id,
                 title: story.title,
                 synopsis: story.synopsis,
-                coverImage: outlineResponse.coverImage,
+                coverImageUrl: coverImageUrl,
                 storyContext: outlineResponse.storyContext,
                 outline: outlineResponse.outline,
                 message:

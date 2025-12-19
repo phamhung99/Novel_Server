@@ -66,6 +66,7 @@ export class StoryController {
     async initializeStory(
         @Headers('x-user-id') userId: string,
         @Headers('x-request-id') requestId: string,
+        @Headers('x-skip-image') skipImage: boolean = false,
         @Body() initializeStoryDto: InitializeStoryDto,
     ): Promise<InitializeStoryResponseDto> {
         if (!requestId) {
@@ -74,6 +75,7 @@ export class StoryController {
         return this.storyService.initializeStoryWithOutline(
             userId,
             requestId,
+            skipImage,
             initializeStoryDto,
         );
     }

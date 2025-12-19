@@ -14,6 +14,9 @@ export const MAX_FILE_SIZE_UPLOAD = {
     IMAGE: 5 * 1024 * 1024, // 5 MB
 };
 
+export const DEFAULT_COVER_IMAGE_URL =
+    'https://myapp-assets.sfo3.cdn.digitaloceanspaces.com/covers/cbba6c8b-744e-47fc-b5ad-a3ec8d7ccfe3.jpg';
+
 export const ERROR_MESSAGES = {
     // File Upload
     FILE_REQUIRED: 'File is required when content type is FILE.',

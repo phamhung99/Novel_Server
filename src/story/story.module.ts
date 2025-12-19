@@ -11,6 +11,7 @@ import { StoryViews } from './entities/story-views.entity';
 import { StorySummary } from './entities/story-summary.entity';
 import { UserModule } from 'src/user/user.module';
 import { Category } from './entities/categories.entity';
+import { DoSpacesService } from 'src/upload/do-spaces.service';
 
 @Module({
     imports: [
@@ -27,7 +28,7 @@ import { Category } from './entities/categories.entity';
         UserModule,
     ],
     controllers: [StoryController],
-    providers: [StoryService],
+    providers: [StoryService, DoSpacesService],
     exports: [StoryService],
 })
 export class StoryModule {}

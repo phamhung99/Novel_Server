@@ -24,10 +24,7 @@ export interface IStoryGenerationProvider {
         responseSchema?: object,
     ): Promise<string>;
 
-    generateImage(
-        prompt: string,
-        size?: '256x256' | '512x512' | '1024x1024',
-    ): Promise<string>;
+    generateImage(prompt: string, size?: string): Promise<string>;
 
     /**
      * Get the provider name

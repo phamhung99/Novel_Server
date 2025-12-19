@@ -13,6 +13,7 @@ export class GrokApiService implements IStoryGenerationProvider {
     private client: AxiosInstance;
     private readonly apiKey: string;
     private readonly modelName = 'grok-4';
+    private readonly imageModel = 'grok-2-image-1212';
     private readonly providerName = 'grok';
 
     constructor(private configService: ConfigService) {
@@ -60,8 +61,6 @@ export class GrokApiService implements IStoryGenerationProvider {
                 requestBody,
             );
 
-            console.log('response', response);
-
             return response.data.choices[0].message.content;
         } catch (error) {
             this.logger.error('Error calling Grok API:', error);
@@ -69,23 +68,25 @@ export class GrokApiService implements IStoryGenerationProvider {
         }
     }
 
-    async generateImage(
-        prompt: string,
-        size: '256x256' | '512x512' | '1024x1024' = '512x512',
-    ): Promise<string> {
+    async generateImage(prompt: string): Promise<string> {
         try {
             const requestBody = {
+                model: this.imageModel,
                 prompt,
-                n: 1,
-                size,
+                n: 1, // Optional, defaults to 1
             };
 
             const response = await this.client.post(
                 '/images/generations',
                 requestBody,
             );
+            const imageData = response.data.data[0];
 
-            return response.data.data[0].url;
+            if (imageData.url) return imageData.url;
+            if (imageData.b64_json)
+                return `data:image/jpeg;base64,${imageData.b64_json}`;
+
+            throw new Error('No valid image returned from Grok API');
         } catch (error) {
             this.logger.error('Error generating image with Grok API:', error);
             throw error;
