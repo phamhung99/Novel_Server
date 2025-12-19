@@ -9,8 +9,6 @@ import {
     JoinColumn,
     OneToMany,
     OneToOne,
-    ManyToMany,
-    JoinTable,
 } from 'typeorm';
 import { User } from 'src/user/entities/user.entity';
 import { StoryType } from '../../common/enums/story-type.enum';
@@ -23,6 +21,7 @@ import { StoryLikes } from './story-likes.entity';
 import { StoryViews } from './story-views.entity';
 import { UserAudioPreference } from './user-audio-preference.entity';
 import { Category } from './categories.entity';
+import { StoryCategory } from './story-category.entity';
 
 @Entity('story')
 export class Story {
@@ -119,11 +118,6 @@ export class Story {
     )
     audioPreferences: UserAudioPreference[];
 
-    @ManyToMany(() => Category, (category) => category.stories)
-    @JoinTable({
-        name: 'story_categories',
-        joinColumn: { name: 'story_id', referencedColumnName: 'id' },
-        inverseJoinColumn: { name: 'category_id', referencedColumnName: 'id' },
-    })
-    categories: Category[];
+    @OneToMany(() => StoryCategory, (storyCategory) => storyCategory.story)
+    storyCategories: StoryCategory[];
 }

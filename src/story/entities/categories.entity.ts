@@ -6,10 +6,9 @@ import {
     OneToMany,
     CreateDateColumn,
     UpdateDateColumn,
-    ManyToMany,
 } from 'typeorm';
-import { Story } from './story.entity';
 import { UserCategoryPreference } from 'src/user/entities/user-category-preference.entity';
+import { StoryCategory } from './story-category.entity';
 
 @Entity('categories')
 export class Category {
@@ -39,8 +38,8 @@ export class Category {
     @UpdateDateColumn({ type: 'timestamptz', name: 'updated_at' })
     updatedAt: Date;
 
-    @ManyToMany(() => Story, (story) => story.categories)
-    stories: Story[];
+    @OneToMany(() => StoryCategory, (storyCategory) => storyCategory.category)
+    storyCategories: StoryCategory[];
 
     @OneToMany(
         () => UserCategoryPreference,

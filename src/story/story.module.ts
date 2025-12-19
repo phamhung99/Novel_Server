@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { StoryController } from './story.controller';
 import { StoryService } from './story.service';
@@ -12,6 +12,7 @@ import { StorySummary } from './entities/story-summary.entity';
 import { UserModule } from 'src/user/user.module';
 import { Category } from './entities/categories.entity';
 import { DoSpacesService } from 'src/upload/do-spaces.service';
+import { ChapterService } from './chapter.service';
 
 @Module({
     imports: [
@@ -25,10 +26,10 @@ import { DoSpacesService } from 'src/upload/do-spaces.service';
             Category,
         ]),
         AiModule,
-        UserModule,
+        forwardRef(() => UserModule),
     ],
     controllers: [StoryController],
-    providers: [StoryService, DoSpacesService],
-    exports: [StoryService],
+    providers: [StoryService, DoSpacesService, ChapterService],
+    exports: [StoryService, ChapterService],
 })
 export class StoryModule {}

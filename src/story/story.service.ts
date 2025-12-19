@@ -16,8 +16,6 @@ import {
 import { ChapterGeneration } from './entities/chapter-generation.entity';
 import { CreateStoryDto } from './dto/create-story.dto';
 import { UpdateStoryDto } from './dto/update-story.dto';
-import { CreateChapterDto } from './dto/create-chapter.dto';
-import { UpdateChapterDto } from './dto/update-chapter.dto';
 import { StoryStatus } from '../common/enums/story-status.enum';
 import {
     ChapterStructureResponse,
@@ -30,7 +28,6 @@ import {
 } from './dto/generate-story-outline.dto';
 import { StoryGenerationApiService } from '../ai/providers/story-generation-api.service';
 import { StoryVisibility } from 'src/common/enums/story-visibility.enum';
-import { excludeFields } from 'src/common/utils/exclude-fields';
 import { StoryViews } from './entities/story-views.entity';
 import { StorySummary } from './entities/story-summary.entity';
 import { getStartOfDay } from 'src/common/utils/date.utils';
@@ -39,6 +36,7 @@ import { GenerationStatus, LibraryType } from 'src/common/enums/app.enum';
 import { Category } from './entities/categories.entity';
 import { DoSpacesService } from 'src/upload/do-spaces.service';
 import { DEFAULT_COVER_IMAGE_URL } from 'src/common/constants/app.constant';
+import { ChapterService } from './chapter.service';
 
 @Injectable()
 export class StoryService {
@@ -61,6 +59,7 @@ export class StoryService {
         @InjectRepository(Category)
         private categoryRepository: Repository<Category>,
         private doSpacesService: DoSpacesService,
+        private chapterService: ChapterService,
     ) {}
 
     async createStory(
@@ -245,116 +244,6 @@ export class StoryService {
         await this.storyRepository.update(id, { rating });
     }
 
-    // Chapter methods
-    async createChapter(
-        storyId: string,
-        createChapterDto: CreateChapterDto,
-    ): Promise<Chapter> {
-        const story = await this.findStoryById(storyId);
-        const chapter = this.chapterRepository.create({
-            ...createChapterDto,
-            storyId: story.id,
-        });
-        return this.chapterRepository.save(chapter);
-    }
-
-    async createChaptersBulk(
-        storyId: string,
-        createChaptersDto: CreateChapterDto[],
-    ): Promise<Chapter[]> {
-        const story = await this.findStoryById(storyId);
-        const chapters = createChaptersDto.map((dto) =>
-            this.chapterRepository.create({
-                ...dto,
-                storyId: story.id,
-            }),
-        );
-        return this.chapterRepository.save(chapters);
-    }
-
-    async findChaptersByStory(storyId: string): Promise<Chapter[]> {
-        const chapters = await this.chapterRepository.find({
-            select: {
-                id: true,
-                index: true,
-                title: true,
-                content: true,
-                chapterGenerations: {
-                    id: true,
-                    structure: true,
-                },
-            },
-            where: { storyId },
-            relations: ['chapterGenerations'],
-            order: { index: 'ASC' },
-        });
-
-        return chapters.map((chapter) => ({
-            ...chapter,
-            structure: chapter.chapterGenerations?.[0]?.structure || null,
-        }));
-    }
-
-    async findChapterById(id: string): Promise<Chapter> {
-        const chapter = await this.chapterRepository.findOne({
-            where: { id },
-            relations: ['story'],
-        });
-
-        if (!chapter) {
-            throw new NotFoundException(`Chapter with ID ${id} not found`);
-        }
-
-        return chapter;
-    }
-
-    async updateChapter(
-        id: string,
-        updateChapterDto: UpdateChapterDto,
-    ): Promise<Chapter> {
-        const chapter = await this.findChapterById(id);
-        Object.assign(chapter, updateChapterDto);
-        return this.chapterRepository.save(chapter);
-    }
-
-    async deleteChapter(id: string): Promise<void> {
-        const result = await this.chapterRepository.delete(id);
-        if (result.affected === 0) {
-            throw new NotFoundException(`Chapter with ID ${id} not found`);
-        }
-    }
-
-    // Chapter methods by index
-    async findChapterByIndex(storyId: string, index: number): Promise<Chapter> {
-        const chapter = await this.chapterRepository.findOne({
-            where: { storyId, index },
-            relations: ['story'],
-        });
-
-        if (!chapter) {
-            throw new NotFoundException(
-                `Chapter ${index} not found in story ${storyId}`,
-            );
-        }
-
-        return chapter;
-    }
-
-    async updateChapterByIndex(
-        storyId: string,
-        index: number,
-        updateChapterDto: UpdateChapterDto,
-    ): Promise<Chapter> {
-        const chapter = await this.findChapterByIndex(storyId, index);
-        Object.assign(chapter, updateChapterDto);
-        return this.chapterRepository.save(chapter);
-    }
-
-    async deleteChapterByIndex(storyId: string, index: number): Promise<void> {
-        const chapter = await this.findChapterByIndex(storyId, index);
-        await this.chapterRepository.delete(chapter.id);
-    }
-
     // Publication workflow methods
     async requestPublication(id: string): Promise<Story> {
         const story = await this.findStoryById(id);
@@ -437,141 +326,141 @@ export class StoryService {
      * Generates story outline only (no chapters)
      * Saves story attributes for reuse across chapters
      */
-    async initializeStoryWithOutline(
-        userId: string,
-        requestId: string,
-        skipImage: boolean,
-        dto: InitializeStoryDto,
-    ): Promise<InitializeStoryResponseDto> {
-        const exists = await this.storyGenerationRepository.findOne({
-            where: { requestId },
-        });
-        if (exists) throw new BadRequestException('Duplicate request');
+    // async initializeStoryWithOutline(
+    //     userId: string,
+    //     requestId: string,
+    //     skipImage: boolean,
+    //     dto: InitializeStoryDto,
+    // ): Promise<InitializeStoryResponseDto> {
+    //     const exists = await this.storyGenerationRepository.findOne({
+    //         where: { requestId },
+    //     });
+    //     if (exists) throw new BadRequestException('Duplicate request');
 
-        const storyGeneration = this.storyGenerationRepository.create({
-            requestId,
-            type: GenerationType.CHAPTER,
-            status: GenerationStatus.IN_PROGRESS,
-            aiProvider: dto.aiProvider || 'grok',
-            aiModel:
-                (dto.aiProvider || 'grok') === 'grok'
-                    ? 'grok-4'
-                    : 'gpt-4o-mini',
-            prompt: {
-                storyPrompt: dto.storyPrompt,
-                numberOfChapters: dto.numberOfChapters,
-            },
-        });
+    //     const storyGeneration = this.storyGenerationRepository.create({
+    //         requestId,
+    //         type: GenerationType.CHAPTER,
+    //         status: GenerationStatus.IN_PROGRESS,
+    //         aiProvider: dto.aiProvider || 'grok',
+    //         aiModel:
+    //             (dto.aiProvider || 'grok') === 'grok'
+    //                 ? 'grok-4'
+    //                 : 'gpt-4o-mini',
+    //         prompt: {
+    //             storyPrompt: dto.storyPrompt,
+    //             numberOfChapters: dto.numberOfChapters,
+    //         },
+    //     });
 
-        const savedStoryGeneration =
-            await this.storyGenerationRepository.save(storyGeneration);
-        try {
-            if (!userId) {
-                throw new Error('userId is required');
-            }
+    //     const savedStoryGeneration =
+    //         await this.storyGenerationRepository.save(storyGeneration);
+    //     try {
+    //         if (!userId) {
+    //             throw new Error('userId is required');
+    //         }
 
-            const user = await this.userService.findById(userId);
-            if (!user) {
-                throw new Error('User not found');
-            }
+    //         const user = await this.userService.findById(userId);
+    //         if (!user) {
+    //             throw new Error('User not found');
+    //         }
 
-            if (dto.storyPrompt.trim().length === 0) {
-                throw new Error('Story prompt cannot be empty');
-            }
+    //         if (dto.storyPrompt.trim().length === 0) {
+    //             throw new Error('Story prompt cannot be empty');
+    //         }
 
-            const outlineResponse =
-                await this.storyGenerationApiService.generateStoryOutline({
-                    storyPrompt: dto.storyPrompt,
-                    genres: dto.genres,
-                    numberOfChapters: dto.numberOfChapters,
-                    aiProvider: dto.aiProvider || 'grok',
-                });
+    //         const outlineResponse =
+    //             await this.storyGenerationApiService.generateStoryOutline({
+    //                 storyPrompt: dto.storyPrompt,
+    //                 genres: dto.genres,
+    //                 numberOfChapters: dto.numberOfChapters,
+    //                 aiProvider: dto.aiProvider || 'grok',
+    //             });
 
-            // Lấy category từ DB theo tên hoặc id (tùy dto gửi)
-            const categories = await this.categoryRepository.find({
-                where: { name: In(dto.genres) }, // hoặc { id: In(dto.genreIds) } nếu gửi id
-            });
+    //         // Lấy category từ DB theo tên hoặc id (tùy dto gửi)
+    //         const categories = await this.categoryRepository.find({
+    //             where: { name: In(dto.genres) }, // hoặc { id: In(dto.genreIds) } nếu gửi id
+    //         });
 
-            let coverImageKey: string | null = null;
+    //         let coverImageKey: string | null = null;
 
-            if (!skipImage) {
-                const tempImageUrl =
-                    await this.storyGenerationApiService.generateCoverImage(
-                        outlineResponse.coverImage,
-                    );
+    //         if (!skipImage) {
+    //             const tempImageUrl =
+    //                 await this.storyGenerationApiService.generateCoverImage(
+    //                     outlineResponse.coverImage,
+    //                 );
 
-                coverImageKey =
-                    await this.doSpacesService.uploadFromStream(tempImageUrl);
-            }
+    //             coverImageKey =
+    //                 await this.doSpacesService.uploadFromStream(tempImageUrl);
+    //         }
 
-            const coverImageUrl = skipImage
-                ? DEFAULT_COVER_IMAGE_URL
-                : await this.doSpacesService.getImageUrl(coverImageKey);
+    //         const coverImageUrl = skipImage
+    //             ? DEFAULT_COVER_IMAGE_URL
+    //             : await this.doSpacesService.getImageUrl(coverImageKey);
 
-            // Tạo story và gắn category
-            const story = this.storyRepository.create({
-                title: outlineResponse.title,
-                synopsis: outlineResponse.synopsis,
-                authorId: userId,
-                categories,
-                coverImage: coverImageKey,
-            });
+    //         // Tạo story và gắn category
+    //         const story = this.storyRepository.create({
+    //             title: outlineResponse.title,
+    //             synopsis: outlineResponse.synopsis,
+    //             authorId: userId,
+    //             categories,
+    //             coverImage: coverImageKey,
+    //         });
 
-            const savedStory = await this.storyRepository.save(story);
+    //         const savedStory = await this.storyRepository.save(story);
 
-            // Update story generation record with story reference and attributes
-            await this.storyGenerationRepository.update(
-                { id: savedStoryGeneration.id },
-                {
-                    storyId: savedStory.id,
-                    response: {
-                        outline: outlineResponse.outline,
-                    } as any,
-                    title: outlineResponse.title,
-                    synopsis: outlineResponse.synopsis,
-                    metadata: {
-                        coverImage: outlineResponse.coverImage,
-                        storyContext: outlineResponse.storyContext,
-                    } as any,
-                    status: GenerationStatus.COMPLETED,
-                },
-            );
+    //         // Update story generation record with story reference and attributes
+    //         await this.storyGenerationRepository.update(
+    //             { id: savedStoryGeneration.id },
+    //             {
+    //                 storyId: savedStory.id,
+    //                 response: {
+    //                     outline: outlineResponse.outline,
+    //                 } as any,
+    //                 title: outlineResponse.title,
+    //                 synopsis: outlineResponse.synopsis,
+    //                 metadata: {
+    //                     coverImage: outlineResponse.coverImage,
+    //                     storyContext: outlineResponse.storyContext,
+    //                 } as any,
+    //                 status: GenerationStatus.COMPLETED,
+    //             },
+    //         );
 
-            // Update story's generation reference
-            savedStory.generation = savedStoryGeneration;
-            await this.storyRepository.save(savedStory);
+    //         // Update story's generation reference
+    //         savedStory.generation = savedStoryGeneration;
+    //         await this.storyRepository.save(savedStory);
 
-            return {
-                id: savedStory.id,
-                title: story.title,
-                synopsis: story.synopsis,
-                coverImageUrl: coverImageUrl,
-                storyContext: outlineResponse.storyContext,
-                outline: outlineResponse.outline,
-                message:
-                    'Story outline generated successfully. Ready to generate chapters on-demand.',
-            };
-        } catch (error) {
-            console.error('Error initializing story:', error);
+    //         return {
+    //             id: savedStory.id,
+    //             title: story.title,
+    //             synopsis: story.synopsis,
+    //             coverImageUrl: coverImageUrl,
+    //             storyContext: outlineResponse.storyContext,
+    //             outline: outlineResponse.outline,
+    //             message:
+    //                 'Story outline generated successfully. Ready to generate chapters on-demand.',
+    //         };
+    //     } catch (error) {
+    //         console.error('Error initializing story:', error);
 
-            await this.storyGenerationRepository.update(
-                { id: savedStoryGeneration.id },
-                {
-                    status: GenerationStatus.FAILED,
-                    errorMessage: error.message || 'Failed to initialize story',
-                },
-            );
+    //         await this.storyGenerationRepository.update(
+    //             { id: savedStoryGeneration.id },
+    //             {
+    //                 status: GenerationStatus.FAILED,
+    //                 errorMessage: error.message || 'Failed to initialize story',
+    //             },
+    //         );
 
-            throw new HttpException(
-                {
-                    statusCode: HttpStatus.BAD_REQUEST,
-                    message: error.message || 'Story initialization failed',
-                    error: 'Story initialization failed',
-                },
-                HttpStatus.BAD_REQUEST,
-            );
-        }
-    }
+    //         throw new HttpException(
+    //             {
+    //                 statusCode: HttpStatus.BAD_REQUEST,
+    //                 message: error.message || 'Story initialization failed',
+    //                 error: 'Story initialization failed',
+    //             },
+    //             HttpStatus.BAD_REQUEST,
+    //         );
+    //     }
+    // }
 
     async generateChapters(
         storyId: string,
@@ -613,7 +502,8 @@ export class StoryService {
                 );
             }
 
-            const existingChapters = await this.findChaptersByStory(storyId);
+            const existingChapters =
+                await this.chapterService.findChaptersByStory(storyId);
 
             const chapterNumber = existingChapters.length + 1;
             const isFirstChapter = chapterNumber === 1;

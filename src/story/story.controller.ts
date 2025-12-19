@@ -31,7 +31,7 @@ import { LibraryType } from 'src/common/enums/app.enum';
 import { ERROR_MESSAGES } from 'src/common/constants/app.constant';
 import { StoryStatus } from 'src/common/enums/story-status.enum';
 import { UserService } from 'src/user/user.service';
-import { Category } from './entities/categories.entity';
+import { ChapterService } from './chapter.service';
 // import { FileInterceptor } from '@nestjs/platform-express';
 // import { diskStorage } from 'multer';
 // import { extname, join } from 'path';
@@ -46,6 +46,7 @@ export class StoryController {
     constructor(
         private readonly storyService: StoryService,
         private readonly userService: UserService,
+        private readonly chapterService: ChapterService,
     ) {}
 
     @Get('/library')
@@ -62,23 +63,23 @@ export class StoryController {
     }
 
     // REQUEST 1: Initialize story with outline
-    @Post('generate/initialize')
-    async initializeStory(
-        @Headers('x-user-id') userId: string,
-        @Headers('x-request-id') requestId: string,
-        @Headers('x-skip-image') skipImage: boolean = false,
-        @Body() initializeStoryDto: InitializeStoryDto,
-    ): Promise<InitializeStoryResponseDto> {
-        if (!requestId) {
-            throw new BadRequestException('requestId is required');
-        }
-        return this.storyService.initializeStoryWithOutline(
-            userId,
-            requestId,
-            skipImage,
-            initializeStoryDto,
-        );
-    }
+    // @Post('generate/initialize')
+    // async initializeStory(
+    //     @Headers('x-user-id') userId: string,
+    //     @Headers('x-request-id') requestId: string,
+    //     @Headers('x-skip-image') skipImage: boolean = false,
+    //     @Body() initializeStoryDto: InitializeStoryDto,
+    // ): Promise<InitializeStoryResponseDto> {
+    //     if (!requestId) {
+    //         throw new BadRequestException('requestId is required');
+    //     }
+    //     return this.storyService.initializeStoryWithOutline(
+    //         userId,
+    //         requestId,
+    //         skipImage,
+    //         initializeStoryDto,
+    //     );
+    // }
 
     @Get('generate/initialize/result')
     async getInitializationResults(
@@ -315,7 +316,7 @@ export class StoryController {
         @Param('storyId') storyId: string,
         @Body() createChapterDto: CreateChapterDto,
     ) {
-        return this.storyService.createChapter(storyId, createChapterDto);
+        return this.chapterService.createChapter(storyId, createChapterDto);
     }
 
     @Post(':storyId/chapter/bulk')
@@ -323,12 +324,15 @@ export class StoryController {
         @Param('storyId') storyId: string,
         @Body() createChaptersDto: CreateChapterDto[],
     ) {
-        return this.storyService.createChaptersBulk(storyId, createChaptersDto);
+        return this.chapterService.createChaptersBulk(
+            storyId,
+            createChaptersDto,
+        );
     }
 
     @Get(':storyId/chapter')
     async getChaptersByStory(@Param('storyId') storyId: string) {
-        return this.storyService.findChaptersByStory(storyId);
+        return this.chapterService.findChaptersByStory(storyId);
     }
 
     @Get(':storyId/chapter/:index')
@@ -336,7 +340,7 @@ export class StoryController {
         @Param('storyId') storyId: string,
         @Param('index') index: number,
     ) {
-        return this.storyService.findChapterByIndex(storyId, index);
+        return this.chapterService.findChapterByIndex(storyId, index);
     }
 
     @Put(':storyId/chapter/:index')
@@ -345,7 +349,7 @@ export class StoryController {
         @Param('index') index: number,
         @Body() updateChapterDto: UpdateChapterDto,
     ) {
-        return this.storyService.updateChapterByIndex(
+        return this.chapterService.updateChapterByIndex(
             storyId,
             index,
             updateChapterDto,
@@ -357,7 +361,7 @@ export class StoryController {
         @Param('storyId') storyId: string,
         @Param('index') index: number,
     ) {
-        await this.storyService.deleteChapterByIndex(storyId, index);
+        await this.chapterService.deleteChapterByIndex(storyId, index);
         return { message: 'Chapter deleted successfully' };
     }
 

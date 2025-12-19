@@ -118,9 +118,17 @@ export class UserService extends BaseCrudService<User> {
                 .leftJoin('s.likes', 'likes', 'likes.userId = :userId', {
                     userId,
                 })
+                .leftJoin('s.generation', 'generation')
                 .leftJoin('story_summary', 'ss', 'ss.story_id = s.id')
                 .leftJoin('s.chapters', 'c')
-                .leftJoin('s.categories', 'cat')
+                .leftJoin('s.storyCategories', 'sc')
+                .leftJoin('sc.category', 'cat')
+                .leftJoin(
+                    'chapter_states',
+                    'cs',
+                    'cs.chapter_id = c.id AND cs.user_id = :userId',
+                    { userId },
+                )
                 .select([
                     's.id AS "storyId"',
                     's.title AS "title"',
@@ -129,22 +137,30 @@ export class UserService extends BaseCrudService<User> {
                     's.rating AS "rating"',
                     's.type AS "type"',
                     's.status AS "status"',
+                    's.createdAt AS "createdAt"',
+                    's.updatedAt AS "updatedAt"',
                     `json_agg(DISTINCT jsonb_build_object('id', cat.id, 'name', cat.name)) AS "categories"`,
-
+                    `json_agg(
+                        DISTINCT jsonb_build_object('id', cat.id, 'name', cat.name)
+                    ) FILTER (WHERE sc.isMainCategory = true) -> 0 AS "mainCategory"`,
                     'a.id AS "authorId"',
                     'a.username AS "authorUsername"',
                     'a.profileImage AS "profileImage"',
-
                     'rh.lastReadAt AS "lastReadAt"',
                     'rh.lastReadChapter AS "lastReadChapter"',
-
                     'CASE WHEN likes.id IS NULL THEN false ELSE true END AS "isLike"',
-
                     'ss.likes_count AS "likesCount"',
                     'ss.views_count AS "viewsCount"',
-
+                    `(COUNT(c.id) = COALESCE((generation.prompt ->> 'numberOfChapters')::int, 0)) AS "isCompleted"`,
                     `json_agg(
-                    json_build_object('id', c.id, 'title', c.title, 'index', c.index)
+                    jsonb_build_object(
+                        'id', c.id,
+                        'title', c.title,
+                        'index', c.index,
+                        'createdAt', c.created_at,
+                        'updatedAt', c.updated_at,
+                        'isLock', cs.chapter_id IS NULL
+                    )
                     ORDER BY c.index ASC
                 ) AS chapters`,
                 ])
@@ -159,6 +175,7 @@ export class UserService extends BaseCrudService<User> {
                 .addGroupBy('likes.id')
                 .addGroupBy('ss.likes_count')
                 .addGroupBy('ss.views_count')
+                .addGroupBy('generation.prompt')
                 .orderBy('rh.lastReadAt', 'DESC')
                 .offset(offset)
                 .limit(limit);

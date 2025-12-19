@@ -1,17 +1,6 @@
-import {
-    Injectable,
-    BadRequestException,
-    Logger,
-    NotFoundException,
-} from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import {
-    ChapterStructureResponse,
-    GenerateChapterDto,
-} from '../../story/dto/generate-chapter.dto';
+import { Injectable, BadRequestException, Logger } from '@nestjs/common';
+import { ChapterStructureResponse } from '../../story/dto/generate-chapter.dto';
 import { StoryGenerationProviderFactory } from './story-generation-provider.factory';
-import { StoryGeneration } from '../../story/entities/story-generation.entity';
 import {
     STORY_OUTLINE_SCHEMA,
     CHAPTER_STRUCTURE_SCHEMA,
@@ -38,8 +27,6 @@ export class StoryGenerationApiService {
 
     constructor(
         private storyGenerationProviderFactory: StoryGenerationProviderFactory,
-        @InjectRepository(StoryGeneration)
-        private storyGenerationRepository: Repository<StoryGeneration>,
     ) {}
 
     async generateCoverImage(prompt: string): Promise<string> {

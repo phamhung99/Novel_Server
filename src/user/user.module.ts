@@ -5,6 +5,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { User } from './entities/user.entity';
 import { UserCategoryPreference } from './entities/user-category-preference.entity';
 import { ReadingHistory } from './entities/reading-history.entity';
+import { StoryGeneration } from 'src/story/entities/story-generation.entity';
 
 @Module({
     controllers: [UserController],
@@ -14,6 +15,7 @@ import { ReadingHistory } from './entities/reading-history.entity';
             User,
             UserCategoryPreference,
             ReadingHistory,
+            StoryGeneration,
         ]),
     ],
     exports: [UserService, TypeOrmModule],
