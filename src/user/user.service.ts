@@ -11,6 +11,7 @@ import { UserCategoryPreference } from './entities/user-category-preference.enti
 import { ERROR_MESSAGES } from 'src/common/constants/app.constant';
 import { ReadingHistory } from './entities/reading-history.entity';
 import { StoryStatus } from 'src/common/enums/story-status.enum';
+import { Chapter } from 'src/story/entities/chapter.entity';
 
 @Injectable()
 export class UserService extends BaseCrudService<User> {
@@ -21,6 +22,8 @@ export class UserService extends BaseCrudService<User> {
         private readonly dataSource: DataSource,
         @InjectRepository(ReadingHistory)
         private readonly readingHistoryRepo: Repository<ReadingHistory>,
+        @InjectRepository(Chapter)
+        private readonly chapterRepo: Repository<Chapter>,
     ) {
         super(userRepo);
     }
@@ -110,6 +113,7 @@ export class UserService extends BaseCrudService<User> {
         try {
             const offset = (page - 1) * limit;
 
+            // Query chính (không lấy chapters)
             const qb = this.dataSource
                 .getRepository(ReadingHistory)
                 .createQueryBuilder('rh')
@@ -120,15 +124,8 @@ export class UserService extends BaseCrudService<User> {
                 })
                 .leftJoin('s.generation', 'generation')
                 .leftJoin('story_summary', 'ss', 'ss.story_id = s.id')
-                .leftJoin('s.chapters', 'c')
                 .leftJoin('s.storyCategories', 'sc')
                 .leftJoin('sc.category', 'cat')
-                .leftJoin(
-                    'chapter_states',
-                    'cs',
-                    'cs.chapter_id = c.id AND cs.user_id = :userId',
-                    { userId },
-                )
                 .select([
                     's.id AS "storyId"',
                     's.title AS "title"',
@@ -140,9 +137,7 @@ export class UserService extends BaseCrudService<User> {
                     's.createdAt AS "createdAt"',
                     's.updatedAt AS "updatedAt"',
                     `json_agg(DISTINCT jsonb_build_object('id', cat.id, 'name', cat.name)) AS "categories"`,
-                    `json_agg(
-                        DISTINCT jsonb_build_object('id', cat.id, 'name', cat.name)
-                    ) FILTER (WHERE sc.isMainCategory = true) -> 0 AS "mainCategory"`,
+                    `json_agg(DISTINCT jsonb_build_object('id', cat.id, 'name', cat.name)) FILTER (WHERE sc.isMainCategory = true) -> 0 AS "mainCategory"`,
                     'a.id AS "authorId"',
                     'a.username AS "authorUsername"',
                     'a.profileImage AS "profileImage"',
@@ -151,46 +146,65 @@ export class UserService extends BaseCrudService<User> {
                     'CASE WHEN likes.id IS NULL THEN false ELSE true END AS "isLike"',
                     'ss.likes_count AS "likesCount"',
                     'ss.views_count AS "viewsCount"',
-                    `(COUNT(c.id) = COALESCE((generation.prompt ->> 'numberOfChapters')::int, 0)) AS "isCompleted"`,
-                    `json_agg(
-                    jsonb_build_object(
-                        'id', c.id,
-                        'title', c.title,
-                        'index', c.index,
-                        'createdAt', c.created_at,
-                        'updatedAt', c.updated_at,
-                        'isLock', cs.chapter_id IS NULL
-                    )
-                    ORDER BY c.index ASC
-                ) AS chapters`,
+                    `(COUNT(*) OVER() = COALESCE((generation.prompt ->> 'numberOfChapters')::int, 0)) AS "isCompleted"`,
                 ])
                 .where('rh.user_id = :userId', { userId })
                 .andWhere('s.status = :status', {
                     status: StoryStatus.PUBLISHED,
                 })
-                .groupBy('s.id')
-                .addGroupBy('a.id')
-                .addGroupBy('rh.lastReadAt')
-                .addGroupBy('rh.lastReadChapter')
-                .addGroupBy('likes.id')
-                .addGroupBy('ss.likes_count')
-                .addGroupBy('ss.views_count')
-                .addGroupBy('generation.prompt')
+                .groupBy(
+                    's.id, a.id, rh.lastReadAt, rh.lastReadChapter, likes.id, ss.likes_count, ss.views_count, generation.prompt',
+                )
                 .orderBy('rh.lastReadAt', 'DESC')
                 .offset(offset)
                 .limit(limit);
 
-            const [items, total] = await Promise.all([
-                qb.getRawMany(),
-                qb.getCount(),
-            ]);
+            const stories = await qb.getRawMany();
+            const total = await qb.getCount();
 
-            return {
-                page,
-                limit,
-                total,
-                items,
-            };
+            // Lấy danh sách storyId
+            const storyIds = stories.map((s) => s.storyId);
+
+            // Query riêng chapters nếu có story
+            let chaptersMap = {};
+            if (storyIds.length > 0) {
+                const chapters = await this.dataSource
+                    .getRepository(Chapter)
+                    .createQueryBuilder('c')
+                    .leftJoin(
+                        'chapter_states',
+                        'cs',
+                        'cs.chapter_id = c.id AND cs.user_id = :userId',
+                        { userId },
+                    )
+                    .select([
+                        'c.story_id AS "storyId"',
+                        `json_agg(
+                        jsonb_build_object(
+                            'id', c.id,
+                            'title', c.title,
+                            'index', c.index,
+                            'createdAt', c.created_at,
+                            'updatedAt', c.updated_at,
+                            'isLock', cs.chapter_id IS NULL
+                        ) ORDER BY c.index ASC
+                    ) AS chapters`,
+                    ])
+                    .where('c.story_id IN (:...storyIds)', { storyIds })
+                    .groupBy('c.story_id')
+                    .getRawMany();
+
+                chaptersMap = Object.fromEntries(
+                    chapters.map((row) => [row.storyId, row.chapters]),
+                );
+            }
+
+            const items = stories.map((story) => ({
+                ...story,
+                chapters: chaptersMap[story.storyId] || [],
+            }));
+
+            return { page, limit, total, items };
         } catch (error) {
             console.error('Failed to get recent stories:', error);
             throw new BadRequestException('Cannot fetch recent stories');

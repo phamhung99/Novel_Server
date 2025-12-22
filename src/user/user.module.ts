@@ -6,6 +6,7 @@ import { User } from './entities/user.entity';
 import { UserCategoryPreference } from './entities/user-category-preference.entity';
 import { ReadingHistory } from './entities/reading-history.entity';
 import { StoryGeneration } from 'src/story/entities/story-generation.entity';
+import { Chapter } from 'src/story/entities/chapter.entity';
 
 @Module({
     controllers: [UserController],
@@ -16,6 +17,7 @@ import { StoryGeneration } from 'src/story/entities/story-generation.entity';
             UserCategoryPreference,
             ReadingHistory,
             StoryGeneration,
+            Chapter,
         ]),
     ],
     exports: [UserService, TypeOrmModule],
