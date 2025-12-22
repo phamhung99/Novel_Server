@@ -171,6 +171,7 @@ export class UserService extends BaseCrudService<User> {
                 const chapters = await this.dataSource
                     .getRepository(Chapter)
                     .createQueryBuilder('c')
+                    .innerJoin('c.story', 's')
                     .leftJoin(
                         'chapter_states',
                         'cs',
@@ -180,17 +181,22 @@ export class UserService extends BaseCrudService<User> {
                     .select([
                         'c.story_id AS "storyId"',
                         `json_agg(
-                        jsonb_build_object(
-                            'id', c.id,
-                            'title', c.title,
-                            'index', c.index,
-                            'createdAt', c.created_at,
-                            'updatedAt', c.updated_at,
-                            'isLock', cs.chapter_id IS NULL
-                        ) ORDER BY c.index ASC
+                jsonb_build_object(
+                    'id', c.id,
+                    'title', c.title,
+                    'index', c.index,
+                    'createdAt', c.created_at,
+                    'updatedAt', c.updated_at,
+                        'isLock', (
+                            cs.chapter_id IS NULL               
+                            AND s.author_id != :userId             
+                            )
+                        )
+                        ORDER BY c.index ASC
                     ) AS chapters`,
                     ])
                     .where('c.story_id IN (:...storyIds)', { storyIds })
+                    .setParameters({ userId })
                     .groupBy('c.story_id')
                     .getRawMany();
 

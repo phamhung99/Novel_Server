@@ -927,14 +927,16 @@ export class StoryService {
     ) {
         const offset = (page - 1) * limit;
 
+        // ===== Query chính (story-level, giống getRecentStories) =====
         const qb = this.dataSource
             .getRepository(Story)
             .createQueryBuilder('s')
             .leftJoin('s.author', 'a')
             .leftJoin('s.likes', 'likes', 'likes.userId = :userId', { userId })
+            .leftJoin('s.generation', 'generation')
             .leftJoin('story_summary', 'ss', 'ss.story_id = s.id')
-            .leftJoin('s.chapters', 'c')
-            .leftJoin('s.categories', 'cat')
+            .leftJoin('s.storyCategories', 'sc')
+            .leftJoin('sc.category', 'cat')
             .select([
                 's.id AS "storyId"',
                 's.title AS "title"',
@@ -943,7 +945,13 @@ export class StoryService {
                 's.rating AS "rating"',
                 's.type AS "type"',
                 's.status AS "status"',
+                's.createdAt AS "createdAt"',
+                's.updatedAt AS "updatedAt"',
+
                 `json_agg(DISTINCT jsonb_build_object('id', cat.id, 'name', cat.name)) AS "categories"`,
+
+                `json_agg(DISTINCT jsonb_build_object('id', cat.id, 'name', cat.name))
+                FILTER (WHERE sc.isMainCategory = true) -> 0 AS "mainCategory"`,
 
                 'a.id AS "authorId"',
                 'a.username AS "authorUsername"',
@@ -954,39 +962,83 @@ export class StoryService {
                 'ss.likes_count AS "likesCount"',
                 'ss.views_count AS "viewsCount"',
 
-                `json_agg(
-                    json_build_object('id', c.id, 'title', c.title, 'index', c.index)
-                    ORDER BY c.index ASC
-                ) AS chapters`,
+                `(COUNT(*) OVER() = COALESCE((generation.prompt ->> 'numberOfChapters')::int, 0)) AS "isCompleted"`,
             ])
-            .groupBy('s.id')
-            .addGroupBy('a.id')
-            .addGroupBy('likes.id')
-            .addGroupBy('ss.likes_count')
-            .addGroupBy('ss.views_count');
+            .groupBy(
+                's.id, a.id, likes.id, ss.likes_count, ss.views_count, generation.prompt',
+            );
 
+        // ===== Filter theo type =====
         if (type === LibraryType.CREATED) {
-            qb.where('s.author_id = :userId', { userId });
-            qb.orderBy('s.created_at', 'DESC');
+            qb.where('s.author_id = :userId', { userId }).orderBy(
+                's.created_at',
+                'DESC',
+            );
         } else if (type === LibraryType.LIKED) {
             qb.innerJoin(
                 'story_likes',
                 'sl',
                 'sl.story_id = s.id AND sl.user_id = :userId',
                 { userId },
-            );
-            qb.addGroupBy('sl.created_at');
-            qb.orderBy('sl.created_at', 'DESC');
+            )
+                .addGroupBy('sl.created_at')
+                .orderBy('sl.created_at', 'DESC');
         } else {
-            throw new BadRequestException('Invalid type parameter');
+            throw new BadRequestException('Invalid library type');
         }
 
         qb.offset(offset).limit(limit);
 
-        const [items, total] = await Promise.all([
-            qb.getRawMany(),
-            qb.getCount(),
-        ]);
+        const stories = await qb.getRawMany();
+        const total = await qb.getCount();
+
+        // ===== Query chapters riêng (giống hệt getRecentStories) =====
+        const storyIds = stories.map((s) => s.storyId);
+
+        let chaptersMap: Record<string, any[]> = {};
+
+        if (storyIds.length > 0) {
+            const chapters = await this.dataSource
+                .getRepository(Chapter)
+                .createQueryBuilder('c')
+                .innerJoin('c.story', 's')
+                .leftJoin(
+                    'chapter_states',
+                    'cs',
+                    'cs.chapter_id = c.id AND cs.user_id = :userId',
+                    { userId },
+                )
+                .select([
+                    'c.story_id AS "storyId"',
+                    `json_agg(
+                jsonb_build_object(
+                    'id', c.id,
+                    'title', c.title,
+                    'index', c.index,
+                    'createdAt', c.created_at,
+                    'updatedAt', c.updated_at,
+                    'isLock', (
+                        cs.chapter_id IS NULL               
+                        AND s.author_id != :userId             
+                        )
+                    )
+                    ORDER BY c.index ASC
+                ) AS chapters`,
+                ])
+                .where('c.story_id IN (:...storyIds)', { storyIds })
+                .setParameters({ userId })
+                .groupBy('c.story_id')
+                .getRawMany();
+
+            chaptersMap = Object.fromEntries(
+                chapters.map((row) => [row.storyId, row.chapters]),
+            );
+        }
+
+        const items = stories.map((story) => ({
+            ...story,
+            chapters: chaptersMap[story.storyId] || [],
+        }));
 
         return { page, limit, total, items };
     }
