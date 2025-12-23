@@ -63,32 +63,33 @@ export class StoryController {
     }
 
     // REQUEST 1: Initialize story with outline
-    // @Post('generate/initialize')
-    // async initializeStory(
-    //     @Headers('x-user-id') userId: string,
-    //     @Headers('x-request-id') requestId: string,
-    //     @Headers('x-skip-image') skipImage: boolean = false,
-    //     @Body() initializeStoryDto: InitializeStoryDto,
-    // ): Promise<InitializeStoryResponseDto> {
-    //     if (!requestId) {
-    //         throw new BadRequestException('requestId is required');
-    //     }
-    //     return this.storyService.initializeStoryWithOutline(
-    //         userId,
-    //         requestId,
-    //         skipImage,
-    //         initializeStoryDto,
-    //     );
-    // }
+    @Post('generate/initialize')
+    async initializeStory(
+        @Headers('x-user-id') userId: string,
+        @Headers('x-request-id') requestId: string,
+        @Headers('x-skip-image') skipImage: boolean = false,
+        @Body() initializeStoryDto: InitializeStoryDto,
+    ): Promise<InitializeStoryResponseDto> {
+        if (!requestId) {
+            throw new BadRequestException('requestId is required');
+        }
+        return this.storyService.initializeStoryWithOutline(
+            userId,
+            requestId,
+            skipImage,
+            initializeStoryDto,
+        );
+    }
 
     @Get('generate/initialize/result')
     async getInitializationResults(
         @Headers('x-request-id') requestId: string,
+        @Headers('x-skip-image') skipImage: boolean = false,
     ): Promise<InitializeStoryResponseDto[]> {
         if (!requestId) {
             throw new BadRequestException('requestId is required');
         }
-        return this.storyService.getInitializationResults(requestId);
+        return this.storyService.getInitializationResults(requestId, skipImage);
     }
 
     @Post(':storyId/generate/chapter')

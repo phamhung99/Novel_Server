@@ -6,7 +6,7 @@ import {
     HttpStatus,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, In, IsNull, MoreThan, Not, Repository } from 'typeorm';
+import { DataSource, ILike, IsNull, MoreThan, Not, Repository } from 'typeorm';
 import { Story } from './entities/story.entity';
 import { Chapter } from './entities/chapter.entity';
 import {
@@ -37,6 +37,7 @@ import { Category } from './entities/categories.entity';
 import { DoSpacesService } from 'src/upload/do-spaces.service';
 import { DEFAULT_COVER_IMAGE_URL } from 'src/common/constants/app.constant';
 import { ChapterService } from './chapter.service';
+import { StoryCategory } from './entities/story-category.entity';
 
 @Injectable()
 export class StoryService {
@@ -58,6 +59,8 @@ export class StoryService {
         private userService: UserService,
         @InjectRepository(Category)
         private categoryRepository: Repository<Category>,
+        @InjectRepository(StoryCategory)
+        private storyCategoryRepository: Repository<StoryCategory>,
         private doSpacesService: DoSpacesService,
         private chapterService: ChapterService,
     ) {}
@@ -326,141 +329,230 @@ export class StoryService {
      * Generates story outline only (no chapters)
      * Saves story attributes for reuse across chapters
      */
-    // async initializeStoryWithOutline(
-    //     userId: string,
-    //     requestId: string,
-    //     skipImage: boolean,
-    //     dto: InitializeStoryDto,
-    // ): Promise<InitializeStoryResponseDto> {
-    //     const exists = await this.storyGenerationRepository.findOne({
-    //         where: { requestId },
-    //     });
-    //     if (exists) throw new BadRequestException('Duplicate request');
+    async initializeStoryWithOutline(
+        userId: string,
+        requestId: string,
+        skipImage: boolean,
+        dto: InitializeStoryDto,
+    ): Promise<InitializeStoryResponseDto> {
+        const exists = await this.storyGenerationRepository.findOne({
+            where: { requestId },
+        });
+        if (exists) throw new BadRequestException('Duplicate request');
 
-    //     const storyGeneration = this.storyGenerationRepository.create({
-    //         requestId,
-    //         type: GenerationType.CHAPTER,
-    //         status: GenerationStatus.IN_PROGRESS,
-    //         aiProvider: dto.aiProvider || 'grok',
-    //         aiModel:
-    //             (dto.aiProvider || 'grok') === 'grok'
-    //                 ? 'grok-4'
-    //                 : 'gpt-4o-mini',
-    //         prompt: {
-    //             storyPrompt: dto.storyPrompt,
-    //             numberOfChapters: dto.numberOfChapters,
-    //         },
-    //     });
+        const storyGeneration = this.storyGenerationRepository.create({
+            requestId,
+            type: GenerationType.CHAPTER,
+            status: GenerationStatus.IN_PROGRESS,
+            aiProvider: dto.aiProvider || 'grok',
+            aiModel:
+                (dto.aiProvider || 'grok') === 'grok'
+                    ? 'grok-4'
+                    : 'gpt-4o-mini',
+            prompt: {
+                storyPrompt: dto.storyPrompt,
+                numberOfChapters: dto.numberOfChapters,
+            },
+        });
 
-    //     const savedStoryGeneration =
-    //         await this.storyGenerationRepository.save(storyGeneration);
-    //     try {
-    //         if (!userId) {
-    //             throw new Error('userId is required');
-    //         }
+        const savedStoryGeneration =
+            await this.storyGenerationRepository.save(storyGeneration);
+        try {
+            if (!userId) {
+                throw new Error('userId is required');
+            }
 
-    //         const user = await this.userService.findById(userId);
-    //         if (!user) {
-    //             throw new Error('User not found');
-    //         }
+            const user = await this.userService.findById(userId);
+            if (!user) {
+                throw new Error('User not found');
+            }
 
-    //         if (dto.storyPrompt.trim().length === 0) {
-    //             throw new Error('Story prompt cannot be empty');
-    //         }
+            if (dto.storyPrompt.trim().length === 0) {
+                throw new Error('Story prompt cannot be empty');
+            }
 
-    //         const outlineResponse =
-    //             await this.storyGenerationApiService.generateStoryOutline({
-    //                 storyPrompt: dto.storyPrompt,
-    //                 genres: dto.genres,
-    //                 numberOfChapters: dto.numberOfChapters,
-    //                 aiProvider: dto.aiProvider || 'grok',
-    //             });
+            const outlineResponse =
+                await this.storyGenerationApiService.generateStoryOutline({
+                    storyPrompt: dto.storyPrompt,
+                    genres: dto.genres,
+                    numberOfChapters: dto.numberOfChapters,
+                    aiProvider: dto.aiProvider || 'grok',
+                });
 
-    //         // Lấy category từ DB theo tên hoặc id (tùy dto gửi)
-    //         const categories = await this.categoryRepository.find({
-    //             where: { name: In(dto.genres) }, // hoặc { id: In(dto.genreIds) } nếu gửi id
-    //         });
+            // ==== PHẦN MỚI: LẤY CATEGORY TỪ storyContext.meta ====
+            const meta = outlineResponse.storyContext?.meta;
+            if (!meta) {
+                throw new Error(
+                    'Missing storyContext.meta in outline response',
+                );
+            }
 
-    //         let coverImageKey: string | null = null;
+            const primaryGenreWords = meta.primaryGenre
+                ? meta.primaryGenre
+                      .trim()
+                      .split(/\s+/)
+                      .map((word) => word.trim())
+                      .filter((word) => word.length > 0)
+                : [];
 
-    //         if (!skipImage) {
-    //             const tempImageUrl =
-    //                 await this.storyGenerationApiService.generateCoverImage(
-    //                     outlineResponse.coverImage,
-    //                 );
+            const secondaryGenreNames = (meta.secondaryGenres || [])
+                .map((g: string) => g.trim())
+                .filter((g: string) => g);
 
-    //             coverImageKey =
-    //                 await this.doSpacesService.uploadFromStream(tempImageUrl);
-    //         }
+            const allGenreNames = [
+                ...new Set([...primaryGenreWords, ...secondaryGenreNames]),
+            ];
 
-    //         const coverImageUrl = skipImage
-    //             ? DEFAULT_COVER_IMAGE_URL
-    //             : await this.doSpacesService.getImageUrl(coverImageKey);
+            const existingCategories = await this.categoryRepository.find({
+                where: allGenreNames.map((name) => ({
+                    name: ILike(name),
+                    isActive: true,
+                })),
+            });
 
-    //         // Tạo story và gắn category
-    //         const story = this.storyRepository.create({
-    //             title: outlineResponse.title,
-    //             synopsis: outlineResponse.synopsis,
-    //             authorId: userId,
-    //             categories,
-    //             coverImage: coverImageKey,
-    //         });
+            // Map name -> category entity để dễ lookup
+            const categoryMap = new Map<string, Category>();
+            existingCategories.forEach((cat) => categoryMap.set(cat.name, cat));
 
-    //         const savedStory = await this.storyRepository.save(story);
+            // ==== TẠO CÁC StoryCategory ====
+            const storyCategoryEntities: StoryCategory[] = [];
 
-    //         // Update story generation record with story reference and attributes
-    //         await this.storyGenerationRepository.update(
-    //             { id: savedStoryGeneration.id },
-    //             {
-    //                 storyId: savedStory.id,
-    //                 response: {
-    //                     outline: outlineResponse.outline,
-    //                 } as any,
-    //                 title: outlineResponse.title,
-    //                 synopsis: outlineResponse.synopsis,
-    //                 metadata: {
-    //                     coverImage: outlineResponse.coverImage,
-    //                     storyContext: outlineResponse.storyContext,
-    //                 } as any,
-    //                 status: GenerationStatus.COMPLETED,
-    //             },
-    //         );
+            let mainCategoryAssigned = false;
+            let usedMainGenreWord: string | null = null;
+            // Ưu tiên gán main category từ primaryGenre (lấy từ đầu tiên match được)
+            for (const word of primaryGenreWords) {
+                const lowerWord = word.toLowerCase();
+                if (categoryMap.has(lowerWord)) {
+                    const cat = categoryMap.get(lowerWord)!;
+                    storyCategoryEntities.push(
+                        this.storyCategoryRepository.create({
+                            categoryId: cat.id,
+                            isMainCategory: true,
+                        }),
+                    );
+                    mainCategoryAssigned = true;
+                    usedMainGenreWord = word; // Lưu lại từ gốc (không lowercase)
+                    categoryMap.delete(lowerWord);
+                    break; // Chỉ gán 1 main
+                }
+            }
 
-    //         // Update story's generation reference
-    //         savedStory.generation = savedStoryGeneration;
-    //         await this.storyRepository.save(savedStory);
+            // Gán các genre còn lại làm secondary
+            const remainingGenres =
+                mainCategoryAssigned && usedMainGenreWord
+                    ? [
+                          // Bỏ từ đã dùng làm main khỏi primaryWords
+                          ...primaryGenreWords.filter(
+                              (w) => w !== usedMainGenreWord,
+                          ),
+                          ...secondaryGenreNames,
+                      ]
+                    : [...primaryGenreWords, ...secondaryGenreNames];
 
-    //         return {
-    //             id: savedStory.id,
-    //             title: story.title,
-    //             synopsis: story.synopsis,
-    //             coverImageUrl: coverImageUrl,
-    //             storyContext: outlineResponse.storyContext,
-    //             outline: outlineResponse.outline,
-    //             message:
-    //                 'Story outline generated successfully. Ready to generate chapters on-demand.',
-    //         };
-    //     } catch (error) {
-    //         console.error('Error initializing story:', error);
+            for (const genre of remainingGenres) {
+                const lowerGenre = genre.toLowerCase();
+                if (categoryMap.has(lowerGenre)) {
+                    const cat = categoryMap.get(lowerGenre)!;
+                    storyCategoryEntities.push(
+                        this.storyCategoryRepository.create({
+                            categoryId: cat.id,
+                            isMainCategory: false,
+                        }),
+                    );
+                    categoryMap.delete(lowerGenre);
+                }
+            }
 
-    //         await this.storyGenerationRepository.update(
-    //             { id: savedStoryGeneration.id },
-    //             {
-    //                 status: GenerationStatus.FAILED,
-    //                 errorMessage: error.message || 'Failed to initialize story',
-    //             },
-    //         );
+            // Nếu không có primary nào match → lấy cái đầu tiên làm main
+            if (!mainCategoryAssigned && storyCategoryEntities.length > 0) {
+                storyCategoryEntities[0].isMainCategory = true;
+            }
 
-    //         throw new HttpException(
-    //             {
-    //                 statusCode: HttpStatus.BAD_REQUEST,
-    //                 message: error.message || 'Story initialization failed',
-    //                 error: 'Story initialization failed',
-    //             },
-    //             HttpStatus.BAD_REQUEST,
-    //         );
-    //     }
-    // }
+            let coverImageKey: string | null = null;
+
+            if (!skipImage) {
+                const tempImageUrl =
+                    await this.storyGenerationApiService.generateCoverImage(
+                        outlineResponse.coverImage,
+                    );
+
+                coverImageKey =
+                    await this.doSpacesService.uploadFromStream(tempImageUrl);
+            }
+
+            const coverImageUrl = skipImage
+                ? DEFAULT_COVER_IMAGE_URL
+                : await this.doSpacesService.getImageUrl(coverImageKey);
+
+            const story = this.storyRepository.create({
+                title: outlineResponse.title,
+                synopsis: outlineResponse.synopsis,
+                authorId: userId,
+                coverImage: coverImageKey,
+            });
+
+            const savedStory = await this.storyRepository.save(story);
+
+            if (storyCategoryEntities.length > 0) {
+                storyCategoryEntities.forEach((sc) => {
+                    sc.storyId = savedStory.id;
+                });
+
+                await this.storyCategoryRepository.save(storyCategoryEntities);
+            }
+
+            // Update story generation record with story reference and attributes
+            await this.storyGenerationRepository.update(
+                { id: savedStoryGeneration.id },
+                {
+                    storyId: savedStory.id,
+                    response: {
+                        outline: outlineResponse.outline,
+                    } as any,
+                    title: outlineResponse.title,
+                    synopsis: outlineResponse.synopsis,
+                    metadata: {
+                        coverImage: outlineResponse.coverImage,
+                        storyContext: outlineResponse.storyContext,
+                    } as any,
+                    status: GenerationStatus.COMPLETED,
+                },
+            );
+
+            // Update story's generation reference
+            savedStory.generation = savedStoryGeneration;
+            await this.storyRepository.save(savedStory);
+
+            return {
+                id: savedStory.id,
+                title: story.title,
+                synopsis: story.synopsis,
+                coverImageUrl: coverImageUrl,
+                outline: outlineResponse.outline,
+                message:
+                    'Story outline generated successfully. Ready to generate chapters on-demand.',
+            };
+        } catch (error) {
+            console.error('Error initializing story:', error);
+
+            await this.storyGenerationRepository.update(
+                { id: savedStoryGeneration.id },
+                {
+                    status: GenerationStatus.FAILED,
+                    errorMessage: error.message || 'Failed to initialize story',
+                },
+            );
+
+            throw new HttpException(
+                {
+                    statusCode: HttpStatus.BAD_REQUEST,
+                    message: error.message || 'Story initialization failed',
+                    error: 'Story initialization failed',
+                },
+                HttpStatus.BAD_REQUEST,
+            );
+        }
+    }
 
     async generateChapters(
         storyId: string,
@@ -791,32 +883,24 @@ export class StoryService {
         });
     }
 
-    async previewStory(id: string): Promise<any> {
+    async previewStory(id: string, skipImage: boolean = false): Promise<any> {
         const story = await this.storyRepository.findOne({
             where: { id },
             relations: {
                 generation: true,
-                chapters: true,
+                storyCategories: {
+                    category: true,
+                },
             },
             select: {
                 id: true,
                 title: true,
                 synopsis: true,
                 authorId: true,
-                chapters: {
-                    id: true,
-                    index: true,
-                    title: true,
-                    content: true,
-                },
+                coverImage: true,
                 generation: {
                     prompt: true,
                     metadata: true,
-                },
-            },
-            order: {
-                chapters: {
-                    index: 'ASC',
                 },
             },
         });
@@ -825,32 +909,44 @@ export class StoryService {
             throw new NotFoundException(`Story with ID ${id} not found`);
         }
 
-        const firstChapter = story.chapters?.[0];
+        // Xử lý categories
+        const storyCategories = story.storyCategories || [];
+
+        const categories = storyCategories.map((sc) => ({
+            id: sc.category.id,
+            name: sc.category.name,
+        }));
+
+        // Tìm mainCategory (isMainCategory = true)
+        const mainStoryCategory = storyCategories.find(
+            (sc) => sc.isMainCategory,
+        );
+        const mainCategory = mainStoryCategory
+            ? {
+                  id: mainStoryCategory.category.id,
+                  name: mainStoryCategory.category.name,
+              }
+            : categories.length > 0
+              ? categories[0]
+              : null; // fallback nếu không có main
 
         return {
-            story: {
-                storyId: story.id,
-                title: story.title,
-                synopsis: story.synopsis,
-                numberOfChapters:
-                    story.generation?.prompt?.numberOfChapters || 0,
-                outline: story.generation?.response?.outline || '',
-            },
-            chapter: firstChapter
-                ? {
-                      id: firstChapter.id,
-                      index: firstChapter.index,
-                      title: firstChapter.title,
-                      content: firstChapter.content || '',
-                      summary: '',
-                      imagePrompt: '',
-                      directions: '',
-                  }
-                : null,
+            id: story.id,
+            title: story.title,
+            synopsis: story.synopsis,
+            numberOfChapters: story.generation?.prompt?.numberOfChapters || 0,
+            mainCategory,
+            categories,
+            coverImageUrl: skipImage
+                ? DEFAULT_COVER_IMAGE_URL
+                : await this.doSpacesService.getImageUrl(story.coverImage),
         };
     }
 
-    async getInitializationResults(requestId: string): Promise<any> {
+    async getInitializationResults(
+        requestId: string,
+        skipImage: boolean,
+    ): Promise<any> {
         const generation = await this.storyGenerationRepository.findOne({
             where: { requestId },
         });
@@ -864,10 +960,8 @@ export class StoryService {
 
         const { storyId, errorMessage } = generation;
 
-        console.log('generation', generation);
-
         if (storyId) {
-            return this.previewStory(storyId);
+            return this.previewStory(storyId, skipImage);
         }
 
         if (errorMessage) {
@@ -937,6 +1031,12 @@ export class StoryService {
             .leftJoin('story_summary', 'ss', 'ss.story_id = s.id')
             .leftJoin('s.storyCategories', 'sc')
             .leftJoin('sc.category', 'cat')
+            .leftJoin(
+                'reading_history',
+                'rh',
+                'rh.story_id = s.id AND rh.user_id = :userId',
+                { userId },
+            )
             .select([
                 's.id AS "storyId"',
                 's.title AS "title"',
@@ -957,6 +1057,9 @@ export class StoryService {
                 'a.username AS "authorUsername"',
                 'a.profileImage AS "profileImage"',
 
+                'rh.lastReadAt AS "lastReadAt"',
+                'rh.lastReadChapter AS "lastReadChapter"',
+
                 'CASE WHEN likes.id IS NULL THEN false ELSE true END AS "isLike"',
 
                 'ss.likes_count AS "likesCount"',
@@ -965,7 +1068,7 @@ export class StoryService {
                 `(COUNT(*) OVER() = COALESCE((generation.prompt ->> 'numberOfChapters')::int, 0)) AS "isCompleted"`,
             ])
             .groupBy(
-                's.id, a.id, likes.id, ss.likes_count, ss.views_count, generation.prompt',
+                's.id, a.id, likes.id, ss.likes_count, ss.views_count, generation.prompt,  rh.lastReadAt, rh.lastReadChapter',
             );
 
         // ===== Filter theo type =====
@@ -1038,6 +1141,8 @@ export class StoryService {
         const items = stories.map((story) => ({
             ...story,
             chapters: chaptersMap[story.storyId] || [],
+            lastReadAt: story.lastReadAt || null,
+            lastReadChapter: story.lastReadChapter || null,
         }));
 
         return { page, limit, total, items };

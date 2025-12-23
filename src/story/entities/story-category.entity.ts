@@ -1,5 +1,12 @@
 // story-category.entity.ts
-import { Entity, Column, ManyToOne, PrimaryColumn, Index, JoinColumn } from 'typeorm';
+import {
+    Entity,
+    Column,
+    ManyToOne,
+    PrimaryColumn,
+    Index,
+    JoinColumn,
+} from 'typeorm';
 import { Story } from './story.entity';
 import { Category } from './categories.entity';
 

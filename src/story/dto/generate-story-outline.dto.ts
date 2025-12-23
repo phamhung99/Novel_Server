@@ -69,7 +69,6 @@ export class InitializeStoryResponseDto {
     title: string;
     synopsis: string;
     coverImageUrl: string;
-    storyContext: any;
     outline: string;
     message: string;
 }

@@ -13,6 +13,7 @@ import { UserModule } from 'src/user/user.module';
 import { Category } from './entities/categories.entity';
 import { DoSpacesService } from 'src/upload/do-spaces.service';
 import { ChapterService } from './chapter.service';
+import { StoryCategory } from './entities/story-category.entity';
 
 @Module({
     imports: [
@@ -24,6 +25,7 @@ import { ChapterService } from './chapter.service';
             StoryViews,
             StorySummary,
             Category,
+            StoryCategory,
         ]),
         AiModule,
         forwardRef(() => UserModule),

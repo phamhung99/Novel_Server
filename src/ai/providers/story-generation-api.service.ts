@@ -78,6 +78,7 @@ You think in three dimensions simultaneously:
 3. **STORY CONTEXT**: In ENGLISH - For AI reasoning consistency
 4. **CULTURAL AGNOSTIC**: Design for global resonance
 5. **NARRATIVE IMMERSION**: The story's prose, when generated from this architecture, must maintain an organic and seamless flow. It is strictly forbidden to use awkward meta-references to its own structure (e.g., "as mentioned in chapter X," "as we will see later," "little did he know, this event would trigger..."). All exposition, foreshadowing, and character knowledge must be revealed naturally through present-moment action, dialogue, internal thought, and sensory description.
+6.  **TOTAL CHAPTERS**MUST be exactly ${dto.numberOfChapters}. The story ends at chapter ${dto.numberOfChapters} and no further.
 `;
 
         try {

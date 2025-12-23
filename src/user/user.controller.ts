@@ -107,6 +107,7 @@ export class UserController {
             'username',
             'email',
             'profileImage',
+            'deletedAt',
             'createdAt',
             'updatedAt',
         ];
