@@ -23,12 +23,12 @@ export const StoryTable = ({ stories, onMenuOpen }: StoryTableProps) => {
         <Table>
             <TableHead>
                 <TableRow>
-                    <TableCell>Id</TableCell>
                     <TableCell>Title</TableCell>
                     <TableCell>Author</TableCell>
                     <TableCell>Type</TableCell>
                     <TableCell>Genres</TableCell>
                     <TableCell>Views</TableCell>
+                    <TableCell>Likes</TableCell>
                     <TableCell>Rating</TableCell>
                     <TableCell>Status</TableCell>
                     <TableCell>Created At</TableCell>
@@ -39,7 +39,6 @@ export const StoryTable = ({ stories, onMenuOpen }: StoryTableProps) => {
             <TableBody>
                 {stories.map((story) => (
                     <TableRow key={story.id}>
-                        <TableCell>{story.id}</TableCell>
                         <TableCell>{story.title}</TableCell>
                         <TableCell>
                             {story.author
@@ -49,18 +48,17 @@ export const StoryTable = ({ stories, onMenuOpen }: StoryTableProps) => {
                         </TableCell>
                         <TableCell>{story.type}</TableCell>
                         <TableCell>
-                            {story.genres?.length
-                                ? story.genres.map((g) => (
-                                      <Chip
-                                          key={g}
-                                          label={g}
-                                          size="small"
-                                          sx={{ mr: 0.5 }}
-                                      />
-                                  ))
-                                : 'N/A'}
+                            {story?.mainCategory?.name ? (
+                                <Chip label={story?.mainCategory?.name} />
+                            ) : (
+                                'N/A'
+                            )}
                         </TableCell>
-                        <TableCell>{story.views}</TableCell>
+                        <TableCell>{story.viewsCount || 0}</TableCell>
+                        <TableCell>
+                            <strong>{story.likesCount || 0}</strong>{' '}
+                            {/* Giả sử field là likes hoặc likes */}
+                        </TableCell>
                         <TableCell>{story.rating ?? 'N/A'}</TableCell>
                         <TableCell>{story.status}</TableCell>
                         <TableCell>

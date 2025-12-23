@@ -42,7 +42,6 @@ const StoryUploadPage: React.FC = () => {
     const [aiProvider, setAiProvider] = useState<'grok' | 'gpt'>('grok');
 
     // load params
-    const [storyIdToLoad, setStoryIdToLoad] = useState('');
     const [isLoading, setIsLoading] = useState(false);
 
     // genres from API
@@ -165,22 +164,6 @@ const StoryUploadPage: React.FC = () => {
         }
     };
 
-    const loadExistingStory = async () => {
-        try {
-            if (!storyIdToLoad) {
-                alert('Please enter a Story ID');
-                return;
-            }
-
-            navigate(ROUTES.CHAPTER_GENERATOR, {
-                state: { storyId: storyIdToLoad },
-            });
-        } catch (err: any) {
-            console.error(err);
-            alert(err.response?.data?.message || 'Story not found');
-        }
-    };
-
     return (
         <Container maxWidth="sm" sx={{ py: 4 }}>
             <Typography variant="h4" gutterBottom>
@@ -199,29 +182,7 @@ const StoryUploadPage: React.FC = () => {
                     margin="normal"
                 >
                     <MenuItem value="create">Create new</MenuItem>
-                    <MenuItem value="load">Load existing story</MenuItem>
                 </TextField>
-
-                {mode === 'load' && (
-                    <>
-                        <TextField
-                            label="Story ID"
-                            value={storyIdToLoad}
-                            onChange={(e) => setStoryIdToLoad(e.target.value)}
-                            fullWidth
-                            margin="normal"
-                        />
-                        <Button
-                            variant="contained"
-                            fullWidth
-                            sx={{ mt: 2 }}
-                            size="large"
-                            onClick={loadExistingStory}
-                        >
-                            Load Story
-                        </Button>
-                    </>
-                )}
 
                 {mode === 'create' && (
                     <>

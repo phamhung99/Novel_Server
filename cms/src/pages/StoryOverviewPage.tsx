@@ -14,6 +14,7 @@ import {
     ListItemButton,
     ListItemText,
     Paper,
+    Chip,
 } from '@mui/material';
 import { useParams, useNavigate } from 'react-router-dom';
 import axios from '../api/axios';
@@ -121,11 +122,28 @@ const StoryOverviewPage = () => {
                             fullWidth
                             variant="contained"
                             color="success"
-                            onClick={() => {
-                                // TODO: Save story info
-                                console.log('Save story:', story);
-                                setEditMode(false);
+                            onClick={async () => {
+                                try {
+                                    await axios.put(
+                                        `/api/v1/story/${storyId}`,
+                                        {
+                                            title: story.title,
+                                            synopsis: story.synopsis,
+                                        },
+                                        {
+                                            headers: { 'x-user-id': userId },
+                                        },
+                                    );
+
+                                    setEditMode(false);
+                                } catch (err) {
+                                    console.error(
+                                        'Failed to update story:',
+                                        err,
+                                    );
+                                }
                             }}
+                            sx={{ mb: 2 }}
                         >
                             Save Story Info
                         </Button>
@@ -156,6 +174,158 @@ const StoryOverviewPage = () => {
                             <Typography variant="body1" gutterBottom>
                                 <strong>Type:</strong> {story.type} |{' '}
                                 <strong>Status:</strong> {story.status}
+                            </Typography>
+
+                            {/* Categories (Main Category được highlight) */}
+                            <Typography
+                                variant="body1"
+                                gutterBottom
+                                sx={{ mt: 2 }}
+                            >
+                                <strong>Categories:</strong>
+                                {editMode ? (
+                                    // --- EDIT MODE: Hiển thị từng TextField nhưng vẫn giữ nguyên ID ---
+                                    <Box
+                                        sx={{
+                                            mt: 1,
+                                            display: 'flex',
+                                            flexWrap: 'wrap',
+                                            gap: 1,
+                                        }}
+                                    >
+                                        {story.categories &&
+                                        story.categories.length > 0 ? (
+                                            story.categories.map((cat) => {
+                                                const isMain =
+                                                    story.mainCategory?.id ===
+                                                    cat.id;
+                                                return (
+                                                    <TextField
+                                                        key={cat.id}
+                                                        size="small"
+                                                        label={
+                                                            isMain
+                                                                ? 'Main Category'
+                                                                : undefined
+                                                        }
+                                                        value={cat.name}
+                                                        onChange={(e) => {
+                                                            const newCats =
+                                                                story.categories.map(
+                                                                    (c) =>
+                                                                        c.id ===
+                                                                        cat.id
+                                                                            ? {
+                                                                                  ...c,
+                                                                                  name: e
+                                                                                      .target
+                                                                                      .value,
+                                                                              }
+                                                                            : c,
+                                                                );
+                                                            handleChange(
+                                                                'categories',
+                                                                newCats,
+                                                            );
+
+                                                            // Nếu đây là main category → cập nhật luôn mainCategory name
+                                                            if (isMain) {
+                                                                handleChange(
+                                                                    'mainCategory',
+                                                                    {
+                                                                        ...story.mainCategory,
+                                                                        name: e
+                                                                            .target
+                                                                            .value,
+                                                                    },
+                                                                );
+                                                            }
+                                                        }}
+                                                        sx={{
+                                                            width: 180,
+                                                            ...(isMain && {
+                                                                '& .MuiOutlinedInput-root':
+                                                                    {
+                                                                        fontWeight:
+                                                                            'bold',
+                                                                        borderColor:
+                                                                            'primary.main',
+                                                                    },
+                                                            }),
+                                                        }}
+                                                        InputProps={{
+                                                            endAdornment:
+                                                                isMain && (
+                                                                    <Chip
+                                                                        label="MAIN"
+                                                                        size="small"
+                                                                        color="primary"
+                                                                    />
+                                                                ),
+                                                        }}
+                                                    />
+                                                );
+                                            })
+                                        ) : (
+                                            <Typography
+                                                component="span"
+                                                color="text.secondary"
+                                                sx={{ ml: 1 }}
+                                            >
+                                                None
+                                            </Typography>
+                                        )}
+                                    </Box>
+                                ) : (
+                                    // --- VIEW MODE: Chip thường + Main Category highlight ---
+                                    <Box
+                                        component="span"
+                                        sx={{
+                                            ml: 1,
+                                            display: 'inline-flex',
+                                            flexWrap: 'wrap',
+                                            gap: 0.5,
+                                        }}
+                                    >
+                                        {story.categories &&
+                                        story.categories.length > 0 ? (
+                                            story.categories.map((cat) => {
+                                                const isMain =
+                                                    story.mainCategory?.id ===
+                                                    cat.id;
+                                                return (
+                                                    <Chip
+                                                        key={cat.id}
+                                                        label={cat.name}
+                                                        size="small"
+                                                        color={
+                                                            isMain
+                                                                ? 'primary'
+                                                                : 'default'
+                                                        }
+                                                        variant={
+                                                            isMain
+                                                                ? 'filled'
+                                                                : 'outlined'
+                                                        }
+                                                        sx={{
+                                                            fontWeight: isMain
+                                                                ? 'bold'
+                                                                : 'normal',
+                                                        }}
+                                                    />
+                                                );
+                                            })
+                                        ) : (
+                                            <Typography
+                                                component="span"
+                                                color="text.secondary"
+                                            >
+                                                None
+                                            </Typography>
+                                        )}
+                                    </Box>
+                                )}
                             </Typography>
 
                             <Divider sx={{ my: 3 }} />

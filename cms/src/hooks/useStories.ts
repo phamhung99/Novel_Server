@@ -3,7 +3,7 @@ import axios from '../api/axios';
 import type { StoryDto } from '../types/app';
 
 export const useStories = (
-    statusFilter: string,
+    statusFilter: string | undefined,
     page: number,
     rowsPerPage: number,
 ) => {
@@ -15,23 +15,38 @@ export const useStories = (
         setLoading(true);
         try {
             let url = '/api/v1/story';
-            if (statusFilter === 'pending') url = '/api/v1/story/pending';
-            else if (statusFilter === 'deleted')
+
+            if (statusFilter === 'pending') {
+                url = '/api/v1/story/pending';
+            } else if (statusFilter === 'deleted') {
                 url = '/api/v1/story/deleted/all';
-            else if (statusFilter === 'public') url = '/api/v1/story/public';
+            } else if (statusFilter === 'public') {
+                url = '/api/v1/story/public';
+            }
 
             const res = await axios.get(url, {
-                params: { page: page + 1, limit: rowsPerPage },
+                params: {
+                    page: page,
+                    limit: rowsPerPage,
+                },
             });
 
-            setStories(res.data.data);
-            setTotalStories(res.data.total || 0);
+            console.log(res);
+
+            const items = res?.data?.data?.items ?? [];
+            const total = res?.data?.data?.total ?? 0;
+
+            setStories(Array.isArray(items) ? items : []);
+            setTotalStories(Number(total) || 0);
         } catch (err) {
-            console.error(err);
+            console.error('Error fetching stories:', err);
+            setStories([]);
+            setTotalStories(0);
         } finally {
             setLoading(false);
         }
     };
+
     useEffect(() => {
         fetchStories();
     }, [statusFilter, page, rowsPerPage]);

@@ -40,7 +40,8 @@ export interface StoryDto {
     genres: string[];
     coverImageUrl: string;
     type: string;
-    views: number;
+    viewsCount: number;
+    likesCount: number;
     rating: string;
     status: string;
     visibility: string;
@@ -48,6 +49,8 @@ export interface StoryDto {
     updatedAt: string;
     deletedAt: string | null;
     author: AuthorDto;
+    mainCategory: any;
+    categories: any[];
     chapters: ChapterDto[];
     generation?: GenerationDto;
 }

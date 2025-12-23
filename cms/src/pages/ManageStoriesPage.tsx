@@ -54,8 +54,8 @@ const ManageStories = () => {
     }, []);
 
     const { stories, totalStories, loading, fetchStories } = useStories(
-        statusFilter,
-        page,
+        statusFilter === 'all' ? undefined : statusFilter,
+        page + 1,
         rowsPerPage,
     );
 
@@ -80,7 +80,9 @@ const ManageStories = () => {
         setSelectedStoryId(null);
     };
 
-    const selectedStory = stories.find((s) => s.id === selectedStoryId) || null;
+    const selectedStory = Array.isArray(stories)
+        ? stories.find((s) => s.id === selectedStoryId) || null
+        : null;
 
     return (
         <Container>
@@ -190,6 +192,12 @@ const ManageStories = () => {
                             },
                         }),
                     unpublishStory: (id) => unpublishStory(id),
+                    generateChapter: (id) => {
+                        handleMenuClose();
+                        navigate(ROUTES.CHAPTER_GENERATOR, {
+                            state: { storyId: id },
+                        });
+                    },
                 }}
             />
 

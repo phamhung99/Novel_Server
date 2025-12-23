@@ -13,6 +13,7 @@ interface StoryMenuProps {
         approveStory: (id: string) => void;
         rejectStory: (id: string) => void;
         unpublishStory: (id: string) => void;
+        generateChapter: (id: string) => void;
     };
 }
 
@@ -30,6 +31,15 @@ export const StoryMenu = ({
             <MenuItem onClick={() => actions.viewDetails(story.id)}>
                 View Details
             </MenuItem>
+            {story.deletedAt === null && (
+                <MenuItem
+                    onClick={() => {
+                        actions.generateChapter(story.id);
+                    }}
+                >
+                    Generate Chapter
+                </MenuItem>
+            )}
             {story.deletedAt === null ? (
                 <MenuItem
                     onClick={() => {
