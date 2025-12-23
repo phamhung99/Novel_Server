@@ -46,11 +46,10 @@ export interface ChapterStructureResponse {
 }
 
 export class GenerateChapterResponseDto {
-    chapterId: string;
+    id: string;
     index: number;
     title: string;
     content: string;
-    summary: string;
     structure: ChapterStructure;
     message: string;
 }

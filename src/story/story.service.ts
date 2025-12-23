@@ -38,6 +38,7 @@ import { DoSpacesService } from 'src/upload/do-spaces.service';
 import { DEFAULT_COVER_IMAGE_URL } from 'src/common/constants/app.constant';
 import { ChapterService } from './chapter.service';
 import { StoryCategory } from './entities/story-category.entity';
+import { excludeFields } from 'src/common/utils/exclude-fields';
 
 @Injectable()
 export class StoryService {
@@ -102,7 +103,7 @@ export class StoryService {
         });
     }
 
-    async findStoryById(id: string): Promise<Story> {
+    async findStoryById(id: string) {
         const story = await this.storyRepository.findOne({
             where: { id },
             relations: {
@@ -114,6 +115,7 @@ export class StoryService {
                 id: true,
                 title: true,
                 synopsis: true,
+                coverImage: true,
                 type: true,
                 authorId: true,
                 status: true,
@@ -137,8 +139,6 @@ export class StoryService {
                     aiProvider: true,
                     aiModel: true,
                     prompt: true,
-                    title: true,
-                    synopsis: true,
                     metadata: true,
                 },
             },
@@ -153,7 +153,20 @@ export class StoryService {
             throw new NotFoundException(`Story with ID ${id} not found`);
         }
 
-        return story;
+        const coverImageUrl = await this.doSpacesService.getImageUrl(
+            story.coverImage,
+        );
+
+        const cleanedStory = excludeFields(story, ['coverImage']);
+
+        return {
+            ...cleanedStory,
+            coverImageUrl,
+            generation: {
+                ...story.generation,
+                metadata: story.generation.metadata.storyContext || null,
+            },
+        };
     }
 
     async updateStory(
@@ -937,6 +950,7 @@ export class StoryService {
             numberOfChapters: story.generation?.prompt?.numberOfChapters || 0,
             mainCategory,
             categories,
+            metadata: story.generation?.metadata.storyContext || {},
             coverImageUrl: skipImage
                 ? DEFAULT_COVER_IMAGE_URL
                 : await this.doSpacesService.getImageUrl(story.coverImage),
@@ -979,7 +993,7 @@ export class StoryService {
     ): Promise<GenerateChapterResponseDto> {
         const generation = await this.chapterGenerationRepository.findOne({
             where: { requestId },
-            relations: ['chapter'], // chỉ join chapter thôi
+            relations: ['chapter'],
         });
 
         if (!generation) {
@@ -1004,11 +1018,10 @@ export class StoryService {
         }
 
         return {
-            chapterId: generation.chapter.id,
+            id: generation.chapter.id,
             index: generation.chapter.index,
             title: generation.chapter.title,
             content: generation.chapter.content,
-            summary: generation.structure.summary,
             structure: generation.structure || ({} as any),
             message: `Chapter ${generation.chapter.index} generated successfully.`,
         };

@@ -36,7 +36,7 @@ export class ChapterService {
         return this.chapterRepository.save(chapters);
     }
 
-    async findChaptersByStory(storyId: string): Promise<Chapter[]> {
+    async findChaptersByStory(storyId: string) {
         const chapters = await this.chapterRepository.find({
             select: {
                 id: true,
@@ -54,7 +54,10 @@ export class ChapterService {
         });
 
         return chapters.map((chapter) => ({
-            ...chapter,
+            id: chapter.id,
+            index: chapter.index,
+            title: chapter.title,
+            content: chapter.content,
             structure: chapter.chapterGenerations?.[0]?.structure || null,
         }));
     }
