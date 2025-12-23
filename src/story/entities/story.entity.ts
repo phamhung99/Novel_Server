@@ -20,8 +20,8 @@ import { StorySource } from 'src/common/enums/app.enum';
 import { StoryLikes } from './story-likes.entity';
 import { StoryViews } from './story-views.entity';
 import { UserAudioPreference } from './user-audio-preference.entity';
-import { Category } from './categories.entity';
 import { StoryCategory } from './story-category.entity';
+import { StorySummary } from './story-summary.entity';
 
 @Entity('story')
 export class Story {
@@ -111,6 +111,9 @@ export class Story {
 
     @OneToMany(() => StoryViews, (storyViews) => storyViews.story)
     views: StoryViews[];
+
+    @OneToOne(() => StorySummary, (summary) => summary.story, { cascade: true })
+    summary: StorySummary;
 
     @OneToMany(
         () => UserAudioPreference,

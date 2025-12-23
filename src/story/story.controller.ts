@@ -32,6 +32,7 @@ import { ERROR_MESSAGES } from 'src/common/constants/app.constant';
 import { StoryStatus } from 'src/common/enums/story-status.enum';
 import { UserService } from 'src/user/user.service';
 import { ChapterService } from './chapter.service';
+import { PaginationDto } from './dto/pagination.dto';
 // import { FileInterceptor } from '@nestjs/platform-express';
 // import { diskStorage } from 'multer';
 // import { extname, join } from 'path';
@@ -172,18 +173,18 @@ export class StoryController {
     }
 
     @Get()
-    async getAllStories() {
-        return this.storyService.findAllStories();
+    async getAllStories(@Query() paginationDto: PaginationDto) {
+        return this.storyService.findAllStories(paginationDto);
     }
 
     @Get('public')
-    async getPublicStories() {
-        return this.storyService.findPublicStories();
+    async getPublicStories(@Query() paginationDto: PaginationDto) {
+        return this.storyService.findPublicStories(paginationDto);
     }
 
     @Get('pending')
-    async getPendingStories() {
-        return this.storyService.findPendingStories();
+    async getPendingStories(@Query() paginationDto: PaginationDto) {
+        return this.storyService.findPendingStories(paginationDto);
     }
 
     @Get('author/:authorId')
@@ -240,8 +241,8 @@ export class StoryController {
     }
 
     @Get('deleted/all')
-    async getDeletedStories() {
-        return this.storyService.findDeletedStories();
+    async getDeletedStories(@Query() paginationDto: PaginationDto) {
+        return this.storyService.findDeletedStories(paginationDto);
     }
 
     @Put(':id/rating')

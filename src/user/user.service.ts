@@ -40,6 +40,14 @@ export class UserService extends BaseCrudService<User> {
         return this.repository.findOne({ where: { email } });
     }
 
+    async findByEmailForLogin(email: string): Promise<User> {
+        return this.repository
+            .createQueryBuilder('user')
+            .addSelect('user.password')
+            .where('user.email = :email', { email })
+            .getOne();
+    }
+
     async createOrUpdateUser({
         userId,
         language,

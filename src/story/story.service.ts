@@ -6,7 +6,7 @@ import {
     HttpStatus,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, ILike, IsNull, MoreThan, Not, Repository } from 'typeorm';
+import { DataSource, ILike, MoreThan, Repository } from 'typeorm';
 import { Story } from './entities/story.entity';
 import { Chapter } from './entities/chapter.entity';
 import {
@@ -38,7 +38,7 @@ import { DoSpacesService } from 'src/upload/do-spaces.service';
 import { DEFAULT_COVER_IMAGE_URL } from 'src/common/constants/app.constant';
 import { ChapterService } from './chapter.service';
 import { StoryCategory } from './entities/story-category.entity';
-import { excludeFields } from 'src/common/utils/exclude-fields';
+import { PaginationDto } from './dto/pagination.dto';
 
 @Injectable()
 export class StoryService {
@@ -77,22 +77,181 @@ export class StoryService {
         return this.storyRepository.save(story);
     }
 
-    async findAllStories(): Promise<Story[]> {
-        return this.storyRepository.find({
-            relations: ['author', 'chapters'],
-            order: { createdAt: 'DESC' },
-        });
+    async findAllStories(paginationDto: PaginationDto) {
+        const { page = 1, limit = 10 } = paginationDto;
+        const skip = (page - 1) * limit;
+
+        const queryBuilder = this.storyRepository
+            .createQueryBuilder('story')
+            .leftJoinAndSelect('story.author', 'author')
+            .leftJoinAndSelect('story.summary', 'summary')
+            .leftJoinAndSelect('story.storyCategories', 'storyCategories')
+            .leftJoinAndSelect('storyCategories.category', 'category')
+            .orderBy('story.createdAt', 'DESC')
+            .skip(skip)
+            .take(limit);
+
+        const [stories, total] = await Promise.all([
+            queryBuilder.getMany(),
+            queryBuilder.clone().getCount(),
+        ]);
+
+        const items = stories.map((story) => ({
+            ...story,
+            likesCount: story.summary?.likesCount || 0,
+            viewsCount: story.summary?.viewsCount || 0,
+            mainCategory:
+                story.storyCategories.find((sc) => sc.isMainCategory)
+                    ?.category || null,
+            summary: undefined,
+            storyCategories: undefined,
+        }));
+
+        return {
+            page,
+            limit,
+            total,
+            items,
+        };
     }
 
-    async findPublicStories(): Promise<Story[]> {
-        return this.storyRepository.find({
-            where: {
-                visibility: StoryVisibility.PUBLIC,
-                status: StoryStatus.PUBLISHED,
-            },
-            relations: ['author', 'chapters'],
-            order: { createdAt: 'DESC' },
-        });
+    async findDeletedStories(paginationDto: PaginationDto): Promise<{
+        page: number;
+        limit: number;
+        total: number;
+        items: any[];
+    }> {
+        const { page = 1, limit = 10 } = paginationDto;
+        const skip = (page - 1) * limit;
+
+        const queryBuilder = this.storyRepository
+            .createQueryBuilder('story')
+            .leftJoinAndSelect('story.author', 'author')
+            .leftJoinAndSelect('story.summary', 'summary')
+            .leftJoinAndSelect('story.storyCategories', 'storyCategories')
+            .leftJoinAndSelect('storyCategories.category', 'category')
+            .where('story.deletedAt IS NOT NULL')
+            .withDeleted()
+            .orderBy('story.deletedAt', 'DESC')
+            .skip(skip)
+            .take(limit);
+
+        const [stories, total] = await Promise.all([
+            queryBuilder.getMany(),
+            queryBuilder.clone().getCount(),
+        ]);
+
+        const items = stories.map((story) => ({
+            ...story,
+            likesCount: story.summary?.likesCount || 0,
+            viewsCount: story.summary?.viewsCount || 0,
+            mainCategory:
+                story.storyCategories.find((sc) => sc.isMainCategory)
+                    ?.category || null,
+            summary: undefined,
+            storyCategories: undefined,
+        }));
+
+        return {
+            page,
+            limit,
+            total,
+            items,
+        };
+    }
+
+    async findPendingStories(paginationDto: PaginationDto): Promise<{
+        page: number;
+        limit: number;
+        total: number;
+        items: any[];
+    }> {
+        const { page = 1, limit = 10 } = paginationDto;
+        const skip = (page - 1) * limit;
+
+        const queryBuilder = this.storyRepository
+            .createQueryBuilder('story')
+            .leftJoinAndSelect('story.author', 'author')
+            .leftJoinAndSelect('story.summary', 'summary')
+            .leftJoinAndSelect('story.storyCategories', 'storyCategories')
+            .leftJoinAndSelect('storyCategories.category', 'category')
+            .where('story.status = :status', { status: StoryStatus.PENDING })
+            .orderBy('story.createdAt', 'ASC')
+            .skip(skip)
+            .take(limit);
+
+        const [stories, total] = await Promise.all([
+            queryBuilder.getMany(),
+            queryBuilder.clone().getCount(),
+        ]);
+
+        const items = stories.map((story) => ({
+            ...story,
+            likesCount: story.summary?.likesCount || 0,
+            viewsCount: story.summary?.viewsCount || 0,
+            mainCategory:
+                story.storyCategories.find((sc) => sc.isMainCategory)
+                    ?.category || null,
+            summary: undefined,
+            storyCategories: undefined,
+        }));
+
+        return {
+            page,
+            limit,
+            total,
+            items,
+        };
+    }
+
+    async findPublicStories(paginationDto: PaginationDto): Promise<{
+        page: number;
+        limit: number;
+        total: number;
+        items: any[];
+    }> {
+        const { page = 1, limit = 10 } = paginationDto;
+        const skip = (page - 1) * limit;
+
+        const queryBuilder = this.storyRepository
+            .createQueryBuilder('story')
+            .leftJoinAndSelect('story.author', 'author')
+            .leftJoinAndSelect('story.summary', 'summary')
+            .leftJoinAndSelect('story.storyCategories', 'storyCategories')
+            .leftJoinAndSelect('storyCategories.category', 'category')
+            .where(
+                'story.visibility = :visibility AND story.status = :status',
+                {
+                    visibility: StoryVisibility.PUBLIC,
+                    status: StoryStatus.PUBLISHED,
+                },
+            )
+            .orderBy('story.createdAt', 'DESC')
+            .skip(skip)
+            .take(limit);
+
+        const [stories, total] = await Promise.all([
+            queryBuilder.getMany(),
+            queryBuilder.clone().getCount(),
+        ]);
+
+        const items = stories.map((story) => ({
+            ...story,
+            likesCount: story.summary?.likesCount || 0,
+            viewsCount: story.summary?.viewsCount || 0,
+            mainCategory:
+                story.storyCategories.find((sc) => sc.isMainCategory)
+                    ?.category || null,
+            summary: undefined,
+            storyCategories: undefined,
+        }));
+
+        return {
+            page,
+            limit,
+            total,
+            items,
+        };
     }
 
     async findStoriesByAuthor(authorId: string): Promise<Story[]> {
@@ -110,6 +269,7 @@ export class StoryService {
                 author: true,
                 chapters: true,
                 generation: true,
+                storyCategories: { category: true },
             },
             select: {
                 id: true,
@@ -157,14 +317,34 @@ export class StoryService {
             story.coverImage,
         );
 
-        const cleanedStory = excludeFields(story, ['coverImage']);
+        console.log(story.storyCategories);
+
+        const categories = story.storyCategories.map((sc) => ({
+            id: sc.category.id,
+            name: sc.category.name,
+        }));
+
+        const mainCategoryEntry = story.storyCategories.find(
+            (sc) => sc.isMainCategory,
+        );
+        const mainCategory = mainCategoryEntry
+            ? {
+                  id: mainCategoryEntry.category.id,
+                  name: mainCategoryEntry.category.name,
+              }
+            : null;
+
+        story.storyCategories = undefined;
+        story.coverImage = undefined;
 
         return {
-            ...cleanedStory,
+            ...story,
             coverImageUrl,
+            categories,
+            mainCategory,
             generation: {
                 ...story.generation,
-                metadata: story.generation.metadata.storyContext || null,
+                metadata: story.generation?.metadata?.storyContext || null,
             },
         };
     }
@@ -190,15 +370,6 @@ export class StoryService {
         if (result.affected === 0) {
             throw new NotFoundException(`Story with ID ${id} not found`);
         }
-    }
-
-    async findDeletedStories(): Promise<Story[]> {
-        return this.storyRepository.find({
-            where: { deletedAt: Not(IsNull()) },
-            withDeleted: true,
-            relations: ['author', 'chapters'],
-            order: { deletedAt: 'DESC' },
-        });
     }
 
     async incrementViews({
@@ -325,14 +496,6 @@ export class StoryService {
         story.visibility = StoryVisibility.PRIVATE;
 
         return this.storyRepository.save(story);
-    }
-
-    async findPendingStories(): Promise<Story[]> {
-        return this.storyRepository.find({
-            where: { status: StoryStatus.PENDING },
-            relations: ['author', 'chapters'],
-            order: { createdAt: 'ASC' },
-        });
     }
 
     // Chapter Generation Methods (Incremental On-Demand)

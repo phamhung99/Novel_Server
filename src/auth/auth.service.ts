@@ -13,7 +13,7 @@ export class AuthService {
     ) {}
 
     async login(loginDto: LoginDto) {
-        const user = await this.userService.findByEmail(loginDto.email);
+        const user = await this.userService.findByEmailForLogin(loginDto.email);
         const isPasswordValid = await bcrypt.compare(
             loginDto.password,
             user.password,
