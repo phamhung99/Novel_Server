@@ -1,5 +1,6 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
+    Box,
     Button,
     CircularProgress,
     Container,
@@ -19,29 +20,6 @@ import {
 import axios from '../api/axios';
 import { useNavigate } from 'react-router-dom';
 import { v4 as uuidv4 } from 'uuid';
-
-const genresList = [
-    'Fantasy',
-    'Science Fiction',
-    'Romance',
-    'Action',
-    'Adventure',
-    'Mystery',
-    'Thriller',
-    'Horror',
-    'Comedy',
-    'Drama',
-    'Slice of Life',
-    'Isekai',
-    'Historical',
-    'Supernatural',
-    'Psychological',
-    'Martial Arts',
-    'Cyberpunk',
-    'Post-Apocalyptic',
-    'Steampunk',
-    'Crime',
-];
 
 const BASE_URL = `/api/v1/story`;
 
@@ -67,14 +45,46 @@ const StoryUploadPage: React.FC = () => {
     const [storyIdToLoad, setStoryIdToLoad] = useState('');
     const [isLoading, setIsLoading] = useState(false);
 
+    // genres from API
+    const [genresList, setGenresList] = useState<string[]>([]);
+    const [loadingGenres, setLoadingGenres] = useState(true);
+    const [genresError, setGenresError] = useState<string | null>(null);
+
     const navigate = useNavigate();
+
+    useEffect(() => {
+        const fetchGenres = async () => {
+            try {
+                setLoadingGenres(true);
+                const response = await axios.get(`${BASE_URL}/categories`);
+                const genres = response.data.data
+                    .sort((a: any, b: any) => a.displayOrder - b.displayOrder)
+                    .map((item: any) => item.name);
+
+                setGenresList(genres);
+            } catch (err: any) {
+                console.error('Failed to fetch genres:', err);
+                setGenresError(
+                    err.response?.data?.message ||
+                        'Failed to load genres. Using fallback list.',
+                );
+                // Optional: fallback to hard-coded list if API fails
+                // setGenresList(['Fantasy', 'Science Fiction', ...]);
+            } finally {
+                setLoadingGenres(false);
+            }
+        };
+
+        fetchGenres();
+    }, []);
 
     const pollInitializationResult = async (
         requestId: string,
+        skipImage: boolean,
     ): Promise<any> => {
         await new Promise((r) => setTimeout(r, POLL_INITIALIZATION_DELAY));
 
-        const maxAttempts = 15; // ~2.5 minutes
+        const maxAttempts = 15;
         let attempt = 0;
 
         while (attempt < maxAttempts) {
@@ -82,7 +92,10 @@ const StoryUploadPage: React.FC = () => {
                 const res = await axios.get(
                     `${BASE_URL}/generate/initialize/result`,
                     {
-                        headers: { 'x-request-id': requestId },
+                        headers: {
+                            'x-request-id': requestId,
+                            'x-skip-image': skipImage,
+                        },
                     },
                 );
 
@@ -116,21 +129,30 @@ const StoryUploadPage: React.FC = () => {
 
             setIsLoading(true);
 
-            const requestId = uuidv4();
+            const requestId = `100032`;
 
-            axios.post(
-                `${BASE_URL}/generate/initialize`,
-                {
-                    storyPrompt,
-                    genres: selectedGenres,
-                    numberOfChapters: numChapters,
-                    aiProvider,
-                },
-                { headers: { 'x-user-id': userId, 'x-request-id': requestId } },
-            );
+            // const requestId = uuidv4();
 
-            const storyData = await pollInitializationResult(requestId);
-            console.log(storyData);
+            // axios.post(
+            //     `${BASE_URL}/generate/initialize`,
+            //     {
+            //         storyPrompt,
+            //         genres: selectedGenres,
+            //         numberOfChapters: numChapters,
+            //         aiProvider,
+            //     },
+            //     {
+            //         headers: {
+            //             'x-user-id': userId,
+            //             'x-request-id': requestId,
+            //             'x-skip-image': true,
+            //         },
+            //     },
+            // );
+
+            const storyData = await pollInitializationResult(requestId, true);
+
+            console.log('Initialized story data:', storyData);
 
             navigate(ROUTES.STORY_PREVIEW, { state: { storyData } });
         } catch (err: any) {
@@ -217,7 +239,6 @@ const StoryUploadPage: React.FC = () => {
 
                         <FormControl fullWidth margin="normal">
                             <InputLabel id="genres-label">Genres</InputLabel>
-
                             <Select
                                 labelId="genres-label"
                                 multiple
@@ -231,13 +252,43 @@ const StoryUploadPage: React.FC = () => {
                                     )
                                 }
                                 renderValue={(selected) => selected.join(', ')}
+                                disabled={loadingGenres}
                             >
-                                {genresList.map((genre) => (
-                                    <MenuItem key={genre} value={genre}>
-                                        {genre}
+                                {loadingGenres ? (
+                                    <MenuItem disabled>
+                                        <Box
+                                            sx={{
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: 1,
+                                            }}
+                                        >
+                                            <CircularProgress size={20} />
+                                            Loading genres...
+                                        </Box>
                                     </MenuItem>
-                                ))}
+                                ) : genresList.length === 0 ? (
+                                    <MenuItem disabled>
+                                        No genres available
+                                    </MenuItem>
+                                ) : (
+                                    genresList.map((genre) => (
+                                        <MenuItem key={genre} value={genre}>
+                                            {genre.charAt(0).toUpperCase() +
+                                                genre.slice(1)}
+                                        </MenuItem>
+                                    ))
+                                )}
                             </Select>
+                            {genresError && (
+                                <Typography
+                                    variant="caption"
+                                    color="error"
+                                    sx={{ mt: 1, display: 'block' }}
+                                >
+                                    {genresError}
+                                </Typography>
+                            )}
                         </FormControl>
 
                         <TextField
@@ -246,19 +297,19 @@ const StoryUploadPage: React.FC = () => {
                             value={numChapters}
                             onChange={(e) => {
                                 const value = Number(e.target.value);
-                                if (value >= 1 && value <= 10) {
+                                if (value >= 1 && value <= 10000) {
                                     setNumChapters(value);
                                 }
                             }}
                             slotProps={{
                                 htmlInput: {
                                     min: 1,
-                                    max: 10,
+                                    max: 10000,
                                 },
                             }}
                             fullWidth
                             margin="normal"
-                            helperText="Must be between 1 and 10"
+                            helperText="Must be between 1 and 10000"
                         />
 
                         <TextField

@@ -12,4 +12,4 @@ export const SERVER_URL = import.meta.env.VITE_SERVER_URL;
 
 // in milliseconds
 export const POLL_INTERVAL = 10000;
-export const POLL_INITIALIZATION_DELAY = 10000; 
+export const POLL_INITIALIZATION_DELAY = 0; 

@@ -49,7 +49,6 @@ export default function UsersPage() {
         { field: 'id', headerName: 'ID', flex: 1 },
         { field: 'username', headerName: 'Username', flex: 1 },
         { field: 'country', headerName: 'Country', flex: 1 },
-        { field: 'ipCountryCode', headerName: 'IP Code', flex: 1 },
         {
             field: 'profileImage',
             headerName: 'Avatar',
@@ -68,12 +67,6 @@ export default function UsersPage() {
             ),
         },
         {
-            field: 'active',
-            headerName: 'Active',
-            flex: 1,
-            renderCell: (params) => (params.value ? '✅' : '❌'),
-        },
-        {
             field: 'createdAt',
             headerName: 'Created At',
             flex: 2,
@@ -84,6 +77,14 @@ export default function UsersPage() {
             headerName: 'Updated At',
             flex: 2,
             valueGetter: (params) => new Date(params).toLocaleString(),
+        },
+        {
+            field: 'deletedAt',
+            headerName: 'Deleted At',
+            flex: 2,
+            valueGetter: (value) => {
+                return value ? new Date(value).toLocaleString() : 'null';
+            },
         },
     ];
 
