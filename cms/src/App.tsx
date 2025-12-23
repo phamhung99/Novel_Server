@@ -5,9 +5,10 @@ import StoryUploadPage from './pages/StoryUploadPage';
 import StoryPreviewPage from './pages/StoryPreviewPage';
 import ChapterGeneratorPage from './pages/ChapterGeneratorPage';
 import ManageStories from './pages/ManageStoriesPage';
-import StoryDetailPage from './pages/StoryDetailPage';
+import StoryDetailPage from './pages/StoryOverviewPage';
 import LoginPage from './pages/loginPage';
 import PrivateRoute from './utils/PrivateRoute';
+import ChapterReaderPage from './pages/ChapterReaderPage';
 
 export default function App() {
     return (
@@ -41,6 +42,10 @@ export default function App() {
                         <Route
                             path="stories/:storyId"
                             element={<StoryDetailPage />}
+                        />
+                        <Route
+                            path="stories/:storyId/chapters/:index"
+                            element={<ChapterReaderPage />}
                         />
                     </Route>
                 </Route>

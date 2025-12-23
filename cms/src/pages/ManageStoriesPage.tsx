@@ -143,7 +143,7 @@ const ManageStories = () => {
                 actions={{
                     viewDetails: (id) => {
                         handleMenuClose();
-                        navigate(`${ROUTES.STORY_DETAILS}/${id}`);
+                        navigate(`${ROUTES.STORY_OVERVIEW}/${id}`);
                     },
                     deleteStory: (id) =>
                         setConfirmDialog({

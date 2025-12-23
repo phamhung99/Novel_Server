@@ -28,50 +28,60 @@ import {
     POLL_INTERVAL,
 } from '../constants/app.constants';
 
-type Structure = {
-    summary: string;
-    directions: string[];
-    writingStyle: string;
-    tone: string;
-    plotLogic: string;
-    emotionalMotif: string;
-    mainCharacterArc: string;
-    subCharacterArc: string;
-    antagonistAction: string;
-    emotionChart: string;
-    philosophicalSubtheme: string;
+type NextOption = {
+    label: string;
+    immediateRisk: string;
+    immediateSafety: string;
+    longTermPotential: string;
+    longTermCost: string;
 };
 
-type GenerateChapterResponseDto = {
+type ContinuityCheckpoints = {
+    toneConsistency: string;
+    characterConsistency: string;
+    worldRulesMaintained: string;
+    foreshadowingPlanted: string;
+};
+
+type CharacterStatus = {
+    protagonist: string;
+    keyRelationships: string;
+    inventoryChanges: string;
+};
+
+type ChapterStructure = {
+    chapterNumber: number;
+    chapterSummary: string;
+    characterStatus: CharacterStatus;
+    plotAdvancements: string[];
+    nextOptions: NextOption[];
+    continuityCheckpoints: ContinuityCheckpoints;
+};
+
+type ChapterData = {
     chapterId: string;
     index: number;
     title: string;
     content: string;
-    structure: Structure;
-    message: string;
+    structure: ChapterStructure;
 };
 
 const BASE_URL = `/api/v1/story`;
 
 const ChapterGeneratorPage: React.FC = () => {
     const location = useLocation();
-
     const storyId = location.state?.storyId as string;
-    const initialChapter = location.state?.chapterData;
 
-    const [chapters, setChapters] = useState<GenerateChapterResponseDto[]>(
-        initialChapter ? [initialChapter] : [],
-    );
-    const [expanded, setExpanded] = useState<boolean[]>(
-        Array(chapters.length).fill(false),
-    );
-    const [loading, setLoading] = useState<boolean>(false);
+    const [chapters, setChapters] = useState<ChapterData[]>([]);
+    const [expanded, setExpanded] = useState<boolean[]>([]);
+    const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
-
     const [directionMode, setDirectionMode] = useState<'select' | 'custom'>(
         'select',
     );
-    const [selectedDirection, setSelectedDirection] = useState<string>('');
+    const [selectedOptionIndex, setSelectedOptionIndex] = useState<number | ''>(
+        '',
+    );
     const [customDirection, setCustomDirection] = useState<string>('');
 
     const toggleChapter = (idx: number) => {
@@ -84,8 +94,8 @@ const ChapterGeneratorPage: React.FC = () => {
 
     const handleChapterChange = (
         idx: number,
-        field: keyof GenerateChapterResponseDto,
-        value: string,
+        field: keyof ChapterData,
+        value: any,
     ) => {
         setChapters((prev) => {
             const newChaps = [...prev];
@@ -96,8 +106,8 @@ const ChapterGeneratorPage: React.FC = () => {
 
     const handleStructureChange = (
         idx: number,
-        field: keyof Structure,
-        value: string,
+        field: keyof ChapterStructure,
+        value: any,
     ) => {
         setChapters((prev) => {
             const newChaps = [...prev];
@@ -109,82 +119,77 @@ const ChapterGeneratorPage: React.FC = () => {
         });
     };
 
-    const pollChapterResult = async (requestId: string) => {
+    const pollChapterResult = async (
+        requestId: string,
+    ): Promise<ChapterData> => {
         await new Promise((r) => setTimeout(r, POLL_INITIALIZATION_DELAY));
-
-        return new Promise<GenerateChapterResponseDto>((resolve, reject) => {
+        return new Promise((resolve, reject) => {
             let attempts = 0;
-            const maxAttempts = 25;
-
+            const maxAttempts = 30;
             const interval = setInterval(async () => {
                 attempts++;
-
                 try {
                     const res = await axios.get(
                         `${BASE_URL}/generate/chapter/result`,
-                        {
-                            headers: {
-                                'x-request-id': requestId,
-                            },
-                        },
+                        { headers: { 'x-request-id': requestId } },
                     );
-
-                    const data = res.data?.data;
-                    if (data) {
+                    if (res.data?.data) {
                         clearInterval(interval);
-                        resolve(data);
+                        resolve(res.data.data);
                     }
-                } catch (error: any) {
-                    if (error.response && error.response.status !== 202) {
+                } catch (err: any) {
+                    if (err.response?.status !== 202) {
                         clearInterval(interval);
-                        reject(error);
+                        reject(err);
                     }
                 }
-
                 if (attempts >= maxAttempts) {
                     clearInterval(interval);
-                    reject(new Error('Timeout waiting for result'));
+                    reject(new Error('Timeout waiting for chapter generation'));
                 }
             }, POLL_INTERVAL);
         });
     };
 
     const generateChapter = async () => {
-        const lastChapter = chapters[chapters.length - 1];
-
-        // Lấy direction dựa trên mode
-        const direction =
-            directionMode === 'custom'
-                ? customDirection.trim()
-                : selectedDirection || lastChapter?.structure?.directions?.[0];
-
-        if (!direction) {
-            setError('Please select or enter a chapter direction');
+        if (chapters.length === 0) {
+            setError('No chapters available to continue from');
             return;
+        }
+        let direction: string = '';
+        if (directionMode === 'custom') {
+            if (!customDirection.trim()) {
+                setError('Please enter a custom direction');
+                return;
+            }
+            direction = customDirection.trim();
+        } else {
+            if (selectedOptionIndex === '') {
+                setError('Please select a direction option');
+                return;
+            }
+            const lastChapter = chapters[chapters.length - 1];
+            direction =
+                lastChapter.structure.nextOptions[selectedOptionIndex].label;
         }
 
         const requestId = uuidv4();
-
         try {
             setLoading(true);
             setError(null);
 
-            axios.post(
+            await axios.post(
                 `${BASE_URL}/${storyId}/generate/chapter`,
                 { direction },
-                {
-                    headers: {
-                        'x-request-id': requestId,
-                    },
-                },
+                { headers: { 'x-request-id': requestId } },
             );
 
-            const result = await pollChapterResult(requestId);
-
-            setChapters((prev) => [...prev, result]);
-            setSelectedDirection('');
+            const newChapter = await pollChapterResult(requestId);
+            setChapters((prev) => [...prev, newChapter]);
+            setExpanded((prev) => [...prev, false]);
+            setSelectedOptionIndex('');
             setCustomDirection('');
-            setDirectionMode('select'); // Reset về select mode
+            setDirectionMode('select');
         } catch (err: any) {
             setError(
                 err.response?.data?.message ||
@@ -196,7 +201,7 @@ const ChapterGeneratorPage: React.FC = () => {
         }
     };
 
-    const updateChapter = async (chapter: GenerateChapterResponseDto) => {
+    const updateChapter = async (chapter: ChapterData) => {
         try {
             setLoading(true);
             setError(null);
@@ -216,13 +221,9 @@ const ChapterGeneratorPage: React.FC = () => {
         try {
             setLoading(true);
             setError(null);
-
             await axios.post(`${BASE_URL}/${storyId}/request-publication`);
-
-            alert('Publication request sent!');
+            alert('Publication request sent successfully!');
         } catch (err: any) {
-            console.log(err.response?.data?.message);
-
             setError(
                 err.response?.data?.message || 'Error requesting publication',
             );
@@ -233,44 +234,66 @@ const ChapterGeneratorPage: React.FC = () => {
 
     useEffect(() => {
         const fetchChapters = async () => {
+            if (!storyId) return;
             try {
+                setLoading(true);
                 const res = await axios.get(`${BASE_URL}/${storyId}/chapter`);
-
-                setChapters(res.data.data);
+                // Fix: extract the array from res.data.data
+                const fetched = Array.isArray(res.data.data)
+                    ? res.data.data
+                    : [];
+                setChapters(fetched);
+                setExpanded(Array(fetched.length).fill(false));
             } catch (err) {
                 console.error(err);
+                setError('Failed to load chapters');
             } finally {
                 setLoading(false);
             }
         };
-
-        if (storyId) {
-            fetchChapters();
-        }
+        fetchChapters();
     }, [storyId]);
 
+    const lastChapter = chapters[chapters.length - 1];
+
     return (
-        <Container maxWidth="md" sx={{ py: 4 }}>
+        <Container maxWidth="lg" sx={{ py: 4 }}>
+            {loading && chapters.length === 0 && (
+                <Box sx={{ display: 'flex', justifyContent: 'center', my: 4 }}>
+                    <CircularProgress />
+                </Box>
+            )}
+
+            {error && (
+                <Alert severity="error" sx={{ mb: 3 }}>
+                    {error}
+                </Alert>
+            )}
+
+            {/* Danh sách các chapter */}
             {chapters.map((chap, idx) => (
-                <Paper key={chap.chapterId} sx={{ mb: 3 }}>
+                <Paper key={chap.chapterId} sx={{ mb: 4 }}>
                     <Box
                         sx={{
                             display: 'flex',
                             justifyContent: 'space-between',
                             alignItems: 'center',
                             p: 2,
-                            backgroundColor: 'grey.100',
+                            bgcolor: 'grey.100',
+                            cursor: 'pointer',
                         }}
+                        onClick={() => toggleChapter(idx)}
                     >
-                        <Typography variant="h6">{chap.title}</Typography>
-                        <IconButton onClick={() => toggleChapter(idx)}>
+                        <Typography variant="h6">
+                            Chapter {chap.index}: {chap.title}
+                        </Typography>
+                        <IconButton>
                             {expanded[idx] ? <ExpandLess /> : <ExpandMore />}
                         </IconButton>
                     </Box>
 
                     <Collapse in={expanded[idx]}>
-                        <Box sx={{ p: 2 }}>
-                            {/* Editable fields */}
+                        <Box sx={{ p: 3 }}>
                             <TextField
                                 fullWidth
                                 label="Title"
@@ -284,11 +307,12 @@ const ChapterGeneratorPage: React.FC = () => {
                                 }
                                 sx={{ mb: 2 }}
                             />
+
                             <TextField
                                 fullWidth
                                 label="Content"
                                 multiline
-                                minRows={4}
+                                minRows={10}
                                 value={chap.content}
                                 onChange={(e) =>
                                     handleChapterChange(
@@ -297,204 +321,233 @@ const ChapterGeneratorPage: React.FC = () => {
                                         e.target.value,
                                     )
                                 }
+                                sx={{ mb: 3 }}
+                            />
+
+                            <Typography variant="subtitle1" gutterBottom>
+                                Structure Details
+                            </Typography>
+
+                            <TextField
+                                fullWidth
+                                label="Chapter Summary"
+                                multiline
+                                minRows={2}
+                                value={chap.structure?.chapterSummary ?? ''}
+                                onChange={(e) =>
+                                    handleStructureChange(
+                                        idx,
+                                        'chapterSummary',
+                                        e.target.value,
+                                    )
+                                }
                                 sx={{ mb: 2 }}
                             />
 
-                            {Object.entries(chap.structure).map(
-                                ([key, value]) => {
-                                    if (key === 'directions') {
-                                        const isLast =
-                                            idx === chapters.length - 1;
-                                        if (!isLast) return null;
+                            {/* You can add more structure fields here later if needed */}
 
-                                        return (
-                                            <FormControl
-                                                fullWidth
-                                                sx={{ mb: 2 }}
-                                                key={key}
-                                            >
-                                                <InputLabel
-                                                    id={`direction-select-${idx}`}
-                                                >
-                                                    Directions
-                                                </InputLabel>
-                                                <Select
-                                                    labelId={`direction-select-${idx}`}
-                                                    multiple
-                                                    value={value as string[]}
-                                                    onChange={(e) =>
-                                                        handleStructureChange(
-                                                            idx,
-                                                            key as keyof Structure,
-                                                            e.target
-                                                                .value as string,
-                                                        )
-                                                    }
-                                                >
-                                                    {(value as string[]).map(
-                                                        (dir, i) => (
-                                                            <MenuItem
-                                                                key={i}
-                                                                value={dir}
-                                                            >
-                                                                {dir}
-                                                            </MenuItem>
-                                                        ),
-                                                    )}
-                                                </Select>
-                                            </FormControl>
-                                        );
-                                    } else {
-                                        return (
-                                            <TextField
-                                                key={key}
-                                                fullWidth
-                                                label={key
-                                                    .replace(/([A-Z])/g, ' $1')
-                                                    .replace(/^./, (str) =>
-                                                        str.toUpperCase(),
-                                                    )}
-                                                value={value as string}
-                                                onChange={(e) =>
-                                                    handleStructureChange(
-                                                        idx,
-                                                        key as keyof Structure,
-                                                        e.target.value,
-                                                    )
-                                                }
-                                                sx={{ mb: 2 }}
-                                            />
-                                        );
-                                    }
-                                },
-                            )}
-
-                            {error && (
-                                <Alert severity="error" sx={{ mb: 2 }}>
-                                    {error}
-                                </Alert>
-                            )}
-
-                            <Button
-                                variant="contained"
-                                onClick={() => updateChapter(chap)}
-                                disabled={loading}
+                            <Box
                                 sx={{
-                                    display: 'block',
-                                    mx: 'auto',
-                                    mt: 2,
+                                    mt: 3,
+                                    display: 'flex',
+                                    justifyContent: 'center',
                                 }}
                             >
-                                {loading ? (
-                                    <CircularProgress size={24} />
-                                ) : (
-                                    'Update Chapter'
-                                )}
-                            </Button>
+                                <Button
+                                    variant="contained"
+                                    color="primary"
+                                    onClick={() => updateChapter(chap)}
+                                    disabled={loading}
+                                    size="large"
+                                >
+                                    {loading ? (
+                                        <CircularProgress size={24} />
+                                    ) : (
+                                        'Update Chapter'
+                                    )}
+                                </Button>
+                            </Box>
                         </Box>
                     </Collapse>
                 </Paper>
             ))}
 
-            <Box
-                sx={{
-                    mt: 5,
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    gap: 2,
-                }}
-            >
-                <Paper sx={{ p: 3, width: '100%', maxWidth: 500 }}>
-                    <FormControl component="fieldset" sx={{ mb: 2 }}>
-                        <FormLabel component="legend">
-                            Direction Input Mode
-                        </FormLabel>
-                        <RadioGroup
-                            row
-                            value={directionMode}
-                            onChange={(e) =>
-                                setDirectionMode(
-                                    e.target.value as 'select' | 'custom',
-                                )
-                            }
-                        >
-                            <FormControlLabel
-                                value="select"
-                                control={<Radio />}
-                                label="Select from list"
-                            />
-                            <FormControlLabel
-                                value="custom"
-                                control={<Radio />}
-                                label="Enter custom direction"
-                            />
-                        </RadioGroup>
-                    </FormControl>
+            {/* Phần chọn direction cho chapter tiếp theo */}
+            {lastChapter &&
+                lastChapter.structure &&
+                lastChapter.structure.nextOptions &&
+                lastChapter.structure.nextOptions.length > 0 && (
+                    <Paper sx={{ p: 4, mt: 5 }}>
+                        <Typography variant="h6" gutterBottom>
+                            Generate Next Chapter
+                        </Typography>
 
-                    {directionMode === 'select' ? (
-                        <FormControl fullWidth>
-                            <InputLabel id="chapter-direction-label">
-                                Chapter Direction
-                            </InputLabel>
-                            <Select
-                                labelId="chapter-direction-label"
-                                value={selectedDirection}
-                                label="Chapter Direction"
+                        <FormControl component="fieldset" sx={{ mb: 3 }}>
+                            <FormLabel component="legend">
+                                Direction Mode
+                            </FormLabel>
+                            <RadioGroup
+                                row
+                                value={directionMode}
                                 onChange={(e) =>
-                                    setSelectedDirection(e.target.value)
+                                    setDirectionMode(
+                                        e.target.value as 'select' | 'custom',
+                                    )
                                 }
                             >
-                                {chapters[
-                                    chapters.length - 1
-                                ]?.structure?.directions?.map(
-                                    (dir: string, i: number) => (
-                                        <MenuItem key={i} value={dir}>
-                                            {dir}
-                                        </MenuItem>
-                                    ),
-                                )}
-                            </Select>
+                                <FormControlLabel
+                                    value="select"
+                                    control={<Radio />}
+                                    label="Choose from suggested options"
+                                />
+                                <FormControlLabel
+                                    value="custom"
+                                    control={<Radio />}
+                                    label="Write custom direction"
+                                />
+                            </RadioGroup>
                         </FormControl>
-                    ) : (
+
+                        {directionMode === 'select' ? (
+                            <FormControl fullWidth>
+                                <InputLabel id="next-option-label">
+                                    Suggested Next Direction
+                                </InputLabel>
+                                <Select
+                                    labelId="next-option-label"
+                                    value={selectedOptionIndex}
+                                    label="Suggested Next Direction"
+                                    onChange={(e) =>
+                                        setSelectedOptionIndex(
+                                            Number(e.target.value),
+                                        )
+                                    }
+                                >
+                                    {lastChapter.structure.nextOptions.map(
+                                        (opt, i) => (
+                                            <MenuItem key={i} value={i}>
+                                                <Box>
+                                                    <strong>{opt.label}</strong>
+                                                    <Typography
+                                                        variant="body2"
+                                                        color="text.secondary"
+                                                    >
+                                                        Risk:{' '}
+                                                        {opt.immediateRisk} |
+                                                        Safety:{' '}
+                                                        {opt.immediateSafety}
+                                                    </Typography>
+                                                    <Typography
+                                                        variant="body2"
+                                                        color="text.secondary"
+                                                    >
+                                                        Long-term:{' '}
+                                                        {opt.longTermPotential}{' '}
+                                                        / Cost:{' '}
+                                                        {opt.longTermCost}
+                                                    </Typography>
+                                                </Box>
+                                            </MenuItem>
+                                        ),
+                                    )}
+                                </Select>
+                            </FormControl>
+                        ) : (
+                            <TextField
+                                fullWidth
+                                label="Custom Direction"
+                                multiline
+                                minRows={4}
+                                value={customDirection}
+                                onChange={(e) =>
+                                    setCustomDirection(e.target.value)
+                                }
+                                placeholder="Describe what should happen in the next chapter..."
+                            />
+                        )}
+
+                        <Box sx={{ mt: 4, textAlign: 'center' }}>
+                            <Button
+                                variant="contained"
+                                size="large"
+                                onClick={generateChapter}
+                                disabled={loading}
+                                sx={{ minWidth: 250 }}
+                            >
+                                {loading ? (
+                                    <CircularProgress size={24} />
+                                ) : (
+                                    'Generate Next Chapter'
+                                )}
+                            </Button>
+                        </Box>
+                    </Paper>
+                )}
+
+            {/* Optional: Show a message when there are chapters but no next options yet */}
+            {lastChapter &&
+                (!lastChapter.structure ||
+                    !lastChapter.structure.nextOptions ||
+                    lastChapter.structure.nextOptions.length === 0) && (
+                    <Paper sx={{ p: 4, mt: 5 }}>
+                        <Typography variant="h6" gutterBottom>
+                            Generate Next Chapter
+                        </Typography>
+                        <Typography
+                            variant="body2"
+                            color="text.secondary"
+                            sx={{ mb: 3 }}
+                        >
+                            No suggested directions available yet. You can still
+                            write a custom direction.
+                        </Typography>
+
                         <TextField
                             fullWidth
-                            label="Custom Direction"
+                            label="Custom Direction (Required)"
                             multiline
-                            minRows={3}
+                            minRows={4}
                             value={customDirection}
                             onChange={(e) => setCustomDirection(e.target.value)}
-                            placeholder="Enter your custom direction for the next chapter..."
+                            placeholder="Describe what should happen in the next chapter..."
                         />
-                    )}
-                </Paper>
-                <Button
-                    variant="contained"
-                    onClick={generateChapter}
-                    disabled={loading}
-                    sx={{ width: 320 }}
-                >
-                    {loading ? (
-                        <CircularProgress size={24} />
-                    ) : (
-                        'Generate Chapter'
-                    )}
-                </Button>
 
-                <Button
-                    variant="outlined"
-                    color="secondary"
-                    onClick={requestPublication}
-                    disabled={loading}
-                    sx={{ width: 320 }}
-                >
-                    {loading ? (
-                        <CircularProgress size={24} />
-                    ) : (
-                        'Request Publication'
-                    )}
-                </Button>
-            </Box>
+                        <Box sx={{ mt: 4, textAlign: 'center' }}>
+                            <Button
+                                variant="contained"
+                                size="large"
+                                onClick={generateChapter}
+                                disabled={loading || !customDirection.trim()}
+                                sx={{ minWidth: 250 }}
+                            >
+                                {loading ? (
+                                    <CircularProgress size={24} />
+                                ) : (
+                                    'Generate Next Chapter'
+                                )}
+                            </Button>
+                        </Box>
+                    </Paper>
+                )}
+
+            {/* Request Publication */}
+            {chapters.length > 0 && (
+                <Box sx={{ mt: 6, textAlign: 'center' }}>
+                    <Button
+                        variant="outlined"
+                        color="secondary"
+                        size="large"
+                        onClick={requestPublication}
+                        disabled={loading}
+                    >
+                        {loading ? (
+                            <CircularProgress size={24} />
+                        ) : (
+                            'Request Publication'
+                        )}
+                    </Button>
+                </Box>
+            )}
         </Container>
     );
 };

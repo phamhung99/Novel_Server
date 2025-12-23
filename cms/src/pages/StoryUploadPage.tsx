@@ -80,7 +80,7 @@ const StoryUploadPage: React.FC = () => {
 
     const pollInitializationResult = async (
         requestId: string,
-        skipImage: boolean,
+        skipImage: boolean = false,
     ): Promise<any> => {
         await new Promise((r) => setTimeout(r, POLL_INITIALIZATION_DELAY));
 
@@ -129,26 +129,24 @@ const StoryUploadPage: React.FC = () => {
 
             setIsLoading(true);
 
-            const requestId = `100032`;
+            const requestId = uuidv4();
 
-            // const requestId = uuidv4();
-
-            // axios.post(
-            //     `${BASE_URL}/generate/initialize`,
-            //     {
-            //         storyPrompt,
-            //         genres: selectedGenres,
-            //         numberOfChapters: numChapters,
-            //         aiProvider,
-            //     },
-            //     {
-            //         headers: {
-            //             'x-user-id': userId,
-            //             'x-request-id': requestId,
-            //             'x-skip-image': true,
-            //         },
-            //     },
-            // );
+            axios.post(
+                `${BASE_URL}/generate/initialize`,
+                {
+                    storyPrompt,
+                    genres: selectedGenres,
+                    numberOfChapters: numChapters,
+                    aiProvider,
+                },
+                {
+                    headers: {
+                        'x-user-id': userId,
+                        'x-request-id': requestId,
+                        'x-skip-image': true,
+                    },
+                },
+            );
 
             const storyData = await pollInitializationResult(requestId, true);
 

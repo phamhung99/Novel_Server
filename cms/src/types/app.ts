@@ -38,6 +38,7 @@ export interface StoryDto {
     title: string;
     synopsis: string;
     genres: string[];
+    coverImageUrl: string;
     type: string;
     views: number;
     rating: string;
