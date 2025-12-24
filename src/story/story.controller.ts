@@ -58,6 +58,27 @@ export class StoryController {
         return this.storyService.getUserLibrary(userId, type);
     }
 
+    @Get('/top-trending')
+    async getTopTrending(
+        @Headers('x-user-id') userId: string,
+        @Query() paginationDto: PaginationDto,
+    ) {
+        return this.storyService.getTopTrending(userId, paginationDto);
+    }
+
+    @Get('/top-trending/categories/:categoryId')
+    async getTopTrendingByCategory(
+        @Headers('x-user-id') userId: string,
+        @Param('categoryId') categoryId: string,
+        @Query() paginationDto: PaginationDto,
+    ) {
+        return this.storyService.getTopTrendingByCategory(
+            userId,
+            categoryId,
+            paginationDto,
+        );
+    }
+
     @Get('categories')
     getAllCategories() {
         return this.storyService.getAllCategories();

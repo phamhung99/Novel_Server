@@ -142,6 +142,8 @@ export class UserService extends BaseCrudService<User> {
                     's.rating AS "rating"',
                     's.type AS "type"',
                     's.status AS "status"',
+                    's.visibility AS "visibility"',
+
                     's.createdAt AS "createdAt"',
                     's.updatedAt AS "updatedAt"',
                     `json_agg(DISTINCT jsonb_build_object('id', cat.id, 'name', cat.name)) AS "categories"`,
@@ -216,6 +218,7 @@ export class UserService extends BaseCrudService<User> {
             const items = stories.map((story) => ({
                 ...story,
                 chapters: chaptersMap[story.storyId] || [],
+                canEdit: story.authorId === userId,
             }));
 
             return { page, limit, total, items };
