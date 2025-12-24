@@ -313,11 +313,13 @@ export class StoryService {
             throw new NotFoundException(`Story with ID ${id} not found`);
         }
 
-        const coverImageUrl = await this.doSpacesService.getImageUrl(
-            story.coverImage,
-        );
+        let coverImageUrl = null;
 
-        console.log(story.storyCategories);
+        if (story.coverImage) {
+            coverImageUrl = await this.doSpacesService.getImageUrl(
+                story.coverImage,
+            );
+        }
 
         const categories = story.storyCategories.map((sc) => ({
             id: sc.category.id,
