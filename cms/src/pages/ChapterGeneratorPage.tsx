@@ -151,6 +151,30 @@ const ChapterGeneratorPage: React.FC = () => {
         });
     };
 
+    const generateFirstChapter = async () => {
+        const requestId = uuidv4();
+        try {
+            setLoading(true);
+            setError(null);
+
+            axios.post(`${BASE_URL}/${storyId}/generate/chapter`, null, {
+                headers: { 'x-request-id': requestId },
+            });
+
+            const newChapter = await pollChapterResult(requestId);
+            setChapters([newChapter]);
+            setExpanded([false]);
+        } catch (err: any) {
+            setError(
+                err.response?.data?.message ||
+                    err.message ||
+                    'Error generating Chapter 1',
+            );
+        } finally {
+            setLoading(false);
+        }
+    };
+
     const generateChapter = async () => {
         if (chapters.length === 0) {
             setError('No chapters available to continue from');
@@ -268,6 +292,44 @@ const ChapterGeneratorPage: React.FC = () => {
                 <Alert severity="error" sx={{ mb: 3 }}>
                     {error}
                 </Alert>
+            )}
+
+            {chapters.length === 0 && !loading && (
+                <Box
+                    sx={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        mt: 8,
+                    }}
+                >
+                    <Typography variant="h5" gutterBottom align="center">
+                        Start Your Story
+                    </Typography>
+                    <Typography
+                        variant="body1"
+                        color="text.secondary"
+                        align="center"
+                        sx={{ mb: 4, maxWidth: 600 }}
+                    >
+                        No chapters have been generated yet. Click the button
+                        below to generate the first chapter automatically.
+                    </Typography>
+                    <Button
+                        variant="contained"
+                        size="large"
+                        color="primary"
+                        onClick={generateFirstChapter}
+                        disabled={loading}
+                        sx={{ minWidth: 300, py: 2 }}
+                    >
+                        {loading ? (
+                            <CircularProgress size={28} />
+                        ) : (
+                            'Generate First Chapter'
+                        )}
+                    </Button>
+                </Box>
             )}
 
             {/* Danh sách các chapter */}

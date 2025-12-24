@@ -198,6 +198,10 @@ const ManageStories = () => {
                             state: { storyId: id },
                         });
                     },
+                    copyStoryId: (id) => {
+                        navigator.clipboard.writeText(id);
+                        handleMenuClose();
+                    },
                 }}
             />
 

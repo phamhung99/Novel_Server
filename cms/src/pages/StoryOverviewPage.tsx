@@ -76,9 +76,7 @@ const StoryOverviewPage = () => {
                         elevation={8}
                         sx={{ borderRadius: 2, overflow: 'hidden', mb: 4 }}
                     >
-                        {story.coverImageUrl &&
-                        story.coverImageUrl !==
-                            'https://myapp-assets.sfo3.cdn.digitaloceanspaces.com/null' ? (
+                        {story.coverImageUrl ? (
                             <Box
                                 component="img"
                                 src={story.coverImageUrl}

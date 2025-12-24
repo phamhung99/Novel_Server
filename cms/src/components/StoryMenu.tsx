@@ -14,6 +14,7 @@ interface StoryMenuProps {
         rejectStory: (id: string) => void;
         unpublishStory: (id: string) => void;
         generateChapter: (id: string) => void;
+        copyStoryId: (id: string) => void;
     };
 }
 
@@ -26,11 +27,17 @@ export const StoryMenu = ({
 }: StoryMenuProps) => {
     if (!story) return null;
 
+    const handleCopyId = () => {
+        navigator.clipboard.writeText(story.id);
+        onClose();
+    };
+
     return (
         <Menu anchorEl={anchorEl} open={open} onClose={onClose}>
             <MenuItem onClick={() => actions.viewDetails(story.id)}>
                 View Details
             </MenuItem>
+            <MenuItem onClick={handleCopyId}>Copy Story ID</MenuItem>
             {story.deletedAt === null && (
                 <MenuItem
                     onClick={() => {
