@@ -328,6 +328,141 @@ const StoryOverviewPage = () => {
 
                             <Divider sx={{ my: 3 }} />
 
+                            {/* Generation Info */}
+                            <Typography
+                                variant="h6"
+                                gutterBottom
+                                sx={{ mt: 4 }}
+                            >
+                                Generation Info
+                            </Typography>
+
+                            {story.generation ? (
+                                <Box sx={{ mb: 3 }}>
+                                    <Typography variant="body1" gutterBottom>
+                                        <strong>AI Provider:</strong>{' '}
+                                        <Chip
+                                            label={
+                                                story.generation.aiProvider ||
+                                                'N/A'
+                                            }
+                                            color="info"
+                                            size="small"
+                                            sx={{ ml: 1 }}
+                                        />
+                                    </Typography>
+
+                                    <Typography variant="body1" gutterBottom>
+                                        <strong>AI Model:</strong>{' '}
+                                        <Chip
+                                            label={
+                                                story.generation.aiModel ||
+                                                'N/A'
+                                            }
+                                            color="info"
+                                            size="small"
+                                            sx={{ ml: 1 }}
+                                        />
+                                    </Typography>
+
+                                    {story.generation.prompt && (
+                                        <>
+                                            <Typography
+                                                variant="body1"
+                                                gutterBottom
+                                                sx={{ mt: 2 }}
+                                            >
+                                                <strong>Prompt:</strong>
+                                            </Typography>
+                                            <Paper
+                                                variant="outlined"
+                                                sx={{
+                                                    p: 2,
+                                                    bgcolor: 'grey.50',
+                                                    fontFamily: 'Monospace',
+                                                    fontSize: '0.875rem',
+                                                    overflowX: 'auto',
+                                                    mt: 1,
+                                                }}
+                                            >
+                                                <pre
+                                                    style={{
+                                                        margin: 0,
+                                                        whiteSpace: 'pre-wrap',
+                                                    }}
+                                                >
+                                                    {story.generation.prompt
+                                                        .storyPrompt ||
+                                                        'No story prompt'}
+                                                </pre>
+                                            </Paper>
+
+                                            {story.generation.prompt
+                                                .numberOfChapters && (
+                                                <Typography
+                                                    variant="body1"
+                                                    sx={{ mt: 1 }}
+                                                >
+                                                    <strong>
+                                                        Planned Chapters:
+                                                    </strong>{' '}
+                                                    {
+                                                        story.generation.prompt
+                                                            .numberOfChapters
+                                                    }
+                                                </Typography>
+                                            )}
+                                        </>
+                                    )}
+
+                                    {/* Metadata riêng của generation (nếu có) */}
+                                    {story.generation.metadata &&
+                                        Object.keys(story.generation.metadata)
+                                            .length > 0 && (
+                                            <>
+                                                <Typography
+                                                    variant="h6"
+                                                    gutterBottom
+                                                    sx={{ mt: 3 }}
+                                                >
+                                                    Metadata
+                                                </Typography>
+                                                <Paper
+                                                    variant="outlined"
+                                                    sx={{
+                                                        p: 2,
+                                                        bgcolor: 'grey.50',
+                                                        fontFamily: 'Monospace',
+                                                        fontSize: '0.875rem',
+                                                        overflowX: 'auto',
+                                                    }}
+                                                >
+                                                    <pre
+                                                        style={{
+                                                            margin: 0,
+                                                            whiteSpace:
+                                                                'pre-wrap',
+                                                        }}
+                                                    >
+                                                        {JSON.stringify(
+                                                            story.generation
+                                                                .metadata,
+                                                            null,
+                                                            2,
+                                                        )}
+                                                    </pre>
+                                                </Paper>
+                                            </>
+                                        )}
+                                </Box>
+                            ) : (
+                                <Typography color="text.secondary">
+                                    No generation information available.
+                                </Typography>
+                            )}
+
+                            <Divider sx={{ my: 3 }} />
+
                             <Typography variant="h6" gutterBottom>
                                 Synopsis
                             </Typography>

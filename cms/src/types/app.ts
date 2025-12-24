@@ -13,25 +13,6 @@ export interface ChapterDto {
     content: string;
 }
 
-export interface GenerationDto {
-    type?: string;
-    status?: string;
-    aiProvider?: string;
-    aiModel?: string;
-    prompt?: any;
-    title?: string;
-    genres?: string[];
-    setting?: string;
-    mainCharacter?: string;
-    subCharacters?: string;
-    antagonist?: string;
-    motif?: string;
-    tone?: string;
-    writingStyle?: string;
-    plotLogic?: string;
-    hiddenTheme?: string;
-}
-
 export interface StoryDto {
     id: string;
     authorId: string;
@@ -52,5 +33,5 @@ export interface StoryDto {
     mainCategory: any;
     categories: any[];
     chapters: ChapterDto[];
-    generation?: GenerationDto;
+    generation?: any;
 }
