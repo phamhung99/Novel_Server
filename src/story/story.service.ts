@@ -6,7 +6,7 @@ import {
     HttpStatus,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, ILike, MoreThan, Repository } from 'typeorm';
+import { Brackets, DataSource, ILike, MoreThan, Repository } from 'typeorm';
 import { Story } from './entities/story.entity';
 import { Chapter } from './entities/chapter.entity';
 import {
@@ -32,13 +32,19 @@ import { StoryViews } from './entities/story-views.entity';
 import { StorySummary } from './entities/story-summary.entity';
 import { getStartOfDay } from 'src/common/utils/date.utils';
 import { UserService } from 'src/user/user.service';
-import { GenerationStatus, LibraryType } from 'src/common/enums/app.enum';
+import {
+    GenerationStatus,
+    LibraryType,
+    StorySort,
+    StoryStatusFilter,
+} from 'src/common/enums/app.enum';
 import { Category } from './entities/categories.entity';
 import { DoSpacesService } from 'src/upload/do-spaces.service';
 import { DEFAULT_COVER_IMAGE_URL } from 'src/common/constants/app.constant';
 import { ChapterService } from './chapter.service';
 import { StoryCategory } from './entities/story-category.entity';
 import { PaginationDto } from './dto/pagination.dto';
+import { DiscoverStoriesDto } from './dto/discover-stories.dto';
 
 @Injectable()
 export class StoryService {
@@ -523,10 +529,18 @@ export class StoryService {
             type: GenerationType.CHAPTER,
             status: GenerationStatus.IN_PROGRESS,
             aiProvider: dto.aiProvider || 'grok',
-            aiModel:
-                (dto.aiProvider || 'grok') === 'grok'
-                    ? 'grok-4'
-                    : 'gpt-4o-mini',
+            aiModel: (() => {
+                switch (dto.aiProvider) {
+                    case 'grok':
+                        return 'grok-4';
+                    case 'gpt':
+                        return 'gpt-4o-mini';
+                    case 'gemini':
+                        return 'gemini-3-pro-preview';
+                    default:
+                        return 'grok-4';
+                }
+            })(),
             prompt: {
                 storyPrompt: dto.storyPrompt,
                 numberOfChapters: dto.numberOfChapters,
@@ -706,6 +720,7 @@ export class StoryService {
                 title: story.title,
                 synopsis: story.synopsis,
                 coverImageUrl: coverImageUrl,
+                metadata: outlineResponse.storyContext,
                 outline: outlineResponse.outline,
                 message:
                     'Story outline generated successfully. Ready to generate chapters on-demand.',
@@ -812,7 +827,7 @@ export class StoryService {
                     await this.storyGenerationApiService.generateFirstChapter({
                         storyId,
                         chapterNumber,
-                        aiProvider: dto.aiProvider || 'grok',
+                        aiProvider: storyGeneration.aiProvider || 'grok',
                         direction: dto.direction || '',
                         storyMetadata,
                     });
@@ -822,7 +837,7 @@ export class StoryService {
                         {
                             storyId,
                             chapterNumber,
-                            aiProvider: dto.aiProvider || 'grok',
+                            aiProvider: storyGeneration.aiProvider || 'grok',
                             direction: dto.direction || '',
                             storyMetadata,
                             previousChapterMetadata,
@@ -841,7 +856,7 @@ export class StoryService {
                     await this.storyGenerationApiService.generateChapterSummary(
                         {
                             storyId,
-                            aiProvider: dto.aiProvider || 'grok',
+                            aiProvider: storyGeneration.aiProvider || 'grok',
                             chapterSummary:
                                 chapterStructureResponse.structure.summary,
                             storyMetadata,
@@ -868,6 +883,13 @@ export class StoryService {
                     storyGenerationId: storyGeneration.id,
                     chapterNumber,
                     status: GenerationStatus.COMPLETED,
+                },
+            );
+
+            await this.storyGenerationRepository.update(
+                { id: storyGeneration.id },
+                {
+                    updatedAt: new Date(),
                 },
             );
 
@@ -1378,7 +1400,6 @@ export class StoryService {
 
                 'ss.likes_count AS "likesCount"',
                 'ss.views_count AS "viewsCount"',
-                'ss.views_last_60_days AS "viewsLast60DaysCount"',
 
                 `(COUNT(*) OVER() = COALESCE((generation.prompt ->> 'numberOfChapters')::int, 0)) AS "isCompleted"`,
             ])
@@ -1519,9 +1540,11 @@ export class StoryService {
             })
             .andWhere('s.status = :status', { status: StoryStatus.PUBLISHED })
             .groupBy(
-                's.id, a.id, likes.id, ss.likes_count, ss.views_count, generation.prompt, rh.lastReadAt, rh.lastReadChapter',
+                's.id, a.id, likes.id, ss.likes_count, ss.views_count, generation.prompt, rh.lastReadAt, rh.lastReadChapter, ss.views_last_60_days',
             )
-            .orderBy('ss.views_count', 'DESC')
+            .orderBy('ss.views_last_60_days', 'DESC')
+            .addOrderBy('ss.likes_count', 'DESC')
+            .addOrderBy('s.updatedAt', 'DESC')
             .offset(offset)
             .limit(limit)
             .setParameters({ userId, categoryId });
@@ -1599,4 +1622,350 @@ export class StoryService {
             },
         });
     }
+
+    async getDiscoverStories(
+        userId: string | null,
+        {
+            keyword,
+            categories,
+            status,
+            sort = StorySort.POPULAR,
+            minchapters,
+            page = 1,
+            limit = 20,
+        }: DiscoverStoriesDto,
+    ) {
+        const offset = (page - 1) * limit;
+
+        // Subquery đếm chính xác số chapter của từng story
+        const chapterCountSubQuery = this.dataSource
+            .getRepository(Chapter)
+            .createQueryBuilder('ch')
+            .select('ch.story_id', 'story_id')
+            .addSelect('COUNT(ch.id)', 'chapter_count')
+            .groupBy('ch.story_id');
+
+        const qb = this.dataSource
+            .getRepository(Story)
+            .createQueryBuilder('s')
+            .leftJoin('s.author', 'a')
+            .leftJoin('s.likes', 'likes', 'likes.userId = :userId', { userId })
+            .leftJoin('s.generation', 'generation')
+            .leftJoin('story_summary', 'ss', 'ss.story_id = s.id')
+
+            // All categories
+            .leftJoin('s.storyCategories', 'sc')
+            .leftJoin('sc.category', 'cat')
+
+            // Main category (is_main_category = true)
+            .leftJoin(
+                's.storyCategories',
+                'main_sc',
+                'main_sc.story_id = s.id AND main_sc.is_main_category = true',
+            )
+            .leftJoin('main_sc.category', 'main_cat')
+
+            // Reading history
+            .leftJoin(
+                'reading_history',
+                'rh',
+                'rh.story_id = s.id AND rh.user_id = :userId',
+                { userId },
+            )
+            .leftJoin(
+                `(${chapterCountSubQuery.getQuery()})`,
+                'chapcnt',
+                'chapcnt.story_id = s.id',
+            )
+            .select([
+                's.id AS "storyId"',
+                's.title AS "title"',
+                's.synopsis AS "synopsis"',
+                's.coverImage AS "coverImage"',
+                's.rating AS "rating"',
+                's.type AS "type"',
+                's.status AS "status"',
+                's.createdAt AS "createdAt"',
+                's.updatedAt AS "updatedAt"',
+                's.visibility AS "visibility"',
+
+                // All categories array
+                `json_agg(DISTINCT jsonb_build_object('id', cat.id, 'name', cat.name)) FILTER (WHERE cat.id IS NOT NULL) AS "categories"`,
+
+                // Main category object (or null)
+                `jsonb_build_object('id', main_cat.id, 'name', main_cat.name) AS "mainCategory"`,
+
+                'a.id AS "authorId"',
+                'a.username AS "authorUsername"',
+                'a.profileImage AS "profileImage"',
+
+                'rh.lastReadAt AS "lastReadAt"',
+                'rh.lastReadChapter AS "lastReadChapter"',
+
+                'CASE WHEN likes.id IS NULL THEN false ELSE true END AS "isLike"',
+
+                'ss.likes_count AS "likesCount"',
+                'ss.views_count AS "viewsCount"',
+
+                // Số chapter thực tế
+                'COALESCE(chapcnt.chapter_count::integer, 0) AS "chapterCount"',
+
+                // isCompleted chính xác
+                '(COALESCE(chapcnt.chapter_count::integer, 0) = COALESCE((generation.prompt ->> \'numberOfChapters\')::int, 0)) AS "isCompleted"',
+            ])
+            .where('s.visibility = :visibility', {
+                visibility: StoryVisibility.PUBLIC,
+            })
+            .andWhere('s.status = :status', { status: StoryStatus.PUBLISHED });
+
+        // === Keyword search
+        if (keyword && keyword.trim()) {
+            const searchTerm = `%${keyword.trim()}%`;
+            qb.andWhere(
+                new Brackets((sqb) => {
+                    sqb.where('LOWER(s.title) LIKE LOWER(:searchTerm)');
+                }),
+                { searchTerm },
+            );
+        }
+
+        if (minchapters !== undefined && minchapters > 0) {
+            qb.andWhere(
+                'COALESCE(chapcnt.chapter_count::integer, 0) >= :minchapters',
+                { minchapters },
+            );
+        }
+
+        // === Multi categories filter ===
+        if (categories && categories !== 'all') {
+            const categoryIds = categories
+                .split(',')
+                .map((id) => id.trim())
+                .filter(Boolean);
+
+            if (categoryIds.length > 0) {
+                qb.andWhere('cat.id IN (:...categoryIds)', { categoryIds });
+            }
+        }
+
+        // === Status filter: completed / ongoing ===
+        if (status === StoryStatusFilter.COMPLETED) {
+            qb.andWhere(
+                "COALESCE(chapcnt.chapter_count::integer, 0) = COALESCE((generation.prompt ->> 'numberOfChapters')::int, 0)",
+            );
+        } else if (status === StoryStatusFilter.ONGOING) {
+            qb.andWhere(
+                "COALESCE(chapcnt.chapter_count::integer, 0) < COALESCE((generation.prompt ->> 'numberOfChapters')::int, 0)",
+            );
+        }
+
+        // === Sorting ===
+        switch (sort) {
+            case StorySort.POPULAR:
+                qb.orderBy('ss.views_last_60_days', 'DESC')
+                    .addOrderBy('ss.likes_count', 'DESC')
+                    .addOrderBy('s.updatedAt', 'DESC');
+                break;
+            case StorySort.RECENTLY_UPDATED:
+                qb.orderBy('s.updatedAt', 'DESC');
+                break;
+            case StorySort.RECENTLY_ADDED:
+                qb.orderBy('s.createdAt', 'DESC');
+                break;
+            case StorySort.RELEASE_DATE:
+                // sort theo ngày phê duyệt xuất bản
+                qb.orderBy('s.approvedAt', 'DESC');
+                break;
+            default:
+                qb.orderBy('ss.views_last_60_days', 'DESC');
+        }
+
+        qb.groupBy('s.id')
+            .addGroupBy('a.id')
+            .addGroupBy('likes.id')
+            .addGroupBy('ss.likes_count')
+            .addGroupBy('ss.views_count')
+            .addGroupBy('ss.views_last_60_days')
+            .addGroupBy('generation.prompt')
+            .addGroupBy('rh.lastReadAt')
+            .addGroupBy('rh.lastReadChapter')
+            .addGroupBy('main_cat.id')
+            .addGroupBy('main_cat.name')
+            .addGroupBy('chapcnt.chapter_count')
+
+            .offset(offset)
+            .limit(limit)
+            .setParameter('userId', userId);
+
+        const stories = await qb.getRawMany();
+
+        const total =
+            stories.length > 0
+                ? await qb.offset(0).limit(undefined).getCount()
+                : 0;
+
+        const storyIds = stories.map((s) => s.storyId);
+        let chaptersMap: Record<string, any[]> = {};
+
+        if (storyIds.length > 0) {
+            const chapters = await this.dataSource
+                .getRepository(Chapter)
+                .createQueryBuilder('c')
+                .innerJoin('c.story', 's')
+                .leftJoin(
+                    'chapter_states',
+                    'cs',
+                    'cs.chapter_id = c.id AND cs.user_id = :userId',
+                    { userId },
+                )
+                .select([
+                    'c.story_id AS "storyId"',
+                    `json_agg(
+                jsonb_build_object(
+                    'id', c.id,
+                    'title', c.title,
+                    'index', c.index,
+                    'createdAt', c.created_at,
+                    'updatedAt', c.updated_at,
+                    'isLock', (
+                        cs.chapter_id IS NULL               
+                        AND s.author_id != :userId             
+                        )
+                    )
+                    ORDER BY c.index ASC
+                ) AS chapters`,
+                ])
+                .where('c.story_id IN (:...storyIds)', { storyIds })
+                .setParameters({ userId })
+                .groupBy('c.story_id')
+                .getRawMany();
+
+            chaptersMap = Object.fromEntries(
+                chapters.map((row) => [row.storyId, row.chapters]),
+            );
+        }
+
+        const items = stories.map((story) => ({
+            ...story,
+            chapters: chaptersMap[story.storyId] || [],
+            lastReadAt: story.lastReadAt || null,
+            lastReadChapter: story.lastReadChapter || null,
+            canEdit: story.authorId === userId,
+        }));
+
+        return {
+            page,
+            limit,
+            total,
+            items,
+        };
+    }
+
+    // async likeStory(storyId: string, userId: string) {
+    //     return this.dataSource.transaction(async (manager) => {
+    //         // 1. Kiểm tra story có tồn tại và PUBLIC/PUBLISHED không
+    //         const story = await manager.findOne(Story, {
+    //             where: {
+    //                 id: storyId,
+    //                 visibility: StoryVisibility.PUBLIC,
+    //                 status: StoryStatus.PUBLISHED,
+    //             },
+    //         });
+
+    //         if (!story) {
+    //             throw new NotFoundException(
+    //                 'Story not found or not accessible',
+    //             );
+    //         }
+
+    //         // 2. Kiểm tra xem user đã like chưa
+    //         const existingLike = await manager.findOne(StoryLikes, {
+    //             where: {
+    //                 storyId,
+    //                 userId,
+    //             },
+    //         });
+
+    //         if (existingLike) {
+    //             // Đã like rồi → trả về trạng thái hiện tại
+    //             return {
+    //                 isLike: true,
+    //                 likesCount: story.summary?.likesCount || 0, // nếu có relation load
+    //             };
+    //         }
+
+    //         // 3. Tạo bản ghi like mới
+    //         const newLike = manager.create(StoryLikes, {
+    //             storyId,
+    //             userId,
+    //         });
+    //         await manager.save(newLike);
+
+    //         // 4. Tăng likes_count trong story_summary
+    //         await manager.increment(StorySummary, { storyId }, 'likesCount', 1);
+
+    //         // 5. Lấy likesCount mới (sau khi tăng)
+    //         const updatedSummary = await manager.findOne(StorySummary, {
+    //             where: { storyId },
+    //             select: ['likesCount'],
+    //         });
+
+    //         return {
+    //             isLike: true,
+    //             likesCount: updatedSummary?.likesCount || 0,
+    //         };
+    //     });
+    // }
+
+    // async unlikeStory(storyId: string, userId: string) {
+    //     return this.dataSource.transaction(async (manager) => {
+    //         // 1. Kiểm tra story tồn tại
+    //         const story = await manager.findOne(Story, {
+    //             where: {
+    //                 id: storyId,
+    //                 visibility: StoryVisibility.PUBLIC,
+    //                 status: StoryStatus.PUBLISHED,
+    //             },
+    //         });
+
+    //         if (!story) {
+    //             throw new NotFoundException(
+    //                 'Story not found or not accessible',
+    //             );
+    //         }
+
+    //         // 2. Tìm bản ghi like hiện tại
+    //         const likeRecord = await manager.findOne(StoryLikes, {
+    //             where: {
+    //                 storyId,
+    //                 userId,
+    //             },
+    //         });
+
+    //         if (!likeRecord) {
+    //             // Chưa like → trả về trạng thái hiện tại
+    //             return {
+    //                 isLike: false,
+    //                 likesCount: story.summary?.likesCount || 0,
+    //             };
+    //         }
+
+    //         // 3. Xóa bản ghi like
+    //         await manager.remove(likeRecord);
+
+    //         // 4. Giảm likes_count
+    //         await manager.decrement(StorySummary, { storyId }, 'likesCount', 1);
+
+    //         // 5. Lấy likesCount mới
+    //         const updatedSummary = await manager.findOne(StorySummary, {
+    //             where: { storyId },
+    //             select: ['likesCount'],
+    //         });
+
+    //         return {
+    //             isLike: false,
+    //             likesCount: updatedSummary?.likesCount || 0,
+    //         };
+    //     });
+    // }
 }

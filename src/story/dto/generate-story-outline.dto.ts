@@ -58,7 +58,7 @@ export class InitializeStoryDto {
 
     @IsOptional()
     @IsString()
-    aiProvider?: 'grok' | 'gpt'; // Default: 'grok'
+    aiProvider?: 'grok' | 'gpt' | 'gemini'; // Default: 'grok'
 }
 
 /**
@@ -69,6 +69,7 @@ export class InitializeStoryResponseDto {
     title: string;
     synopsis: string;
     coverImageUrl: string;
+    metadata: any;
     outline: string;
     message: string;
 }

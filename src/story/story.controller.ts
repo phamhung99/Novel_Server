@@ -33,6 +33,7 @@ import { StoryStatus } from 'src/common/enums/story-status.enum';
 import { UserService } from 'src/user/user.service';
 import { ChapterService } from './chapter.service';
 import { PaginationDto } from './dto/pagination.dto';
+import { DiscoverStoriesDto } from './dto/discover-stories.dto';
 // import { FileInterceptor } from '@nestjs/platform-express';
 // import { diskStorage } from 'multer';
 // import { extname, join } from 'path';
@@ -49,6 +50,22 @@ export class StoryController {
         private readonly userService: UserService,
         private readonly chapterService: ChapterService,
     ) {}
+
+    // @Post(':storyId/like')
+    // async likeStory(
+    //     @Param('storyId') storyId: string,
+    //     @Headers('x-user-id') userId: string,
+    // ) {
+    //     return this.storyService.likeStory(storyId, userId);
+    // }
+
+    // @Post(':storyId/unlike')
+    // async unlikeStory(
+    //     @Param('storyId') storyId: string,
+    //     @Headers('x-user-id') userId: string,
+    // ) {
+    //     return this.storyService.unlikeStory(storyId, userId);
+    // }
 
     @Get('/library')
     async getUserLibrary(
@@ -77,6 +94,14 @@ export class StoryController {
             categoryId,
             paginationDto,
         );
+    }
+
+    @Get('/discover')
+    async getDiscoverStories(
+        @Headers('x-user-id') userId: string,
+        @Query() discoverStoriesDto: DiscoverStoriesDto,
+    ) {
+        return this.storyService.getDiscoverStories(userId, discoverStoriesDto);
     }
 
     @Get('categories')
