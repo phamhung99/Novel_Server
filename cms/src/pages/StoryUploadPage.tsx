@@ -39,7 +39,7 @@ const StoryUploadPage: React.FC = () => {
     const [storyPrompt, setStoryPrompt] = useState('');
     const [selectedGenres, setSelectedGenres] = useState<string[]>([]);
     const [numChapters, setNumChapters] = useState(1);
-    const [aiProvider, setAiProvider] = useState<'grok' | 'gpt'>('grok');
+    const [aiProvider, setAiProvider] = useState<'grok' | 'gpt' | 'gemini'>('grok');
 
     // load params
     const [isLoading, setIsLoading] = useState(false);
@@ -276,13 +276,16 @@ const StoryUploadPage: React.FC = () => {
                             label="AI Provider"
                             value={aiProvider}
                             onChange={(e) =>
-                                setAiProvider(e.target.value as 'grok' | 'gpt')
+                                setAiProvider(
+                                    e.target.value as 'grok' | 'gpt' | 'gemini',
+                                )
                             }
                             fullWidth
                             margin="normal"
                         >
                             <MenuItem value="grok">Grok</MenuItem>
                             <MenuItem value="gpt">GPT</MenuItem>
+                            <MenuItem value="gemini">Gemini</MenuItem>
                         </TextField>
 
                         <Button

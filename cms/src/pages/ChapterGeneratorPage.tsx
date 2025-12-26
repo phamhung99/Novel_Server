@@ -202,7 +202,7 @@ const ChapterGeneratorPage: React.FC = () => {
             setLoading(true);
             setError(null);
 
-            await axios.post(
+            axios.post(
                 `${BASE_URL}/${storyId}/generate/chapter`,
                 { direction },
                 { headers: { 'x-request-id': requestId } },
