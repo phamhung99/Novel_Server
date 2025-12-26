@@ -2,6 +2,7 @@ import { Injectable, BadRequestException } from '@nestjs/common';
 import { IStoryGenerationProvider } from './story-generation-provider.interface';
 import { GptApiService } from './gpt-api.service';
 import { GrokApiService } from './grok-api.service';
+import { GeminiApiService } from './gemini-api.service';
 
 /**
  * Story Generation Provider Factory
@@ -15,6 +16,7 @@ export class StoryGenerationProviderFactory {
     constructor(
         private gptApiService: GptApiService,
         private grokApiService: GrokApiService,
+        private geminiApiService: GeminiApiService,
     ) {}
 
     /**
@@ -31,9 +33,11 @@ export class StoryGenerationProviderFactory {
                 return this.gptApiService;
             case 'grok':
                 return this.grokApiService;
+            case 'gemini':
+                return this.geminiApiService;
             default:
                 throw new BadRequestException(
-                    `Unsupported story generation provider: ${providerName}. Supported providers: gpt, grok`,
+                    `Unsupported story generation provider: ${providerName}. Supported providers: gpt, grok, gemini.`,
                 );
         }
     }
@@ -43,6 +47,6 @@ export class StoryGenerationProviderFactory {
      * @returns Array of provider names
      */
     getAvailableProviders(): string[] {
-        return ['gpt', 'grok'];
+        return ['gpt', 'grok', 'gemini'];
     }
 }

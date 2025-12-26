@@ -239,7 +239,6 @@ export const STORY_OUTLINE_SCHEMA = {
                     },
                 },
             },
-            additionalProperties: true,
         },
     },
     required: ['uiDisplay', 'coverImage', 'storyContext'],
@@ -338,7 +337,6 @@ export const CHAPTER_STRUCTURE_SCHEMA = {
                                     '[What opportunity might be lost?]',
                             },
                         },
-                        additionalProperties: false,
                     },
                 },
 
