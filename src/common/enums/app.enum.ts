@@ -83,3 +83,15 @@ export enum GenerationStatus {
     COMPLETED = 'completed',
     FAILED = 'failed',
 }
+
+export enum StoryStatusFilter {
+    COMPLETED = 'completed',
+    ONGOING = 'ongoing',
+}
+
+export enum StorySort {
+    POPULAR = 'popular',
+    RECENTLY_UPDATED = 'recently_updated',
+    RECENTLY_ADDED = 'recently_added',
+    RELEASE_DATE = 'release_date',
+}

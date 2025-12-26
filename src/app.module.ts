@@ -12,6 +12,7 @@ import { PackageMiddleware } from './common/middleware/package.middleware';
 import { StoryModule } from './story/story.module';
 import { AuthModule } from './auth/auth.module';
 import { PaymentsModule } from './payments/payments.module';
+import { MasterDataModule } from './master-data/master-data.module';
 
 @Module({
     imports: [
@@ -51,6 +52,7 @@ import { PaymentsModule } from './payments/payments.module';
         StoryModule,
         AuthModule,
         PaymentsModule,
+        MasterDataModule,
     ],
     controllers: [HealthController],
 })
