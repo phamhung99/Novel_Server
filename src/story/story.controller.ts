@@ -257,12 +257,6 @@ export class StoryController {
         }
 
         const story = await this.storyService.findStoryById(id);
-        if (story.status === StoryStatus.PUBLISHED) {
-            await this.storyService.incrementViews({
-                storyId: id,
-                userId,
-            });
-        }
         return story;
     }
 
@@ -380,15 +374,38 @@ export class StoryController {
 
     @Get(':storyId/chapter')
     async getChaptersByStory(@Param('storyId') storyId: string) {
+        if (!storyId) {
+            throw new BadRequestException(ERROR_MESSAGES.STORY_ID_REQUIRED);
+        }
+
         return this.chapterService.findChaptersByStory(storyId);
     }
 
     @Get(':storyId/chapter/:index')
     async getChapterByIndex(
+        @Headers('x-user-id') userId: string,
         @Param('storyId') storyId: string,
         @Param('index') index: number,
     ) {
-        return this.chapterService.findChapterByIndex(storyId, index);
+        if (!storyId) {
+            throw new BadRequestException(ERROR_MESSAGES.STORY_ID_REQUIRED);
+        }
+
+        if (!userId) {
+            throw new BadRequestException(ERROR_MESSAGES.USER_ID_REQUIRED);
+        }
+
+        const chapter = await this.chapterService.findChapterByIndex(
+            storyId,
+            index,
+        );
+
+        await this.storyService.incrementChapterView({
+            chapterId: chapter.id,
+            userId: userId,
+        });
+
+        return chapter;
     }
 
     @Put(':storyId/chapter/:index')
@@ -412,22 +429,6 @@ export class StoryController {
         await this.chapterService.deleteChapterByIndex(storyId, index);
         return { message: 'Chapter deleted successfully' };
     }
-
-    // Legacy endpoint (kept for backward compatibility)
-    // @Post(':storyId/generate/chapter')
-    // async generateChapter(
-    //     @Param('storyId') storyId: string,
-    //     @Body() generateChapterDto: GenerateChapterDto,
-    // ) {
-    //     const result = await this.storyService.generateChapter(
-    //         storyId,
-    //         generateChapterDto,
-    //     );
-    //     return {
-    //         message: 'Chapter generated successfully',
-    //         data: result,
-    //     };
-    // }
 
     // Generation History endpoints
     @Get(':storyId/generation/history')

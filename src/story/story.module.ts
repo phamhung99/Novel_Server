@@ -7,7 +7,6 @@ import { Chapter } from './entities/chapter.entity';
 import { StoryGeneration } from './entities/story-generation.entity';
 import { ChapterGeneration } from './entities/chapter-generation.entity';
 import { AiModule } from '../ai/ai.module';
-import { StoryViews } from './entities/story-views.entity';
 import { StorySummary } from './entities/story-summary.entity';
 import { UserModule } from 'src/user/user.module';
 import { Category } from './entities/categories.entity';
@@ -19,6 +18,7 @@ import { StoryPublicationService } from './story-publication.service';
 import { StoryInteractionService } from './story-interaction.service';
 import { StoryGenerationService } from './story-generation.service';
 import { StoryDiscoveryService } from './story-discovery.service';
+import { ChapterViews } from './entities/chapter-views.entity';
 
 @Module({
     imports: [
@@ -27,7 +27,7 @@ import { StoryDiscoveryService } from './story-discovery.service';
             Chapter,
             StoryGeneration,
             ChapterGeneration,
-            StoryViews,
+            ChapterViews,
             StorySummary,
             Category,
             StoryCategory,

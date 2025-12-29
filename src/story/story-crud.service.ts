@@ -8,15 +8,12 @@ import { PaginationDto } from './dto/pagination.dto';
 import { StoryVisibility } from 'src/common/enums/story-visibility.enum';
 import { StoryStatus } from 'src/common/enums/story-status.enum';
 import { DoSpacesService } from 'src/upload/do-spaces.service';
-import { StoryCategory } from './entities/story-category.entity';
 
 @Injectable()
 export class StoryCrudService {
     constructor(
         @InjectRepository(Story)
         private storyRepository: Repository<Story>,
-        @InjectRepository(StoryCategory)
-        private storyCategoryRepository: Repository<StoryCategory>,
         private doSpacesService: DoSpacesService,
     ) {}
 

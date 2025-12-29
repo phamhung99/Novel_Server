@@ -43,7 +43,9 @@ export class StoryService {
     // ========================
     // User Interactions
     // ========================
-    incrementViews = this.interaction.incrementViews.bind(this.interaction);
+    incrementChapterView = this.interaction.incrementChapterView.bind(
+        this.interaction,
+    );
     updateRating = this.interaction.updateRating.bind(this.interaction);
     likeStory = this.interaction.likeStory.bind(this.interaction);
     unlikeStory = this.interaction.unlikeStory.bind(this.interaction);

@@ -1,6 +1,6 @@
 import { ChapterState } from 'src/story/entities/chapter-states.entity';
 import { StoryLikes } from 'src/story/entities/story-likes.entity';
-import { StoryViews } from 'src/story/entities/story-views.entity';
+import { ChapterViews } from 'src/story/entities/chapter-views.entity';
 import {
     Entity,
     Column,
@@ -52,11 +52,11 @@ export class User {
     @OneToMany(() => StoryLikes, (storyLikes) => storyLikes.user)
     storyLikes: StoryLikes[];
 
-    @OneToMany(() => StoryViews, (storyViews) => storyViews.user)
-    storyViews: StoryViews[];
-
     @OneToMany(() => ChapterState, (chapterState) => chapterState.user)
     audioPreferences: ChapterState[];
+
+    @OneToMany(() => ChapterViews, (chapterViews) => chapterViews.user)
+    chapterViews: ChapterViews[];
 
     @OneToMany(
         () => UserCategoryPreference,

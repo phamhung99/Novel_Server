@@ -2,12 +2,14 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { DataSource, MoreThan, Repository } from 'typeorm';
 import { Story } from './entities/story.entity';
 import { StoryLikes } from './entities/story-likes.entity';
-import { StoryViews } from './entities/story-views.entity';
+import { ChapterViews } from './entities/chapter-views.entity';
 import { StorySummary } from './entities/story-summary.entity';
 import { StoryVisibility } from 'src/common/enums/story-visibility.enum';
 import { StoryStatus } from 'src/common/enums/story-status.enum';
 import { getStartOfDay } from 'src/common/utils/date.utils';
 import { InjectRepository } from '@nestjs/typeorm';
+import { Chapter } from './entities/chapter.entity';
+import { ReadingHistory } from 'src/user/entities/reading-history.entity';
 
 @Injectable()
 export class StoryInteractionService {
@@ -99,35 +101,47 @@ export class StoryInteractionService {
         });
     }
 
-    async incrementViews({
-        storyId,
+    async incrementChapterView({
+        chapterId,
         userId,
     }: {
-        storyId: string;
+        chapterId: string;
         userId: string;
     }): Promise<void> {
         await this.dataSource.transaction(async (manager) => {
             const now = new Date();
             const startOfToday = getStartOfDay(now);
 
-            const existed = await manager.findOne(StoryViews, {
+            const chapter = await manager.findOne(Chapter, {
+                relations: ['story'],
                 where: {
-                    story: { id: storyId },
+                    id: chapterId,
+                    story: {
+                        visibility: StoryVisibility.PUBLIC,
+                        status: StoryStatus.PUBLISHED,
+                    },
+                },
+            });
+
+            if (!chapter) {
+                throw new NotFoundException(
+                    'Chapter not found or not accessible',
+                );
+            }
+
+            const storyId = chapter.story.id;
+
+            const existingViewToday = await manager.findOne(ChapterViews, {
+                where: {
+                    chapter: { id: chapterId },
                     user: { id: userId },
                     viewedAt: MoreThan(startOfToday),
                 },
             });
 
-            if (existed) {
-                await manager.update(
-                    StoryViews,
-                    { id: existed.id },
-                    { viewedAt: now },
-                );
-            } else {
-                // Chưa xem hôm nay => insert mới
-                await manager.insert(StoryViews, {
-                    story: { id: storyId },
+            if (!existingViewToday) {
+                await manager.insert(ChapterViews, {
+                    chapter: { id: chapterId },
                     user: { id: userId },
                     viewedAt: now,
                 });
@@ -136,7 +150,6 @@ export class StoryInteractionService {
                     where: { storyId },
                 });
 
-                // Increment StorySummary chỉ 1 lần/ngày/người
                 if (summary) {
                     await manager.increment(
                         StorySummary,
@@ -148,8 +161,40 @@ export class StoryInteractionService {
                     await manager.insert(StorySummary, {
                         storyId,
                         viewsCount: 1,
+                        likesCount: 0,
                     });
                 }
+            } else {
+                await manager.update(
+                    ChapterViews,
+                    { id: existingViewToday.id },
+                    { viewedAt: now },
+                );
+            }
+
+            const history = await manager.findOne(ReadingHistory, {
+                where: {
+                    user: { id: userId },
+                    story: { id: storyId },
+                },
+            });
+
+            if (history) {
+                await manager.update(
+                    ReadingHistory,
+                    { id: history.id },
+                    {
+                        lastReadChapter: chapterId,
+                        lastReadAt: now,
+                    },
+                );
+            } else {
+                await manager.insert(ReadingHistory, {
+                    user: { id: userId },
+                    story: { id: storyId },
+                    lastReadChapter: chapterId,
+                    lastReadAt: now,
+                });
             }
         });
     }
