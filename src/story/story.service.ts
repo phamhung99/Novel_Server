@@ -45,6 +45,7 @@ import { ChapterService } from './chapter.service';
 import { StoryCategory } from './entities/story-category.entity';
 import { PaginationDto } from './dto/pagination.dto';
 import { DiscoverStoriesDto } from './dto/discover-stories.dto';
+import { StoryLikes } from './entities/story-likes.entity';
 
 @Injectable()
 export class StoryService {
@@ -1861,111 +1862,85 @@ export class StoryService {
         };
     }
 
-    // async likeStory(storyId: string, userId: string) {
-    //     return this.dataSource.transaction(async (manager) => {
-    //         // 1. Kiểm tra story có tồn tại và PUBLIC/PUBLISHED không
-    //         const story = await manager.findOne(Story, {
-    //             where: {
-    //                 id: storyId,
-    //                 visibility: StoryVisibility.PUBLIC,
-    //                 status: StoryStatus.PUBLISHED,
-    //             },
-    //         });
+    async likeStory(storyId: string, userId: string) {
+        return this.dataSource.transaction(async (manager) => {
+            const story = await manager.findOne(Story, {
+                where: {
+                    id: storyId,
+                    visibility: StoryVisibility.PUBLIC,
+                    status: StoryStatus.PUBLISHED,
+                },
+            });
 
-    //         if (!story) {
-    //             throw new NotFoundException(
-    //                 'Story not found or not accessible',
-    //             );
-    //         }
+            if (!story) {
+                throw new NotFoundException(
+                    'Story not found or not accessible',
+                );
+            }
 
-    //         // 2. Kiểm tra xem user đã like chưa
-    //         const existingLike = await manager.findOne(StoryLikes, {
-    //             where: {
-    //                 storyId,
-    //                 userId,
-    //             },
-    //         });
+            const existingLike = await manager.findOne(StoryLikes, {
+                where: {
+                    storyId,
+                    userId,
+                },
+            });
 
-    //         if (existingLike) {
-    //             // Đã like rồi → trả về trạng thái hiện tại
-    //             return {
-    //                 isLike: true,
-    //                 likesCount: story.summary?.likesCount || 0, // nếu có relation load
-    //             };
-    //         }
+            if (existingLike) {
+                return {
+                    isLike: true,
+                };
+            }
 
-    //         // 3. Tạo bản ghi like mới
-    //         const newLike = manager.create(StoryLikes, {
-    //             storyId,
-    //             userId,
-    //         });
-    //         await manager.save(newLike);
+            const newLike = manager.create(StoryLikes, {
+                storyId,
+                userId,
+            });
+            await manager.save(newLike);
 
-    //         // 4. Tăng likes_count trong story_summary
-    //         await manager.increment(StorySummary, { storyId }, 'likesCount', 1);
+            await manager.increment(StorySummary, { storyId }, 'likesCount', 1);
 
-    //         // 5. Lấy likesCount mới (sau khi tăng)
-    //         const updatedSummary = await manager.findOne(StorySummary, {
-    //             where: { storyId },
-    //             select: ['likesCount'],
-    //         });
+            return {
+                isLike: true,
+            };
+        });
+    }
 
-    //         return {
-    //             isLike: true,
-    //             likesCount: updatedSummary?.likesCount || 0,
-    //         };
-    //     });
-    // }
+    async unlikeStory(storyId: string, userId: string) {
+        return this.dataSource.transaction(async (manager) => {
+            const story = await manager.findOne(Story, {
+                where: {
+                    id: storyId,
+                    visibility: StoryVisibility.PUBLIC,
+                    status: StoryStatus.PUBLISHED,
+                },
+            });
 
-    // async unlikeStory(storyId: string, userId: string) {
-    //     return this.dataSource.transaction(async (manager) => {
-    //         // 1. Kiểm tra story tồn tại
-    //         const story = await manager.findOne(Story, {
-    //             where: {
-    //                 id: storyId,
-    //                 visibility: StoryVisibility.PUBLIC,
-    //                 status: StoryStatus.PUBLISHED,
-    //             },
-    //         });
+            if (!story) {
+                throw new NotFoundException(
+                    'Story not found or not accessible',
+                );
+            }
 
-    //         if (!story) {
-    //             throw new NotFoundException(
-    //                 'Story not found or not accessible',
-    //             );
-    //         }
+            const likeRecord = await manager.findOne(StoryLikes, {
+                where: {
+                    storyId,
+                    userId,
+                },
+            });
 
-    //         // 2. Tìm bản ghi like hiện tại
-    //         const likeRecord = await manager.findOne(StoryLikes, {
-    //             where: {
-    //                 storyId,
-    //                 userId,
-    //             },
-    //         });
+            if (!likeRecord) {
+                return {
+                    isLike: false,
+                };
+            }
 
-    //         if (!likeRecord) {
-    //             // Chưa like → trả về trạng thái hiện tại
-    //             return {
-    //                 isLike: false,
-    //                 likesCount: story.summary?.likesCount || 0,
-    //             };
-    //         }
+            await manager.remove(likeRecord);
 
-    //         // 3. Xóa bản ghi like
-    //         await manager.remove(likeRecord);
+            await manager.decrement(StorySummary, { storyId }, 'likesCount', 1);
 
-    //         // 4. Giảm likes_count
-    //         await manager.decrement(StorySummary, { storyId }, 'likesCount', 1);
-
-    //         // 5. Lấy likesCount mới
-    //         const updatedSummary = await manager.findOne(StorySummary, {
-    //             where: { storyId },
-    //             select: ['likesCount'],
-    //         });
-
-    //         return {
-    //             isLike: false,
-    //             likesCount: updatedSummary?.likesCount || 0,
-    //         };
-    //     });
-    // }
+            return {
+                isLike: false,
+            };
+        });
+    }
 }

@@ -10,14 +10,14 @@ import axios from 'axios';
 @Injectable()
 export class DoSpacesService {
     private client: S3Client;
-    private bucket = process.env.DO_SPACES_BUCKET; // e.g., 'my-bucket'
-    private region = process.env.DO_SPACES_REGION; // e.g., 'nyc3'
+    private bucket = process.env.DO_SPACES_BUCKET;
+    private region = process.env.DO_SPACES_REGION;
     private endpoint = `https://${this.region}.digitaloceanspaces.com`;
 
     constructor() {
         this.client = new S3Client({
             endpoint: this.endpoint,
-            region: 'us-east-1', // required but ignored
+            region: 'us-east-1',
             credentials: {
                 accessKeyId: process.env.DO_SPACES_KEY,
                 secretAccessKey: process.env.DO_SPACES_SECRET,

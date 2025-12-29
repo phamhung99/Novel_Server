@@ -51,21 +51,21 @@ export class StoryController {
         private readonly chapterService: ChapterService,
     ) {}
 
-    // @Post(':storyId/like')
-    // async likeStory(
-    //     @Param('storyId') storyId: string,
-    //     @Headers('x-user-id') userId: string,
-    // ) {
-    //     return this.storyService.likeStory(storyId, userId);
-    // }
+    @Post(':storyId/like')
+    async likeStory(
+        @Param('storyId') storyId: string,
+        @Headers('x-user-id') userId: string,
+    ) {
+        return this.storyService.likeStory(storyId, userId);
+    }
 
-    // @Post(':storyId/unlike')
-    // async unlikeStory(
-    //     @Param('storyId') storyId: string,
-    //     @Headers('x-user-id') userId: string,
-    // ) {
-    //     return this.storyService.unlikeStory(storyId, userId);
-    // }
+    @Post(':storyId/unlike')
+    async unlikeStory(
+        @Param('storyId') storyId: string,
+        @Headers('x-user-id') userId: string,
+    ) {
+        return this.storyService.unlikeStory(storyId, userId);
+    }
 
     @Get('/library')
     async getUserLibrary(
