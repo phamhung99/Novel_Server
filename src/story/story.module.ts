@@ -14,6 +14,11 @@ import { Category } from './entities/categories.entity';
 import { DoSpacesService } from 'src/upload/do-spaces.service';
 import { ChapterService } from './chapter.service';
 import { StoryCategory } from './entities/story-category.entity';
+import { StoryCrudService } from './story-crud.service';
+import { StoryPublicationService } from './story-publication.service';
+import { StoryInteractionService } from './story-interaction.service';
+import { StoryGenerationService } from './story-generation.service';
+import { StoryDiscoveryService } from './story-discovery.service';
 
 @Module({
     imports: [
@@ -31,7 +36,16 @@ import { StoryCategory } from './entities/story-category.entity';
         forwardRef(() => UserModule),
     ],
     controllers: [StoryController],
-    providers: [StoryService, DoSpacesService, ChapterService],
+    providers: [
+        StoryService,
+        DoSpacesService,
+        ChapterService,
+        StoryCrudService,
+        StoryPublicationService,
+        StoryInteractionService,
+        StoryGenerationService,
+        StoryDiscoveryService,
+    ],
     exports: [StoryService, ChapterService],
 })
 export class StoryModule {}
