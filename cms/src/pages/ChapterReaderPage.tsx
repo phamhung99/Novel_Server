@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
     Container,
     Typography,
@@ -22,6 +22,14 @@ interface FullChapterDto {
 }
 
 const ChapterReaderPage = () => {
+    const userId = useMemo(() => {
+        try {
+            const user = JSON.parse(localStorage.getItem('user') || '{}');
+            return user.id || '';
+        } catch {
+            return '';
+        }
+    }, []);
     const { storyId, index } = useParams<{ storyId: string; index: string }>();
     const location = useLocation();
     const navigate = useNavigate();
@@ -52,6 +60,11 @@ const ChapterReaderPage = () => {
             try {
                 const res = await axios.get(
                     `/api/v1/story/${storyId}/chapter/${index}`,
+                    {
+                        headers: {
+                            'x-user-id': userId,
+                        },
+                    },
                 );
                 setChapter(res.data.data);
 
@@ -59,6 +72,11 @@ const ChapterReaderPage = () => {
                 if (!navState) {
                     const storyRes = await axios.get(
                         `/api/v1/story/${storyId}`,
+                        {
+                            headers: {
+                                'x-user-id': userId,
+                            },
+                        },
                     );
                     const storyData = storyRes.data.data;
                     setStoryTitle(storyData.title);
