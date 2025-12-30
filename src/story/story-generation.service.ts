@@ -4,6 +4,7 @@ import {
     HttpException,
     HttpStatus,
     NotFoundException,
+    Logger,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -35,6 +36,8 @@ import { StoryCategory } from './entities/story-category.entity';
 
 @Injectable()
 export class StoryGenerationService {
+    private readonly logger = new Logger(StoryGenerationService.name);
+
     constructor(
         @InjectRepository(Story)
         private storyRepository: Repository<Story>,
@@ -94,6 +97,10 @@ export class StoryGenerationService {
                 numberOfChapters: dto.numberOfChapters,
             },
         });
+
+        this.logger.log(
+            `Initializing story generation for requestId: ${requestId}`,
+        );
 
         const savedStoryGeneration =
             await this.storyGenerationRepository.save(storyGeneration);
@@ -303,6 +310,10 @@ export class StoryGenerationService {
         let savedPreGen: any = null;
 
         try {
+            this.logger.log(
+                `Initializing chapter generation for requestId: ${requestId}`,
+            );
+
             const exists = await this.chapterGenerationRepository.findOne({
                 where: { requestId },
             });

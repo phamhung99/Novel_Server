@@ -46,8 +46,6 @@ export class GeminiApiService implements IStoryGenerationProvider {
                 requestBody.generationConfig.responseSchema = responseSchema;
             }
 
-            console.log('Request Body:', JSON.stringify(requestBody, null, 2));
-
             // URL đúng format
             const response = await this.client.post(
                 `/models/${this.modelName}:generateContent?key=${this.apiKey}`,
@@ -59,6 +57,8 @@ export class GeminiApiService implements IStoryGenerationProvider {
             if (!candidates || candidates.length === 0) {
                 throw new Error('No candidates returned from Gemini API');
             }
+
+            console.log('Gemini API response data:', response.data);
 
             return candidates[0].content.parts[0].text;
         } catch (error) {

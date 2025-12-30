@@ -583,8 +583,6 @@ Architecture Alignment: Verify events serve story's core objectives from origina
         try {
             const parsed = JSON.parse(content);
 
-            this.logger.log('Parsed story outline in string: ', content);
-
             return {
                 title: parsed.uiDisplay?.storyTitle || 'Untitled',
                 synopsis: parsed.uiDisplay?.storyCoverBlurb || '',
@@ -598,6 +596,8 @@ Architecture Alignment: Verify events serve story's core objectives from origina
                 'Failed to parse JSON response, falling back to text parsing',
                 error,
             );
+
+            console.log('Parsed story outline in string: ', content);
 
             try {
                 return {
@@ -651,6 +651,8 @@ Architecture Alignment: Verify events serve story's core objectives from origina
                 'Failed to parse JSON response, falling back to text parsing',
                 jsonError,
             );
+
+            console.log('Parsed story outline in string: ', content);
 
             try {
                 const extract = (label: string) =>
