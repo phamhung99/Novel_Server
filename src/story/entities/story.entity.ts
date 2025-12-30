@@ -75,6 +75,7 @@ export class Story {
 
     @Column({
         type: 'enum',
+        name: 'source_type',
         enum: StorySource,
         default: StorySource.AI,
     })
