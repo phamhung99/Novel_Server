@@ -13,6 +13,7 @@ import { StoryModule } from './story/story.module';
 import { AuthModule } from './auth/auth.module';
 import { PaymentsModule } from './payments/payments.module';
 import { MasterDataModule } from './master-data/master-data.module';
+import { CronModule } from './cron/cron.module';
 
 @Module({
     imports: [
@@ -53,6 +54,7 @@ import { MasterDataModule } from './master-data/master-data.module';
         AuthModule,
         PaymentsModule,
         MasterDataModule,
+        CronModule,
     ],
     controllers: [HealthController],
 })
