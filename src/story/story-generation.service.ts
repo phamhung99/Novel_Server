@@ -37,6 +37,7 @@ import { StoryCategory } from './entities/story-category.entity';
 @Injectable()
 export class StoryGenerationService {
     private readonly logger = new Logger(StoryGenerationService.name);
+    private readonly MAX_PROMPT_CHARS = 2000;
 
     constructor(
         @InjectRepository(Story)
@@ -57,13 +58,168 @@ export class StoryGenerationService {
         private userService: UserService,
     ) {}
 
-    // Chapter Generation Methods (Incremental On-Demand)
+    private sanitizePrompt(input: string): string {
+        let s = input ?? '';
+        // turn literal "\n" into actual newlines and normalize CRLF
+        s = s.replace(/\\n/g, '\n').replace(/\r\n?/g, '\n');
+        // remove ASCII control chars (keep newlines)
+        s = s.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
+        // collapse spaces/tabs but keep newlines; limit consecutive blank lines
+        s = s
+            .replace(/[^\S\n]+/g, ' ')
+            .replace(/\n{3,}/g, '\n\n')
+            .trim();
+        return s.slice(0, this.MAX_PROMPT_CHARS);
+    }
 
-    /**
-     * REQUEST 1: Initialize story with outline
-     * Generates story outline only (no chapters)
-     * Saves story attributes for reuse across chapters
-     */
+    private ensurePromptAllowed(input: string): void {
+        if (!input || input.trim().length === 0) {
+            throw new BadRequestException('Story prompt cannot be empty');
+        }
+        if (input.length > this.MAX_PROMPT_CHARS) {
+            throw new BadRequestException(
+                `Story prompt too long (> ${this.MAX_PROMPT_CHARS} chars)`,
+            );
+        }
+        // basic disallowed words check; expand per your policy
+        const disallowed = [/hate|racist|sexist|explicit gore/i];
+        if (disallowed.some((r) => r.test(input))) {
+            throw new BadRequestException('Prompt contains disallowed content');
+        }
+    }
+
+    async buildStoryCategories(
+        meta: any | undefined | null,
+        dtoGenres: string[] | undefined | null,
+    ): Promise<StoryCategory[]> {
+        if (!meta) {
+            throw new BadRequestException(
+                'Missing storyContext.meta in outline response',
+            );
+        }
+
+        const primaryGenreWords = meta.primaryGenre
+            ? meta.primaryGenre
+                  .trim()
+                  .split(/\s+/)
+                  .map((w) => w.trim())
+                  .filter(Boolean)
+            : [];
+
+        const secondaryGenreNames = (meta.secondaryGenres || [])
+            .map((g) => g.trim())
+            .filter(Boolean);
+
+        const dtoGenreNames = (dtoGenres || [])
+            .map((g) => g.trim())
+            .filter(Boolean);
+
+        // Query tất cả name có thể dùng: meta + dto
+        const searchNames = [
+            ...new Set([
+                ...primaryGenreWords,
+                ...secondaryGenreNames,
+                ...dtoGenreNames,
+            ]),
+        ];
+
+        if (searchNames.length === 0) return [];
+
+        const existingCategories = await this.categoryRepository.find({
+            where: searchNames.map((name) => ({
+                name: ILike(name),
+                isActive: true,
+            })),
+        });
+
+        const categoryMap = new Map<string, Category>();
+        existingCategories.forEach((cat) =>
+            categoryMap.set(cat.name.toLowerCase(), cat),
+        );
+
+        const storyCategoryEntities: StoryCategory[] = [];
+        const addedCategoryIds = new Set<string>();
+
+        let mainCategoryAssigned = false;
+        let mainCategoryId: string | null = null;
+
+        // 1) Ưu tiên main từ primaryGenreWords
+        for (const word of primaryGenreWords) {
+            const cat = categoryMap.get(word.toLowerCase());
+            if (!cat) continue;
+
+            storyCategoryEntities.push(
+                this.storyCategoryRepository.create({
+                    categoryId: cat.id,
+                    isMainCategory: true,
+                }),
+            );
+            addedCategoryIds.add(cat.id);
+            mainCategoryAssigned = true;
+            mainCategoryId = cat.id;
+            break;
+        }
+
+        // 2) Add meta genres còn lại làm secondary
+        const metaAll = [...primaryGenreWords, ...secondaryGenreNames];
+        for (const g of metaAll) {
+            const cat = categoryMap.get(g.toLowerCase());
+            if (!cat) continue;
+            if (addedCategoryIds.has(cat.id)) continue;
+
+            storyCategoryEntities.push(
+                this.storyCategoryRepository.create({
+                    categoryId: cat.id,
+                    isMainCategory: false,
+                }),
+            );
+            addedCategoryIds.add(cat.id);
+        }
+
+        // 3) Fallback main: nếu chưa có main → dùng dto.genres[0]
+        if (!mainCategoryAssigned) {
+            const firstDtoName = dtoGenreNames[0]?.toLowerCase();
+            const fallbackCat = firstDtoName
+                ? categoryMap.get(firstDtoName)
+                : undefined;
+
+            if (fallbackCat) {
+                storyCategoryEntities.push(
+                    this.storyCategoryRepository.create({
+                        categoryId: fallbackCat.id,
+                        isMainCategory: true,
+                    }),
+                );
+                addedCategoryIds.add(fallbackCat.id);
+                mainCategoryAssigned = true;
+                mainCategoryId = fallbackCat.id;
+            } else if (storyCategoryEntities.length > 0) {
+                // vẫn đảm bảo có main
+                storyCategoryEntities[0].isMainCategory = true;
+                mainCategoryId = storyCategoryEntities[0].categoryId;
+                mainCategoryAssigned = true;
+            }
+        }
+
+        // 4) Add các genres còn lại của DTO làm secondary
+        for (const g of dtoGenreNames) {
+            const cat = categoryMap.get(g.toLowerCase());
+            if (!cat) continue;
+            if (cat.id === mainCategoryId) continue;
+            if (addedCategoryIds.has(cat.id)) continue;
+
+            storyCategoryEntities.push(
+                this.storyCategoryRepository.create({
+                    categoryId: cat.id,
+                    isMainCategory: false,
+                }),
+            );
+            addedCategoryIds.add(cat.id);
+        }
+
+        return storyCategoryEntities;
+    }
+
     async initializeStoryWithOutline(
         userId: string,
         requestId: string,
@@ -118,102 +274,21 @@ export class StoryGenerationService {
                 throw new Error('Story prompt cannot be empty');
             }
 
+            const sanitizedPrompt = this.sanitizePrompt(dto.storyPrompt || '');
+            this.ensurePromptAllowed(sanitizedPrompt);
+
             const outlineResponse =
                 await this.storyGenerationApiService.generateStoryOutline({
-                    storyPrompt: dto.storyPrompt,
+                    storyPrompt: sanitizedPrompt,
                     genres: dto.genres,
                     numberOfChapters: dto.numberOfChapters,
                     aiProvider: dto.aiProvider || 'grok',
                 });
 
-            // ==== PHẦN MỚI: LẤY CATEGORY TỪ storyContext.meta ====
-            const meta = outlineResponse.storyContext?.meta;
-            if (!meta) {
-                throw new Error(
-                    'Missing storyContext.meta in outline response',
-                );
-            }
-
-            const primaryGenreWords = meta.primaryGenre
-                ? meta.primaryGenre
-                      .trim()
-                      .split(/\s+/)
-                      .map((word) => word.trim())
-                      .filter((word) => word.length > 0)
-                : [];
-
-            const secondaryGenreNames = (meta.secondaryGenres || [])
-                .map((g: string) => g.trim())
-                .filter((g: string) => g);
-
-            const allGenreNames = [
-                ...new Set([...primaryGenreWords, ...secondaryGenreNames]),
-            ];
-
-            const existingCategories = await this.categoryRepository.find({
-                where: allGenreNames.map((name) => ({
-                    name: ILike(name),
-                    isActive: true,
-                })),
-            });
-
-            // Map name -> category entity để dễ lookup
-            const categoryMap = new Map<string, Category>();
-            existingCategories.forEach((cat) => categoryMap.set(cat.name, cat));
-
-            // ==== TẠO CÁC StoryCategory ====
-            const storyCategoryEntities: StoryCategory[] = [];
-
-            let mainCategoryAssigned = false;
-            let usedMainGenreWord: string | null = null;
-            // Ưu tiên gán main category từ primaryGenre (lấy từ đầu tiên match được)
-            for (const word of primaryGenreWords) {
-                const lowerWord = word.toLowerCase();
-                if (categoryMap.has(lowerWord)) {
-                    const cat = categoryMap.get(lowerWord)!;
-                    storyCategoryEntities.push(
-                        this.storyCategoryRepository.create({
-                            categoryId: cat.id,
-                            isMainCategory: true,
-                        }),
-                    );
-                    mainCategoryAssigned = true;
-                    usedMainGenreWord = word; // Lưu lại từ gốc (không lowercase)
-                    categoryMap.delete(lowerWord);
-                    break; // Chỉ gán 1 main
-                }
-            }
-
-            // Gán các genre còn lại làm secondary
-            const remainingGenres =
-                mainCategoryAssigned && usedMainGenreWord
-                    ? [
-                          // Bỏ từ đã dùng làm main khỏi primaryWords
-                          ...primaryGenreWords.filter(
-                              (w) => w !== usedMainGenreWord,
-                          ),
-                          ...secondaryGenreNames,
-                      ]
-                    : [...primaryGenreWords, ...secondaryGenreNames];
-
-            for (const genre of remainingGenres) {
-                const lowerGenre = genre.toLowerCase();
-                if (categoryMap.has(lowerGenre)) {
-                    const cat = categoryMap.get(lowerGenre)!;
-                    storyCategoryEntities.push(
-                        this.storyCategoryRepository.create({
-                            categoryId: cat.id,
-                            isMainCategory: false,
-                        }),
-                    );
-                    categoryMap.delete(lowerGenre);
-                }
-            }
-
-            // Nếu không có primary nào match → lấy cái đầu tiên làm main
-            if (!mainCategoryAssigned && storyCategoryEntities.length > 0) {
-                storyCategoryEntities[0].isMainCategory = true;
-            }
+            const storyCategoryEntities = await this.buildStoryCategories(
+                outlineResponse.storyContext?.meta,
+                dto.genres,
+            );
 
             let coverImageKey: string | null = null;
 

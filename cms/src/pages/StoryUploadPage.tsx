@@ -39,7 +39,10 @@ const StoryUploadPage: React.FC = () => {
     const [storyPrompt, setStoryPrompt] = useState('');
     const [selectedGenres, setSelectedGenres] = useState<string[]>([]);
     const [numChapters, setNumChapters] = useState(1);
-    const [aiProvider, setAiProvider] = useState<'grok' | 'gpt' | 'gemini'>('grok');
+    const [aiProvider, setAiProvider] = useState<'grok' | 'gpt' | 'gemini'>(
+        'gemini',
+    );
+    const [skipImage, setSkipImage] = useState<boolean>(true); // <-- Thêm state mới, mặc định true
 
     // load params
     const [isLoading, setIsLoading] = useState(false);
@@ -67,8 +70,6 @@ const StoryUploadPage: React.FC = () => {
                     err.response?.data?.message ||
                         'Failed to load genres. Using fallback list.',
                 );
-                // Optional: fallback to hard-coded list if API fails
-                // setGenresList(['Fantasy', 'Science Fiction', ...]);
             } finally {
                 setLoadingGenres(false);
             }
@@ -79,7 +80,7 @@ const StoryUploadPage: React.FC = () => {
 
     const pollInitializationResult = async (
         requestId: string,
-        skipImage: boolean = false,
+        skipImageValue: boolean, // <-- Sửa tham số để dùng giá trị động
     ): Promise<any> => {
         await new Promise((r) => setTimeout(r, POLL_INITIALIZATION_DELAY));
 
@@ -93,7 +94,7 @@ const StoryUploadPage: React.FC = () => {
                     {
                         headers: {
                             'x-request-id': requestId,
-                            'x-skip-image': skipImage,
+                            'x-skip-image': skipImageValue, // <-- Dùng giá trị động
                         },
                     },
                 );
@@ -142,12 +143,15 @@ const StoryUploadPage: React.FC = () => {
                     headers: {
                         'x-user-id': userId,
                         'x-request-id': requestId,
-                        'x-skip-image': true,
+                        'x-skip-image': skipImage, // <-- Truyền giá trị từ state
                     },
                 },
             );
 
-            const storyData = await pollInitializationResult(requestId, true);
+            const storyData = await pollInitializationResult(
+                requestId,
+                skipImage,
+            );
 
             console.log('Initialized story data:', storyData);
 
@@ -288,10 +292,41 @@ const StoryUploadPage: React.FC = () => {
                             <MenuItem value="gemini">Gemini</MenuItem>
                         </TextField>
 
+                        {/* Thêm trường chọn Skip Image */}
+                        <FormControl fullWidth margin="normal">
+                            <InputLabel id="skip-image-label">
+                                Skip Image Generation
+                            </InputLabel>
+                            <Select
+                                labelId="skip-image-label"
+                                value={skipImage.toString()} // boolean → string để Select hoạt động
+                                label="Skip Image Generation"
+                                onChange={(e) =>
+                                    setSkipImage(e.target.value === 'true')
+                                }
+                            >
+                                <MenuItem value="true">
+                                    Yes (faster, no images)
+                                </MenuItem>
+                                <MenuItem value="false">
+                                    No (generate cover images)
+                                </MenuItem>
+                            </Select>
+                            <Typography
+                                variant="caption"
+                                color="text.secondary"
+                                sx={{ mt: 1 }}
+                            >
+                                {skipImage
+                                    ? 'Skipping image generation will make initialization faster.'
+                                    : 'Images will be generated (may take longer).'}
+                            </Typography>
+                        </FormControl>
+
                         <Button
                             variant="contained"
                             fullWidth
-                            sx={{ mt: 2 }}
+                            sx={{ mt: 3 }}
                             size="large"
                             onClick={initializeStory}
                             disabled={isLoading}
