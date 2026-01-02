@@ -124,9 +124,7 @@ export class StoryInteractionService {
             });
 
             if (!chapter) {
-                throw new NotFoundException(
-                    'Chapter not found or not accessible',
-                );
+                return;
             }
 
             const storyId = chapter.story.id;
