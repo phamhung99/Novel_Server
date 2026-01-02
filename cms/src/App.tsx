@@ -9,6 +9,7 @@ import StoryDetailPage from './pages/StoryOverviewPage';
 import LoginPage from './pages/loginPage';
 import PrivateRoute from './utils/PrivateRoute';
 import ChapterReaderPage from './pages/ChapterReaderPage';
+import ManualChaptersPage from './pages/ManualChaptersPage';
 
 export default function App() {
     return (
@@ -46,6 +47,14 @@ export default function App() {
                         <Route
                             path="stories/:storyId/chapters/:index"
                             element={<ChapterReaderPage />}
+                        />
+                        <Route
+                            path="/dashboard/stories/manual-creation"
+                            element={<ManualChaptersPage />}
+                        />
+                        <Route
+                            path="/dashboard/stories/manual-creation/:storyId"
+                            element={<ManualChaptersPage />}
                         />
                     </Route>
                 </Route>

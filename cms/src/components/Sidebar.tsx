@@ -4,7 +4,8 @@ import { ROUTES } from '../constants/app.constants';
 
 const menuItems = [
     { label: 'Manage Users', path: ROUTES.USERS },
-    { label: 'Upload Story', path: ROUTES.STORY_UPLOAD },
+    { label: 'Manual Creation', path: ROUTES.MANUAL_CREATION },
+    { label: 'AI Creation', path: ROUTES.STORY_UPLOAD },
     { label: 'Manage Stories', path: ROUTES.MANAGE_STORIES },
 ];
 

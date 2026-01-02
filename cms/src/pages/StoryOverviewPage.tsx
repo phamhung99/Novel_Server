@@ -63,7 +63,7 @@ const StoryOverviewPage = () => {
         <Container maxWidth="xl" sx={{ py: 6 }}>
             <Button
                 variant="outlined"
-                onClick={() => navigate(-1)}
+                onClick={() => navigate(ROUTES.MANAGE_STORIES)}
                 sx={{ mb: 4 }}
             >
                 Back

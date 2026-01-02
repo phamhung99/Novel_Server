@@ -6,6 +6,7 @@ export const ROUTES = {
     STORY_PREVIEW: '/dashboard/stories/preview',
     CHAPTER_GENERATOR: '/dashboard/chapter-generator',
     MANAGE_STORIES: '/dashboard/stories/manage',
+    MANUAL_CREATION: '/dashboard/stories/manual-creation',
 };
 
 export const SERVER_URL = import.meta.env.VITE_SERVER_URL;
