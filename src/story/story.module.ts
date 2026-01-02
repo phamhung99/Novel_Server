@@ -19,6 +19,7 @@ import { StoryInteractionService } from './story-interaction.service';
 import { StoryGenerationService } from './story-generation.service';
 import { StoryDiscoveryService } from './story-discovery.service';
 import { ChapterViews } from './entities/chapter-views.entity';
+import { MediaService } from 'src/media/media.service';
 
 @Module({
     imports: [
@@ -39,6 +40,7 @@ import { ChapterViews } from './entities/chapter-views.entity';
     providers: [
         StoryService,
         DoSpacesService,
+        MediaService,
         ChapterService,
         StoryCrudService,
         StoryPublicationService,

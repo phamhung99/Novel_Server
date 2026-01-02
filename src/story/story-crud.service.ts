@@ -8,6 +8,8 @@ import { PaginationDto } from './dto/pagination.dto';
 import { StoryVisibility } from 'src/common/enums/story-visibility.enum';
 import { StoryStatus } from 'src/common/enums/story-status.enum';
 import { DoSpacesService } from 'src/upload/do-spaces.service';
+import { ERROR_MESSAGES } from 'src/common/constants/app.constant';
+import { MediaService } from 'src/media/media.service';
 
 @Injectable()
 export class StoryCrudService {
@@ -15,6 +17,7 @@ export class StoryCrudService {
         @InjectRepository(Story)
         private storyRepository: Repository<Story>,
         private doSpacesService: DoSpacesService,
+        private mediaService: MediaService,
     ) {}
 
     async createStory(
@@ -323,5 +326,39 @@ export class StoryCrudService {
         if (result.affected === 0) {
             throw new NotFoundException(`Story with ID ${id} not found`);
         }
+    }
+
+    async updateStoryCoverImage(
+        storyId: string,
+        file: Express.Multer.File,
+    ): Promise<string> {
+        const story = await this.storyRepository.findOne({
+            where: { id: storyId },
+            select: ['id', 'coverImage'],
+        });
+
+        if (!story) {
+            throw new NotFoundException(ERROR_MESSAGES.STORY_NOT_FOUND);
+        }
+
+        const { key: newKey, url: newUrl } =
+            await this.mediaService.uploadStoryCover(file);
+
+        // 3. Lưu cũ để xóa sau
+        const oldKey = story.coverImage;
+
+        await this.storyRepository.update(
+            { id: storyId },
+            { coverImage: newKey },
+        );
+
+        // 5. Xóa cũ
+        if (oldKey && oldKey !== newKey) {
+            this.mediaService.delete(oldKey).catch((err) => {
+                console.error(`Delete old cover failed: ${oldKey}`, err);
+            });
+        }
+
+        return newUrl;
     }
 }

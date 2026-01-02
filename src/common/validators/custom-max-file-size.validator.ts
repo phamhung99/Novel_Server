@@ -12,12 +12,12 @@ export class CustomMaxFileSizeValidator extends FileValidator {
 
         let configKey: string;
         switch (file.mimetype) {
-            case AllowedFileMimeTypes.TXT:
-                configKey = 'TXT';
-                break;
-            case AllowedFileMimeTypes.DOCX:
-                configKey = 'DOCX';
-                break;
+            // case AllowedFileMimeTypes.TXT:
+            //     configKey = 'TXT';
+            //     break;
+            // case AllowedFileMimeTypes.DOCX:
+            //     configKey = 'DOCX';
+            //     break;
             case AllowedImageMimeTypes.JPEG:
             case AllowedImageMimeTypes.PNG:
             case AllowedImageMimeTypes.JPG:

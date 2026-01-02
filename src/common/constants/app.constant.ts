@@ -33,6 +33,8 @@ export const ERROR_MESSAGES = {
 
     STORY_ID_REQUIRED: 'storyId is required',
 
+    STORY_NOT_FOUND: 'Story not found',
+
     // Common
     CONTENT_GENERATE_ERROR: 'An error occurred, please try again later.',
     USER_NOT_FOUND: 'User not found',

@@ -29,6 +29,7 @@ export class StoryService {
     updateStory = this.crud.updateStory.bind(this.crud);
     deleteStory = this.crud.deleteStory.bind(this.crud);
     restoreStory = this.crud.restoreStory.bind(this.crud);
+    updateStoryCoverImage = this.crud.updateStoryCoverImage.bind(this.crud);
 
     // ========================
     // Publication Workflow

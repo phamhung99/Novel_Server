@@ -49,6 +49,24 @@ export class DoSpacesService {
         return `${key}`;
     }
 
+    async uploadFromBuffer(
+        buffer: Buffer,
+        key: string,
+        contentType: string = 'image/jpeg',
+    ): Promise<string> {
+        await this.client.send(
+            new PutObjectCommand({
+                Bucket: this.bucket,
+                Key: key,
+                Body: buffer,
+                ACL: 'public-read',
+                ContentType: contentType,
+            }),
+        );
+
+        return key;
+    }
+
     async deleteImage(key: string): Promise<void> {
         await this.client.send(
             new DeleteObjectCommand({

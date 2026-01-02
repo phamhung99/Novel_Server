@@ -10,6 +10,9 @@ import {
     Headers,
     BadRequestException,
     Query,
+    UseInterceptors,
+    UploadedFile,
+    ParseFilePipe,
 } from '@nestjs/common';
 import { StoryService } from './story.service';
 import { CreateStoryDto } from './dto/create-story.dto';
@@ -27,21 +30,21 @@ import {
     InitializeStoryDto,
     InitializeStoryResponseDto,
 } from './dto/generate-story-outline.dto';
-import { LibraryType } from 'src/common/enums/app.enum';
-import { ERROR_MESSAGES } from 'src/common/constants/app.constant';
-import { StoryStatus } from 'src/common/enums/story-status.enum';
+import { AllowedImageMimeTypes, LibraryType } from 'src/common/enums/app.enum';
+import {
+    ERROR_MESSAGES,
+    MAX_FILE_SIZE_UPLOAD,
+} from 'src/common/constants/app.constant';
 import { UserService } from 'src/user/user.service';
 import { ChapterService } from './chapter.service';
 import { PaginationDto } from './dto/pagination.dto';
 import { DiscoverStoriesDto } from './dto/discover-stories.dto';
-// import { FileInterceptor } from '@nestjs/platform-express';
-// import { diskStorage } from 'multer';
-// import { extname, join } from 'path';
-// import { existsSync, mkdirSync } from 'fs';
-// import { MAX_FILE_SIZE_UPLOAD } from 'src/common/constants/app.constant';
-// import { CustomMaxFileSizeValidator } from 'src/common/validators/custom-max-file-size.validator';
-// import { MimeTypeValidator } from 'src/common/validators/mime-type.validator';
-// import { AllowedImageMimeTypes } from 'src/common/enums/app.enum';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { diskStorage } from 'multer';
+import { extname, join } from 'path';
+import { CustomMaxFileSizeValidator } from 'src/common/validators/custom-max-file-size.validator';
+import { MimeTypeValidator } from 'src/common/validators/mime-type.validator';
+import { MediaService } from 'src/media/media.service';
 
 @Controller('story')
 export class StoryController {
@@ -49,7 +52,54 @@ export class StoryController {
         private readonly storyService: StoryService,
         private readonly userService: UserService,
         private readonly chapterService: ChapterService,
+        private readonly mediaService: MediaService,
     ) {}
+
+    @Post(':storyId/upload-cover')
+    @UseInterceptors(
+        FileInterceptor('image', {
+            storage: diskStorage({
+                destination:
+                    process.env.NODE_ENV === 'production'
+                        ? '/tmp'
+                        : join(process.cwd(), 'tmp'),
+                filename: (req, file, cb) => {
+                    const unique = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
+                    cb(
+                        null,
+                        `${file.fieldname}-${unique}${extname(file.originalname)}`,
+                    );
+                },
+            }),
+            limits: { fileSize: MAX_FILE_SIZE_UPLOAD.IMAGE },
+        }),
+    )
+    async uploadCover(
+        @Headers('x-user-id') userId: string,
+        @Param('storyId') storyId: string,
+        @UploadedFile(
+            new ParseFilePipe({
+                validators: [
+                    new CustomMaxFileSizeValidator(MAX_FILE_SIZE_UPLOAD),
+                    new MimeTypeValidator(AllowedImageMimeTypes),
+                ],
+                fileIsRequired: true,
+            }),
+        )
+        file: Express.Multer.File,
+    ) {
+        if (!userId) throw new BadRequestException('userId required');
+
+        const coverImageUrl = await this.storyService.updateStoryCoverImage(
+            storyId,
+            file,
+        );
+
+        return {
+            message: 'Cover image uploaded successfully',
+            coverImageUrl,
+        };
+    }
 
     @Post(':storyId/like')
     async likeStory(
@@ -166,46 +216,6 @@ export class StoryController {
 
         return await this.storyService.getGeneratedChapterResults(requestId);
     }
-
-    // @Post('upload-cover')
-    // @UseInterceptors(
-    //     FileInterceptor('image', {
-    //         storage: diskStorage({
-    //             destination: tmpDir,
-    //                 const uniqueSuffix =
-    //                     Date.now() + '-' + Math.round(Math.random() * 1e9);
-    //                 cb(
-    //                     null,
-    //                     `${file.fieldname}-${uniqueSuffix}${extname(file.originalname)}`,
-    //                 );
-    //             },
-    //         }),
-    //     }),
-    // )
-    // async uploadCover(
-    //     @Headers('x-user-id') userId: string,
-    //     @UploadedFile(
-    //         new ParseFilePipe({
-    //             validators: [
-    //                 new CustomMaxFileSizeValidator(MAX_FILE_SIZE_UPLOAD),
-    //                 new MimeTypeValidator(AllowedImageMimeTypes),
-    //             ],
-    //             fileIsRequired: true,
-    //         }),
-    //     )
-    //     image: Express.Multer.File,
-    // ): Promise<any> {
-    //     if (!userId) {
-    //         throw new BadRequestException('userId is required');
-    //     }
-    //     if (!image) {
-    //         throw new BadRequestException('No file uploaded');
-    //     }
-    //     return {
-    //         filename: image.filename,
-    //         path: image.path,
-    //     };
-    // }
 
     @Post()
     async createStory(
