@@ -247,9 +247,22 @@ const StoryOverviewPage = () => {
                                     sx={{ mb: 3 }}
                                 />
                             ) : (
-                                <Typography variant="h3" gutterBottom>
-                                    {story.title}
-                                </Typography>
+                                <>
+                                    <Typography variant="h3" gutterBottom>
+                                        {story.title}
+                                    </Typography>
+                                    <Typography
+                                        variant="caption"
+                                        color="text.secondary"
+                                        sx={{
+                                            display: 'block',
+                                            mb: 2,
+                                            fontFamily: 'monospace',
+                                        }}
+                                    >
+                                        ID: {storyId}
+                                    </Typography>
+                                </>
                             )}
 
                             <Typography variant="body1" gutterBottom>
