@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
     Box,
     Button,
@@ -20,6 +20,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import axios from '../api/axios';
 import type { StoryDto } from '../types/app';
 import { ROUTES } from '../constants/app.constants';
+import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 
 const StoryOverviewPage = () => {
     const userId = useMemo(
@@ -31,6 +32,50 @@ const StoryOverviewPage = () => {
     const [story, setStory] = useState<StoryDto | null>(null);
     const [loading, setLoading] = useState(true);
     const [editMode, setEditMode] = useState(false);
+    const [uploadingCover, setUploadingCover] = useState(false);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+
+    const handleUploadCover = async (
+        e: React.ChangeEvent<HTMLInputElement>,
+    ) => {
+        const file = e.target.files?.[0];
+        if (!file || !story || !userId) return;
+
+        setUploadingCover(true);
+
+        try {
+            const formData = new FormData();
+            formData.append('image', file);
+
+            const res = await axios.post(
+                `/api/v1/story/${storyId}/upload-cover`,
+                formData,
+                {
+                    headers: {
+                        'x-user-id': userId,
+                        'Content-Type': 'multipart/form-data',
+                    },
+                },
+            );
+
+            const newCoverUrl = res.data?.data?.coverImageUrl;
+
+            if (newCoverUrl) {
+                setStory((prev) =>
+                    prev ? { ...prev, coverImageUrl: newCoverUrl } : prev,
+                );
+                alert('Upload ảnh bìa thành công!');
+            }
+        } catch (err) {
+            console.error('Upload cover failed:', err);
+            alert('Upload thất bại. Vui lòng thử lại.');
+        } finally {
+            setUploadingCover(false);
+            if (fileInputRef.current) {
+                fileInputRef.current.value = '';
+            }
+        }
+    };
 
     useEffect(() => {
         const fetchStory = async () => {
@@ -103,7 +148,45 @@ const StoryOverviewPage = () => {
                                 </Typography>
                             </Box>
                         )}
+
+                        {/* Overlay khi đang upload */}
+                        {uploadingCover && (
+                            <Box
+                                sx={{
+                                    position: 'absolute',
+                                    inset: 0,
+                                    bgcolor: 'rgba(0,0,0,0.4)',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                }}
+                            >
+                                <CircularProgress color="inherit" />
+                            </Box>
+                        )}
                     </Paper>
+
+                    {/* Nút chọn ảnh + input ẩn */}
+                    <input
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp"
+                        ref={fileInputRef}
+                        style={{ display: 'none' }}
+                        onChange={handleUploadCover}
+                    />
+
+                    <Button
+                        fullWidth
+                        variant="outlined"
+                        startIcon={<CloudUploadIcon />}
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={uploadingCover}
+                        sx={{ mb: 2 }}
+                    >
+                        {uploadingCover
+                            ? 'Đang tải lên...'
+                            : 'Thay đổi ảnh bìa'}
+                    </Button>
 
                     <Button
                         fullWidth

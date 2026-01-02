@@ -300,6 +300,7 @@ const ManualChaptersPage = () => {
         fetchGenres();
     }, []);
 
+    // ── RENDER ────────────────────────────────────────────────────────────────
     if (loading) {
         return (
             <Container maxWidth="md" sx={{ py: 8, textAlign: 'center' }}>

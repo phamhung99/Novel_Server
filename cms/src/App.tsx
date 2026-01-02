@@ -5,7 +5,7 @@ import StoryUploadPage from './pages/StoryUploadPage';
 import StoryPreviewPage from './pages/StoryPreviewPage';
 import ChapterGeneratorPage from './pages/ChapterGeneratorPage';
 import ManageStories from './pages/ManageStoriesPage';
-import StoryDetailPage from './pages/StoryOverviewPage';
+import StoryOverviewPage from './pages/StoryOverviewPage';
 import LoginPage from './pages/loginPage';
 import PrivateRoute from './utils/PrivateRoute';
 import ChapterReaderPage from './pages/ChapterReaderPage';
@@ -42,7 +42,7 @@ export default function App() {
                         />
                         <Route
                             path="stories/:storyId"
-                            element={<StoryDetailPage />}
+                            element={<StoryOverviewPage />}
                         />
                         <Route
                             path="stories/:storyId/chapters/:index"
