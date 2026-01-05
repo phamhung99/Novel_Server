@@ -8,6 +8,8 @@ import {
     Divider,
     Stack,
 } from '@mui/material';
+
+import EditIcon from '@mui/icons-material/Edit';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
@@ -53,6 +55,36 @@ const ChapterReaderPage = () => {
     const [loading, setLoading] = useState(true);
     const [editMode, setEditMode] = useState(false);
 
+    const handleSaveChapter = async () => {
+        if (!chapter || !storyId) return;
+
+        try {
+            setLoading(true);
+
+            const updateData = {
+                title: chapter.title,
+                content: chapter.content,
+            };
+
+            await axios.put(
+                `/api/v1/story/${storyId}/chapter/${chapter.index}`,
+                updateData,
+                {
+                    headers: {
+                        'x-user-id': userId,
+                    },
+                },
+            );
+
+            setEditMode(false);
+        } catch (err) {
+            console.error('Failed to save chapter:', err);
+            alert('Failed to save chapter. Please try again.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
     useEffect(() => {
         const fetchChapter = async () => {
             if (!storyId || !index) return;
@@ -67,8 +99,8 @@ const ChapterReaderPage = () => {
                     },
                 );
                 setChapter(res.data.data);
+                console.log(res.data.data, index);
 
-                // Nếu KHÔNG có state (ví dụ: user refresh trang hoặc mở link trực tiếp)
                 if (!navState) {
                     const storyRes = await axios.get(
                         `/api/v1/story/${storyId}`,
@@ -138,6 +170,19 @@ const ChapterReaderPage = () => {
                 {storyTitle}
             </Typography>
 
+            {!editMode && (
+                <Stack direction="row" justifyContent="flex-end" sx={{ mb: 3 }}>
+                    <Button
+                        variant="outlined"
+                        color="primary"
+                        startIcon={<EditIcon />}
+                        onClick={() => setEditMode(true)}
+                    >
+                        Edit Chapter
+                    </Button>
+                </Stack>
+            )}
+
             {editMode ? (
                 <TextField
                     fullWidth
@@ -184,10 +229,8 @@ const ChapterReaderPage = () => {
                         <Button
                             variant="contained"
                             color="success"
-                            onClick={() => {
-                                console.log('Save chapter:', chapter);
-                                setEditMode(false);
-                            }}
+                            onClick={handleSaveChapter}
+                            disabled={loading}
                         >
                             Save Chapter
                         </Button>

@@ -15,7 +15,14 @@ import {
     ListItemText,
     Paper,
     Chip,
+    IconButton,
+    DialogTitle,
+    Dialog,
+    DialogContentText,
+    DialogContent,
+    DialogActions,
 } from '@mui/material';
+import DeleteIcon from '@mui/icons-material/Delete';
 import { useParams, useNavigate } from 'react-router-dom';
 import axios from '../api/axios';
 import type { StoryDto } from '../types/app';
@@ -34,6 +41,11 @@ const StoryOverviewPage = () => {
     const [editMode, setEditMode] = useState(false);
     const [uploadingCover, setUploadingCover] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const [chapterToDelete, setChapterToDelete] = useState<{
+        index: number;
+        title?: string;
+    } | null>(null);
+    const [deletingIndex, setDeletingIndex] = useState<number | null>(null);
 
     const handleUploadCover = async (
         e: React.ChangeEvent<HTMLInputElement>,
@@ -74,6 +86,34 @@ const StoryOverviewPage = () => {
             if (fileInputRef.current) {
                 fileInputRef.current.value = '';
             }
+        }
+    };
+
+    const handleDeleteChapter = async () => {
+        if (!chapterToDelete || !storyId || !userId) return;
+
+        const idx = chapterToDelete.index;
+        setDeletingIndex(idx);
+
+        try {
+            await axios.delete(`/api/v1/story/${storyId}/chapter/${idx}`, {
+                headers: { 'x-user-id': userId },
+            });
+
+            setStory((prev) => {
+                if (!prev) return prev;
+                return {
+                    ...prev,
+                    chapters: prev.chapters.filter((c) => c.index !== idx),
+                };
+            });
+
+            setChapterToDelete(null);
+        } catch (err) {
+            console.error('Delete chapter failed:', err);
+            alert('Failed to delete chapter. Please try again.');
+        } finally {
+            setDeletingIndex(null);
         }
     };
 
@@ -595,33 +635,68 @@ const StoryOverviewPage = () => {
                             ) : (
                                 <List>
                                     {story.chapters.map((chapter) => (
-                                        <ListItemButton
+                                        <Box
                                             key={chapter.id}
-                                            onClick={() =>
-                                                navigate(
-                                                    `${ROUTES.STORY_OVERVIEW}/${storyId}/chapters/${chapter.index}`,
-                                                    {
-                                                        state: {
-                                                            storyTitle:
-                                                                story.title,
-                                                            totalChapters:
-                                                                story.chapters
-                                                                    .length,
-                                                            chapterIndexes:
-                                                                story.chapters.map(
-                                                                    (c) =>
-                                                                        c.index,
-                                                                ),
-                                                        },
-                                                    },
-                                                )
-                                            }
-                                            sx={{ borderRadius: 1, mb: 1 }}
+                                            sx={{
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: 1,
+                                                mb: 1,
+                                            }}
                                         >
-                                            <ListItemText
-                                                primary={`Chapter ${chapter.index}: ${chapter.title}`}
-                                            />
-                                        </ListItemButton>
+                                            <ListItemButton
+                                                onClick={() =>
+                                                    navigate(
+                                                        `${ROUTES.STORY_OVERVIEW}/${storyId}/chapters/${chapter.index}`,
+                                                        {
+                                                            state: {
+                                                                storyTitle:
+                                                                    story.title,
+                                                                totalChapters:
+                                                                    story
+                                                                        .chapters
+                                                                        .length,
+                                                                chapterIndexes:
+                                                                    story.chapters.map(
+                                                                        (c) =>
+                                                                            c.index,
+                                                                    ),
+                                                            },
+                                                        },
+                                                    )
+                                                }
+                                                sx={{
+                                                    borderRadius: 1,
+                                                    flex: 1,
+                                                }}
+                                                disabled={
+                                                    deletingIndex ===
+                                                    chapter.index
+                                                }
+                                            >
+                                                <ListItemText
+                                                    primary={`Chapter ${chapter.index}: ${chapter.title}`}
+                                                />
+                                            </ListItemButton>
+
+                                            <IconButton
+                                                aria-label="Delete chapter"
+                                                color="error"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setChapterToDelete({
+                                                        index: chapter.index,
+                                                        title: chapter.title,
+                                                    });
+                                                }}
+                                                disabled={
+                                                    deletingIndex ===
+                                                    chapter.index
+                                                }
+                                            >
+                                                <DeleteIcon />
+                                            </IconButton>
+                                        </Box>
                                     ))}
                                 </List>
                             )}
@@ -629,6 +704,43 @@ const StoryOverviewPage = () => {
                     </Card>
                 </Grid>
             </Grid>
+            <Dialog
+                open={!!chapterToDelete}
+                onClose={() => {
+                    if (deletingIndex !== null) return;
+                    setChapterToDelete(null);
+                }}
+            >
+                <DialogTitle>Delete chapter?</DialogTitle>
+                <DialogContent>
+                    <DialogContentText>
+                        Are you sure you want to delete{' '}
+                        <strong>
+                            Chapter {chapterToDelete?.index}
+                            {chapterToDelete?.title
+                                ? `: ${chapterToDelete.title}`
+                                : ''}
+                        </strong>
+                        ? This action cannot be undone.
+                    </DialogContentText>
+                </DialogContent>
+                <DialogActions>
+                    <Button
+                        onClick={() => setChapterToDelete(null)}
+                        disabled={deletingIndex !== null}
+                    >
+                        Cancel
+                    </Button>
+                    <Button
+                        variant="contained"
+                        color="error"
+                        onClick={handleDeleteChapter}
+                        disabled={deletingIndex !== null}
+                    >
+                        {deletingIndex !== null ? 'Deleting...' : 'Delete'}
+                    </Button>
+                </DialogActions>
+            </Dialog>
         </Container>
     );
 };
