@@ -22,7 +22,7 @@ export default () => {
             username: dbConfig.user || process.env.DB_USERNAME,
             password: dbConfig.password || process.env.DB_PASSWORD,
             database: dbConfig.database || process.env.DB_DATABASE,
-            schema: process.env.DB_SCHEMA || 'public',
+            schema: process.env.DB_SCHEMA || 'comic',
             synchronize: process.env.NODE_ENV !== 'production',
             retryAttempts: 0,
             retryDelay: 3000,
