@@ -4,10 +4,13 @@ import {
     PrimaryGeneratedColumn,
     ManyToOne,
     JoinColumn,
+    Index,
 } from 'typeorm';
 import { User } from 'src/user/entities/user.entity';
 import { Chapter } from './chapter.entity';
+import { Story } from './story.entity';
 
+@Index('idx_chapter_views_viewedat_storyid', ['viewedAt', 'story'])
 @Entity('chapter_views')
 export class ChapterViews {
     @PrimaryGeneratedColumn('uuid')
@@ -20,6 +23,10 @@ export class ChapterViews {
     @ManyToOne(() => User, { onDelete: 'SET NULL' })
     @JoinColumn({ name: 'user_id' })
     user: User | null;
+
+    @ManyToOne(() => Story, { onDelete: 'CASCADE' })
+    @JoinColumn({ name: 'story_id' })
+    story: Story;
 
     @Column({
         name: 'viewed_at',

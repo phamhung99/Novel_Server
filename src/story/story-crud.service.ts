@@ -52,8 +52,8 @@ export class StoryCrudService {
 
         const items = stories.map((story) => ({
             ...story,
-            likesCount: story.summary?.likesCount || 0,
-            viewsCount: story.summary?.viewsCount || 0,
+            // likesCount: story.summary?.likesCount || 0,
+            // viewsCount: story.summary?.viewsCount || 0,
             mainCategory:
                 story.storyCategories.find((sc) => sc.isMainCategory)
                     ?.category || null,
@@ -97,8 +97,8 @@ export class StoryCrudService {
 
         const items = stories.map((story) => ({
             ...story,
-            likesCount: story.summary?.likesCount || 0,
-            viewsCount: story.summary?.viewsCount || 0,
+            // likesCount: story.summary?.likesCount || 0,
+            // viewsCount: story.summary?.viewsCount || 0,
             mainCategory:
                 story.storyCategories.find((sc) => sc.isMainCategory)
                     ?.category || null,
@@ -141,8 +141,8 @@ export class StoryCrudService {
 
         const items = stories.map((story) => ({
             ...story,
-            likesCount: story.summary?.likesCount || 0,
-            viewsCount: story.summary?.viewsCount || 0,
+            // likesCount: story.summary?.likesCount || 0,
+            // viewsCount: story.summary?.viewsCount || 0,
             mainCategory:
                 story.storyCategories.find((sc) => sc.isMainCategory)
                     ?.category || null,
@@ -191,8 +191,8 @@ export class StoryCrudService {
 
         const items = stories.map((story) => ({
             ...story,
-            likesCount: story.summary?.likesCount || 0,
-            viewsCount: story.summary?.viewsCount || 0,
+            // likesCount: story.summary?.likesCount || 0,
+            // viewsCount: story.summary?.viewsCount || 0,
             mainCategory:
                 story.storyCategories.find((sc) => sc.isMainCategory)
                     ?.category || null,

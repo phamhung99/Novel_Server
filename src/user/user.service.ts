@@ -131,7 +131,6 @@ export class UserService extends BaseCrudService<User> {
                     userId,
                 })
                 .leftJoin('s.generation', 'generation')
-                .leftJoin('story_summary', 'ss', 'ss.story_id = s.id')
                 .leftJoin('s.storyCategories', 'sc')
                 .leftJoin('sc.category', 'cat')
                 .select([
@@ -154,8 +153,8 @@ export class UserService extends BaseCrudService<User> {
                     'rh.lastReadAt AS "lastReadAt"',
                     'rh.lastReadChapter AS "lastReadChapter"',
                     'CASE WHEN likes.id IS NULL THEN false ELSE true END AS "isLike"',
-                    'ss.likes_count AS "likesCount"',
-                    'ss.views_count AS "viewsCount"',
+                    's.likes_count AS "likesCount"',
+                    's.views_count AS "viewsCount"',
                     `(COUNT(*) OVER() = COALESCE((generation.prompt ->> 'numberOfChapters')::int, 0)) AS "isCompleted"`,
                 ])
                 .where('rh.user_id = :userId', { userId })
@@ -163,7 +162,7 @@ export class UserService extends BaseCrudService<User> {
                     status: StoryStatus.PUBLISHED,
                 })
                 .groupBy(
-                    's.id, a.id, rh.lastReadAt, rh.lastReadChapter, likes.id, ss.likes_count, ss.views_count, generation.prompt',
+                    's.id, a.id, rh.lastReadAt, rh.lastReadChapter, likes.id, s.likes_count, s.views_count, generation.prompt',
                 )
                 .orderBy('rh.lastReadAt', 'DESC')
                 .offset(offset)

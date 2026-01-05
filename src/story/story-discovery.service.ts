@@ -12,6 +12,7 @@ import { Category } from './entities/categories.entity';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Story } from './entities/story.entity';
 import { Chapter } from './entities/chapter.entity';
+import { ChapterViews } from './entities/chapter-views.entity';
 
 @Injectable()
 export class StoryDiscoveryService {
@@ -35,7 +36,6 @@ export class StoryDiscoveryService {
             .leftJoin('s.author', 'a')
             .leftJoin('s.likes', 'likes', 'likes.userId = :userId', { userId })
             .leftJoin('s.generation', 'generation')
-            .leftJoin('story_summary', 'ss', 'ss.story_id = s.id')
             .leftJoin('s.storyCategories', 'sc')
             .leftJoin('sc.category', 'cat')
             .leftJoin(
@@ -55,6 +55,8 @@ export class StoryDiscoveryService {
                 's.createdAt AS "createdAt"',
                 's.updatedAt AS "updatedAt"',
                 's.visibility AS "visibility"',
+                's.likes_count AS "likesCount"',
+                's.views_count AS "viewsCount"',
 
                 `json_agg(DISTINCT jsonb_build_object('id', cat.id, 'name', cat.name)) AS "categories"`,
 
@@ -70,14 +72,16 @@ export class StoryDiscoveryService {
 
                 'CASE WHEN likes.id IS NULL THEN false ELSE true END AS "isLike"',
 
-                'ss.likes_count AS "likesCount"',
-                'ss.views_count AS "viewsCount"',
-
                 `(COUNT(*) OVER() = COALESCE((generation.prompt ->> 'numberOfChapters')::int, 0)) AS "isCompleted"`,
             ])
-            .groupBy(
-                's.id, a.id, likes.id, ss.likes_count, ss.views_count, generation.prompt,  rh.lastReadAt, rh.lastReadChapter',
-            );
+            .groupBy('s.id')
+            .addGroupBy('a.id')
+            .addGroupBy('likes.id')
+            .addGroupBy('s.likes_count')
+            .addGroupBy('s.views_count')
+            .addGroupBy('generation.prompt')
+            .addGroupBy('rh.lastReadAt')
+            .addGroupBy('rh.lastReadChapter');
 
         // ===== Filter theo type =====
         if (type === LibraryType.CREATED) {
@@ -163,14 +167,12 @@ export class StoryDiscoveryService {
     ) {
         const offset = (page - 1) * limit;
 
-        // Query chính: lấy top story theo views_count giảm dần từ story_summary
         const qb = this.dataSource
             .getRepository(Story)
             .createQueryBuilder('s')
             .leftJoin('s.author', 'a')
             .leftJoin('s.likes', 'likes', 'likes.userId = :userId', { userId })
             .leftJoin('s.generation', 'generation')
-            .innerJoin('story_summary', 'ss', 'ss.story_id = s.id')
             .leftJoin('s.storyCategories', 'sc')
             .leftJoin('sc.category', 'cat')
             .leftJoin(
@@ -178,6 +180,17 @@ export class StoryDiscoveryService {
                 'rh',
                 'rh.story_id = s.id AND rh.user_id = :userId',
                 { userId },
+            )
+            .leftJoin(
+                (qb) =>
+                    qb
+                        .select('cv.story_id')
+                        .addSelect('COUNT(cv.id)', 'views_count')
+                        .from(ChapterViews, 'cv')
+                        .where("cv.viewed_at >= NOW() - INTERVAL '60 days'")
+                        .groupBy('cv.story_id'),
+                'recent_views',
+                'recent_views.story_id = s.id',
             )
             .select([
                 's.id AS "storyId"',
@@ -190,6 +203,8 @@ export class StoryDiscoveryService {
                 's.createdAt AS "createdAt"',
                 's.updatedAt AS "updatedAt"',
                 's.visibility AS "visibility"',
+                's.likes_count AS "likesCount"',
+                's.views_count AS "viewsCount"',
 
                 `json_agg(DISTINCT jsonb_build_object('id', cat.id, 'name', cat.name)) AS "categories"`,
 
@@ -205,20 +220,24 @@ export class StoryDiscoveryService {
 
                 'CASE WHEN likes.id IS NULL THEN false ELSE true END AS "isLike"',
 
-                'ss.likes_count AS "likesCount"',
-                'ss.views_count AS "viewsCount"',
-
                 `(COUNT(*) OVER() = COALESCE((generation.prompt ->> 'numberOfChapters')::int, 0)) AS "isCompleted"`,
             ])
+
             .where('s.visibility = :visibility', {
                 visibility: StoryVisibility.PUBLIC,
             })
             .andWhere('s.status = :status', { status: StoryStatus.PUBLISHED })
-            .groupBy(
-                's.id, a.id, likes.id, ss.likes_count, ss.views_count, generation.prompt, rh.lastReadAt, rh.lastReadChapter, ss.views_last_60_days',
-            )
-            .orderBy('ss.views_last_60_days', 'DESC')
-            .addOrderBy('ss.likes_count', 'DESC')
+            .groupBy('s.id')
+            .addGroupBy('a.id')
+            .addGroupBy('likes.id')
+            .addGroupBy('s.likes_count')
+            .addGroupBy('s.views_count')
+            .addGroupBy('generation.prompt')
+            .addGroupBy('rh.lastReadAt')
+            .addGroupBy('rh.lastReadChapter')
+            .addGroupBy('recent_views.views_count')
+            .addOrderBy('recent_views.views_count', 'DESC', 'NULLS LAST')
+            .addOrderBy('s.likes_count', 'DESC', 'NULLS LAST')
             .addOrderBy('s.updatedAt', 'DESC')
             .offset(offset)
             .limit(limit);
@@ -292,8 +311,6 @@ export class StoryDiscoveryService {
             .leftJoin('s.author', 'a')
             .leftJoin('s.likes', 'likes', 'likes.userId = :userId', { userId })
             .leftJoin('s.generation', 'generation')
-            .innerJoin('story_summary', 'ss', 'ss.story_id = s.id')
-
             .innerJoin(
                 's.storyCategories',
                 'main_sc',
@@ -310,6 +327,17 @@ export class StoryDiscoveryService {
                 'rh.story_id = s.id AND rh.user_id = :userId',
                 { userId },
             )
+            .leftJoin(
+                (qb) =>
+                    qb
+                        .select('cv.story_id')
+                        .addSelect('COUNT(cv.id)', 'views_count')
+                        .from(ChapterViews, 'cv')
+                        .where("cv.viewed_at >= NOW() - INTERVAL '60 days'")
+                        .groupBy('cv.story_id'),
+                'recent_views',
+                'recent_views.story_id = s.id',
+            )
             .select([
                 's.id AS "storyId"',
                 's.title AS "title"',
@@ -321,12 +349,13 @@ export class StoryDiscoveryService {
                 's.createdAt AS "createdAt"',
                 's.updatedAt AS "updatedAt"',
                 's.visibility AS "visibility"',
+                's.likes_count AS "likesCount"',
+                's.views_count AS "viewsCount"',
 
                 `json_agg(DISTINCT jsonb_build_object('id', cat.id, 'name', cat.name)) AS "categories"`,
 
                 `json_agg(DISTINCT jsonb_build_object('id', cat.id, 'name', cat.name))
-             FILTER (WHERE sc.is_main_category = true) 
-             -> 0 AS "mainCategory"`,
+            FILTER (WHERE sc.isMainCategory = true) -> 0 AS "mainCategory"`,
 
                 'a.id AS "authorId"',
                 'a.username AS "authorUsername"',
@@ -337,20 +366,23 @@ export class StoryDiscoveryService {
 
                 'CASE WHEN likes.id IS NULL THEN false ELSE true END AS "isLike"',
 
-                'ss.likes_count AS "likesCount"',
-                'ss.views_count AS "viewsCount"',
-
                 `(COUNT(*) OVER() = COALESCE((generation.prompt ->> 'numberOfChapters')::int, 0)) AS "isCompleted"`,
             ])
             .where('s.visibility = :visibility', {
                 visibility: StoryVisibility.PUBLIC,
             })
             .andWhere('s.status = :status', { status: StoryStatus.PUBLISHED })
-            .groupBy(
-                's.id, a.id, likes.id, ss.likes_count, ss.views_count, generation.prompt, rh.lastReadAt, rh.lastReadChapter, ss.views_last_60_days',
-            )
-            .orderBy('ss.views_last_60_days', 'DESC')
-            .addOrderBy('ss.likes_count', 'DESC')
+            .groupBy('s.id')
+            .addGroupBy('a.id')
+            .addGroupBy('likes.id')
+            .addGroupBy('s.likes_count')
+            .addGroupBy('s.views_count')
+            .addGroupBy('generation.prompt')
+            .addGroupBy('rh.lastReadAt')
+            .addGroupBy('rh.lastReadChapter')
+            .addGroupBy('recent_views.views_count')
+            .addOrderBy('recent_views.views_count', 'DESC', 'NULLS LAST')
+            .addOrderBy('s.likes_count', 'DESC', 'NULLS LAST')
             .addOrderBy('s.updatedAt', 'DESC')
             .offset(offset)
             .limit(limit)
@@ -458,8 +490,6 @@ export class StoryDiscoveryService {
             .leftJoin('s.author', 'a')
             .leftJoin('s.likes', 'likes', 'likes.userId = :userId', { userId })
             .leftJoin('s.generation', 'generation')
-            .leftJoin('story_summary', 'ss', 'ss.story_id = s.id')
-
             // All categories
             .leftJoin('s.storyCategories', 'sc')
             .leftJoin('sc.category', 'cat')
@@ -484,6 +514,18 @@ export class StoryDiscoveryService {
                 'chapcnt',
                 'chapcnt.story_id = s.id',
             )
+            .leftJoin(
+                (subQb) =>
+                    subQb
+                        .select('cv.story_id', 'story_id')
+                        .addSelect('COUNT(cv.id)', 'views_count')
+                        .from(ChapterViews, 'cv')
+                        .where("cv.viewed_at >= NOW() - INTERVAL '60 days'")
+                        .groupBy('cv.story_id'),
+                'recent_views',
+                'recent_views.story_id = s.id',
+            )
+
             .select([
                 's.id AS "storyId"',
                 's.title AS "title"',
@@ -511,8 +553,8 @@ export class StoryDiscoveryService {
 
                 'CASE WHEN likes.id IS NULL THEN false ELSE true END AS "isLike"',
 
-                'ss.likes_count AS "likesCount"',
-                'ss.views_count AS "viewsCount"',
+                's.likes_count AS "likesCount"',
+                's.views_count AS "viewsCount"',
 
                 // Số chapter thực tế
                 'COALESCE(chapcnt.chapter_count::integer, 0) AS "chapterCount"',
@@ -569,8 +611,8 @@ export class StoryDiscoveryService {
         // === Sorting ===
         switch (sort) {
             case StorySort.POPULAR:
-                qb.orderBy('ss.views_last_60_days', 'DESC')
-                    .addOrderBy('ss.likes_count', 'DESC')
+                qb.orderBy('recent_views.views_count', 'DESC', 'NULLS LAST')
+                    .addOrderBy('s.likes_count', 'DESC', 'NULLS LAST')
                     .addOrderBy('s.updatedAt', 'DESC');
                 break;
             case StorySort.RECENTLY_UPDATED:
@@ -584,15 +626,15 @@ export class StoryDiscoveryService {
                 qb.orderBy('s.approvedAt', 'DESC');
                 break;
             default:
-                qb.orderBy('ss.views_last_60_days', 'DESC');
+                qb.orderBy('recent_views.views_count', 'DESC', 'NULLS LAST');
         }
 
         qb.groupBy('s.id')
             .addGroupBy('a.id')
             .addGroupBy('likes.id')
-            .addGroupBy('ss.likes_count')
-            .addGroupBy('ss.views_count')
-            .addGroupBy('ss.views_last_60_days')
+            .addGroupBy('s.likes_count')
+            .addGroupBy('s.views_count')
+            .addGroupBy('recent_views.views_count')
             .addGroupBy('generation.prompt')
             .addGroupBy('rh.lastReadAt')
             .addGroupBy('rh.lastReadChapter')

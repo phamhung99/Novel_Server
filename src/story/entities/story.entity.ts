@@ -20,7 +20,6 @@ import { StorySource } from 'src/common/enums/app.enum';
 import { StoryLikes } from './story-likes.entity';
 import { UserAudioPreference } from './user-audio-preference.entity';
 import { StoryCategory } from './story-category.entity';
-import { StorySummary } from './story-summary.entity';
 
 @Entity('story')
 export class Story {
@@ -90,6 +89,12 @@ export class Story {
     @Column({ name: 'rejection_reason', type: 'text', nullable: true })
     rejectionReason: string;
 
+    @Column({ name: 'likes_count', type: 'int', default: 0 })
+    likesCount: number;
+
+    @Column({ name: 'views_count', type: 'int', default: 0 })
+    viewsCount: number;
+
     @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
     createdAt: Date;
 
@@ -108,9 +113,6 @@ export class Story {
 
     @OneToMany(() => StoryLikes, (storyLikes) => storyLikes.story)
     likes: StoryLikes[];
-
-    @OneToOne(() => StorySummary, (summary) => summary.story, { cascade: true })
-    summary: StorySummary;
 
     @OneToMany(
         () => UserAudioPreference,

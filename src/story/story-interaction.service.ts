@@ -3,7 +3,6 @@ import { DataSource, MoreThan, Repository } from 'typeorm';
 import { Story } from './entities/story.entity';
 import { StoryLikes } from './entities/story-likes.entity';
 import { ChapterViews } from './entities/chapter-views.entity';
-import { StorySummary } from './entities/story-summary.entity';
 import { StoryVisibility } from 'src/common/enums/story-visibility.enum';
 import { StoryStatus } from 'src/common/enums/story-status.enum';
 import { getStartOfDay } from 'src/common/utils/date.utils';
@@ -54,7 +53,7 @@ export class StoryInteractionService {
             });
             await manager.save(newLike);
 
-            await manager.increment(StorySummary, { storyId }, 'likesCount', 1);
+            await manager.increment(Story, { id: storyId }, 'likesCount', 1);
 
             return {
                 isLike: true,
@@ -93,7 +92,7 @@ export class StoryInteractionService {
 
             await manager.remove(likeRecord);
 
-            await manager.decrement(StorySummary, { storyId }, 'likesCount', 1);
+            await manager.decrement(Story, { id: storyId }, 'likesCount', 1);
 
             return {
                 isLike: false,
@@ -144,24 +143,12 @@ export class StoryInteractionService {
                     viewedAt: now,
                 });
 
-                const summary = await manager.findOne(StorySummary, {
-                    where: { storyId },
-                });
-
-                if (summary) {
-                    await manager.increment(
-                        StorySummary,
-                        { storyId },
-                        'viewsCount',
-                        1,
-                    );
-                } else {
-                    await manager.insert(StorySummary, {
-                        storyId,
-                        viewsCount: 1,
-                        likesCount: 0,
-                    });
-                }
+                await manager.increment(
+                    Story,
+                    { id: storyId },
+                    'viewsCount',
+                    1,
+                );
             } else {
                 await manager.update(
                     ChapterViews,
