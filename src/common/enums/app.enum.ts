@@ -27,8 +27,8 @@ export enum StorySource {
 }
 
 export enum CoinType {
-    SILVER = 'silver',
-    GOLD = 'gold',
+    TEMPORARY = 'temporary',
+    PERMANENT = 'permanent',
 }
 
 export enum IapStore {

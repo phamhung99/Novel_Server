@@ -16,7 +16,6 @@ import { UserService } from './user.service';
 import { User } from './entities/user.entity';
 import { parseQueryOptions } from 'src/common/utils/parse-query-options.util';
 import { ERROR_MESSAGES } from 'src/common/constants/app.constant';
-import { excludeFields } from 'src/common/utils/exclude-fields';
 import { UpdateUserGenresDto } from './dto/update-user-genres.dto';
 
 @Controller('users')
@@ -69,25 +68,7 @@ export class UserController {
             language,
         });
 
-        const cleanedUser = excludeFields(user, ['password']);
-
-        return {
-            user: {
-                ...cleanedUser,
-                subscription: {
-                    isSubUser: false,
-                    basePlanId: null,
-                },
-                wallet: {
-                    totalCoins: 80,
-                    permanentCoins: 0,
-                    temporaryCoins: [
-                        { amount: 50, expiresAt: '2025-12-31T23:59:59Z' },
-                        { amount: 30, expiresAt: '2026-01-15T23:59:59Z' },
-                    ],
-                },
-            },
-        };
+        return await this.userService.getUserInfo(user);
     }
 
     @Get()

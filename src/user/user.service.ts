@@ -12,6 +12,8 @@ import { ERROR_MESSAGES } from 'src/common/constants/app.constant';
 import { ReadingHistory } from './entities/reading-history.entity';
 import { StoryStatus } from 'src/common/enums/story-status.enum';
 import { Chapter } from 'src/story/entities/chapter.entity';
+import { UserCoins } from './entities/user-coins.entity';
+import { CoinType } from 'src/common/enums/app.enum';
 
 @Injectable()
 export class UserService extends BaseCrudService<User> {
@@ -20,10 +22,8 @@ export class UserService extends BaseCrudService<User> {
         @InjectRepository(UserCategoryPreference)
         private readonly userCategoryPreferenceRepo: Repository<UserCategoryPreference>,
         private readonly dataSource: DataSource,
-        @InjectRepository(ReadingHistory)
-        private readonly readingHistoryRepo: Repository<ReadingHistory>,
-        @InjectRepository(Chapter)
-        private readonly chapterRepo: Repository<Chapter>,
+        @InjectRepository(UserCoins)
+        private readonly userCoinsRepository: Repository<UserCoins>,
     ) {
         super(userRepo);
     }
@@ -55,7 +55,14 @@ export class UserService extends BaseCrudService<User> {
         userId: string;
         language: string;
     }): Promise<User> {
-        let user = await this.findById(userId, false);
+        let user = await this.repository.findOne({
+            where: { id: userId },
+            relations: [
+                'userCategoryPreferences',
+                'userCategoryPreferences.category',
+            ],
+        });
+
         if (!user) {
             user = this.repository.create({
                 id: userId,
@@ -225,5 +232,72 @@ export class UserService extends BaseCrudService<User> {
             console.error('Failed to get recent stories:', error);
             throw new BadRequestException('Cannot fetch recent stories');
         }
+    }
+
+    async getUserInfo(user: User): Promise<any> {
+        if (!user) {
+            throw new NotFoundException('User not found');
+        }
+
+        const now = new Date();
+
+        // Get all coin records for this user
+        const coinRecords = await this.userCoinsRepository.find({
+            where: { userId: user.id },
+            order: { createdAt: 'ASC' },
+        });
+
+        // 1. Tính permanent (thường không expire)
+        const permanentCoins = coinRecords
+            .filter((c) => c.type === CoinType.PERMANENT)
+            .reduce((sum, c) => sum + c.remaining, 0);
+
+        // 2. Tính temporary còn hiệu lực
+        const activeTemporary = coinRecords.filter(
+            (c) =>
+                c.type === CoinType.TEMPORARY &&
+                c.expiresAt &&
+                c.expiresAt > now,
+        );
+
+        const temporaryCoinsForDisplay = activeTemporary.map((c) => ({
+            amount: c.remaining,
+            expiresAt: c.expiresAt!.toISOString(),
+        }));
+
+        const activeTemporaryAmount = activeTemporary.reduce(
+            (sum, c) => sum + c.remaining,
+            0,
+        );
+
+        // 3. Total = permanent + temporary còn hạn
+        const totalCoins = permanentCoins + activeTemporaryAmount;
+
+        // Preferred categories (sorted by some order — you may want to add order column later)
+        const preferredCategories = user.userCategoryPreferences
+            .map((pref) => ({
+                id: pref.categoryId,
+                name: pref.category?.name || 'Unknown',
+                displayOrder: pref.category?.displayOrder,
+            }))
+            .sort((a, b) => a.displayOrder - b.displayOrder);
+
+        user.userCategoryPreferences = undefined;
+
+        return {
+            user: {
+                ...user,
+                subscription: {
+                    isSubUser: false,
+                    basePlanId: null,
+                },
+                wallet: {
+                    totalCoins,
+                    permanentCoins,
+                    temporaryCoins: temporaryCoinsForDisplay,
+                },
+                preferredCategories,
+            },
+        };
     }
 }
