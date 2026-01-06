@@ -82,11 +82,11 @@ const StoryOverviewPage = () => {
                 setStory((prev) =>
                     prev ? { ...prev, coverImageUrl: newCoverUrl } : prev,
                 );
-                alert('Upload ảnh bìa thành công!');
+                alert('Cover image uploaded successfully!');
             }
         } catch (err) {
             console.error('Upload cover failed:', err);
-            alert('Upload thất bại. Vui lòng thử lại.');
+            alert('Upload failed. Please try again.');
         } finally {
             setUploadingCover(false);
             if (fileInputRef.current) {
@@ -203,7 +203,7 @@ const StoryOverviewPage = () => {
                             </Box>
                         )}
 
-                        {/* Overlay khi đang upload */}
+                        {/* Overlay while uploading */}
                         {uploadingCover && (
                             <Box
                                 sx={{
@@ -220,7 +220,7 @@ const StoryOverviewPage = () => {
                         )}
                     </Paper>
 
-                    {/* Nút chọn ảnh + input ẩn */}
+                    {/* Hidden input */}
                     <input
                         type="file"
                         accept="image/jpeg,image/png,image/webp"
@@ -237,9 +237,7 @@ const StoryOverviewPage = () => {
                         disabled={uploadingCover}
                         sx={{ mb: 2 }}
                     >
-                        {uploadingCover
-                            ? 'Đang tải lên...'
-                            : 'Thay đổi ảnh bìa'}
+                        {uploadingCover ? 'Uploading...' : 'Change cover image'}
                     </Button>
 
                     <Button
@@ -257,8 +255,8 @@ const StoryOverviewPage = () => {
                         sx={{ mb: 2 }}
                     >
                         {generatingCover
-                            ? 'Đang tạo...'
-                            : 'Tạo lại ảnh bìa bằng AI'}
+                            ? 'Generating...'
+                            : 'Regenerate cover image with AI'}
                     </Button>
 
                     <Button
@@ -343,7 +341,7 @@ const StoryOverviewPage = () => {
                                 <strong>Status:</strong> {story.status}
                             </Typography>
 
-                            {/* Categories (Main Category được highlight) */}
+                            {/* Categories (Main Category highlighted) */}
                             <Typography
                                 variant="body1"
                                 gutterBottom
@@ -351,7 +349,6 @@ const StoryOverviewPage = () => {
                             >
                                 <strong>Categories:</strong>
                                 {editMode ? (
-                                    // --- EDIT MODE: Hiển thị từng TextField nhưng vẫn giữ nguyên ID ---
                                     <Box
                                         sx={{
                                             mt: 1,
@@ -395,7 +392,6 @@ const StoryOverviewPage = () => {
                                                                 newCats,
                                                             );
 
-                                                            // Nếu đây là main category → cập nhật luôn mainCategory name
                                                             if (isMain) {
                                                                 handleChange(
                                                                     'mainCategory',
@@ -444,7 +440,6 @@ const StoryOverviewPage = () => {
                                         )}
                                     </Box>
                                 ) : (
-                                    // --- VIEW MODE: Chip thường + Main Category highlight ---
                                     <Box
                                         component="span"
                                         sx={{
@@ -584,7 +579,6 @@ const StoryOverviewPage = () => {
                                         </>
                                     )}
 
-                                    {/* Metadata riêng của generation (nếu có) */}
                                     {story.generation.metadata &&
                                         Object.keys(story.generation.metadata)
                                             .length > 0 && (
@@ -737,6 +731,7 @@ const StoryOverviewPage = () => {
                     </Card>
                 </Grid>
             </Grid>
+
             <Dialog
                 open={!!chapterToDelete}
                 onClose={() => {
@@ -774,6 +769,7 @@ const StoryOverviewPage = () => {
                     </Button>
                 </DialogActions>
             </Dialog>
+
             <Dialog
                 open={openGenerateDialog}
                 onClose={() => {
@@ -782,22 +778,22 @@ const StoryOverviewPage = () => {
                 maxWidth="sm"
                 fullWidth
             >
-                <DialogTitle>Tạo lại ảnh bìa bằng AI</DialogTitle>
+                <DialogTitle>Regenerate cover image with AI</DialogTitle>
                 <DialogContent>
                     <DialogContentText sx={{ mb: 2 }}>
-                        Nhập mô tả (prompt) để AI tạo ảnh bìa mới. Nếu để trống,
-                        hệ thống sẽ dùng prompt mặc định từ lần tạo story ban
-                        đầu.
+                        Enter a prompt for the AI to generate a new cover image.
+                        If you leave it empty, the system will use the default
+                        prompt from the original story generation.
                     </DialogContentText>
 
                     <TextField
                         fullWidth
                         multiline
                         minRows={3}
-                        label="Prompt cho ảnh bìa"
+                        label="Cover image prompt"
                         value={coverPrompt}
                         onChange={(e) => setCoverPrompt(e.target.value)}
-                        placeholder="Ví dụ: A mysterious dark fantasy forest with glowing runes, epic book cover style, cinematic lighting"
+                        placeholder="Example: A mysterious dark fantasy forest with glowing runes, epic book cover style, cinematic lighting"
                         disabled={generatingCover}
                         sx={{ mt: 1 }}
                         variant="outlined"
@@ -807,6 +803,7 @@ const StoryOverviewPage = () => {
                                     size="small"
                                     onClick={() => setCoverPrompt('')}
                                     disabled={generatingCover}
+                                    aria-label="Clear prompt"
                                 >
                                     <EditIcon fontSize="small" />
                                 </IconButton>
@@ -821,7 +818,7 @@ const StoryOverviewPage = () => {
                                 color="text.secondary"
                                 sx={{ mt: 1, display: 'block' }}
                             >
-                                Prompt mặc định (từ lần tạo đầu):{' '}
+                                Default prompt (from the initial generation):{' '}
                                 {(
                                     story.generation.metadata as any
                                 ).coverImage.substring(0, 120)}
@@ -832,12 +829,13 @@ const StoryOverviewPage = () => {
                             </Typography>
                         )}
                 </DialogContent>
+
                 <DialogActions>
                     <Button
                         onClick={() => setOpenGenerateDialog(false)}
                         disabled={generatingCover}
                     >
-                        Hủy
+                        Cancel
                     </Button>
                     <Button
                         variant="contained"
@@ -881,7 +879,7 @@ const StoryOverviewPage = () => {
                                             : prev,
                                     );
                                     alert(
-                                        'Ảnh bìa đã được tạo lại thành công!',
+                                        'Cover image was regenerated successfully!',
                                     );
                                     setOpenGenerateDialog(false);
                                 }
@@ -889,7 +887,7 @@ const StoryOverviewPage = () => {
                                 console.error('Generate cover failed:', err);
                                 alert(
                                     err.response?.data?.message ||
-                                        'Tạo ảnh thất bại. Vui lòng thử lại sau.',
+                                        'Generation failed. Please try again later.',
                                 );
                             } finally {
                                 setGeneratingCover(false);
@@ -897,7 +895,9 @@ const StoryOverviewPage = () => {
                         }}
                         disabled={generatingCover}
                     >
-                        {generatingCover ? 'Đang tạo...' : 'Tạo ảnh mới'}
+                        {generatingCover
+                            ? 'Generating...'
+                            : 'Generate new image'}
                     </Button>
                 </DialogActions>
             </Dialog>
