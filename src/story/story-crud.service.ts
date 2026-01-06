@@ -10,6 +10,7 @@ import { StoryStatus } from 'src/common/enums/story-status.enum';
 import { DoSpacesService } from 'src/upload/do-spaces.service';
 import { ERROR_MESSAGES } from 'src/common/constants/app.constant';
 import { MediaService } from 'src/media/media.service';
+import { StorySource } from 'src/common/enums/app.enum';
 
 @Injectable()
 export class StoryCrudService {
@@ -27,6 +28,7 @@ export class StoryCrudService {
         const story = this.storyRepository.create({
             ...createStoryDto,
             authorId,
+            sourceType: StorySource.CRAWL,
         });
         return this.storyRepository.save(story);
     }
@@ -38,7 +40,6 @@ export class StoryCrudService {
         const queryBuilder = this.storyRepository
             .createQueryBuilder('story')
             .leftJoinAndSelect('story.author', 'author')
-            .leftJoinAndSelect('story.summary', 'summary')
             .leftJoinAndSelect('story.storyCategories', 'storyCategories')
             .leftJoinAndSelect('storyCategories.category', 'category')
             .orderBy('story.createdAt', 'DESC')
@@ -81,7 +82,6 @@ export class StoryCrudService {
         const queryBuilder = this.storyRepository
             .createQueryBuilder('story')
             .leftJoinAndSelect('story.author', 'author')
-            .leftJoinAndSelect('story.summary', 'summary')
             .leftJoinAndSelect('story.storyCategories', 'storyCategories')
             .leftJoinAndSelect('storyCategories.category', 'category')
             .where('story.deletedAt IS NOT NULL')
@@ -126,7 +126,6 @@ export class StoryCrudService {
         const queryBuilder = this.storyRepository
             .createQueryBuilder('story')
             .leftJoinAndSelect('story.author', 'author')
-            .leftJoinAndSelect('story.summary', 'summary')
             .leftJoinAndSelect('story.storyCategories', 'storyCategories')
             .leftJoinAndSelect('storyCategories.category', 'category')
             .where('story.status = :status', { status: StoryStatus.PENDING })
@@ -170,7 +169,6 @@ export class StoryCrudService {
         const queryBuilder = this.storyRepository
             .createQueryBuilder('story')
             .leftJoinAndSelect('story.author', 'author')
-            .leftJoinAndSelect('story.summary', 'summary')
             .leftJoinAndSelect('story.storyCategories', 'storyCategories')
             .leftJoinAndSelect('storyCategories.category', 'category')
             .where(
@@ -300,7 +298,7 @@ export class StoryCrudService {
             mainCategory,
             generation: {
                 ...story.generation,
-                metadata: story.generation?.metadata?.storyContext || null,
+                metadata: story.generation?.metadata || null,
             },
         };
     }
@@ -352,7 +350,6 @@ export class StoryCrudService {
             { coverImage: newKey },
         );
 
-        // 5. Xóa cũ
         if (oldKey && oldKey !== newKey) {
             this.mediaService.delete(oldKey).catch((err) => {
                 console.error(`Delete old cover failed: ${oldKey}`, err);

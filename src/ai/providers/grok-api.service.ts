@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import axios, { AxiosInstance } from 'axios';
 import { IStoryGenerationProvider } from './story-generation-provider.interface';
@@ -73,8 +73,15 @@ export class GrokApiService implements IStoryGenerationProvider {
             const requestBody = {
                 model: this.imageModel,
                 prompt,
-                n: 1, // Optional, defaults to 1
             };
+
+            const MAX_PROMPT_LENGTH = 1024;
+
+            if (prompt.length > MAX_PROMPT_LENGTH) {
+                throw new BadRequestException(
+                    `Prompt too long (${prompt.length} characters). Maximum allowed: ${MAX_PROMPT_LENGTH} characters.`,
+                );
+            }
 
             const response = await this.client.post(
                 '/images/generations',
@@ -88,7 +95,14 @@ export class GrokApiService implements IStoryGenerationProvider {
 
             throw new Error('No valid image returned from Grok API');
         } catch (error) {
-            this.logger.error('Error generating image with Grok API:', error);
+            if (axios.isAxiosError(error) && error.response) {
+                this.logger.error('Grok image API failed:', {
+                    status: error.response.status,
+                    data: error.response.data,
+                });
+            } else {
+                this.logger.error('Grok image error:', error);
+            }
             throw error;
         }
     }

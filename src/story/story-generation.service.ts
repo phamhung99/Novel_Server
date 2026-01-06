@@ -5,6 +5,7 @@ import {
     HttpStatus,
     NotFoundException,
     Logger,
+    InternalServerErrorException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -350,7 +351,10 @@ export class StoryGenerationService {
                 title: story.title,
                 synopsis: story.synopsis,
                 coverImageUrl: coverImageUrl,
-                metadata: outlineResponse.storyContext,
+                metadata: {
+                    coverImage: outlineResponse.coverImage,
+                    storyContext: outlineResponse.storyContext,
+                },
                 outline: outlineResponse.outline,
                 message:
                     'Story outline generated successfully. Ready to generate chapters on-demand.',
@@ -726,6 +730,83 @@ export class StoryGenerationService {
             content: generation.chapter.content,
             structure: generation.structure || ({} as any),
             message: `Chapter ${generation.chapter.index} generated successfully.`,
+        };
+    }
+
+    async generateStoryCoverImage(
+        userId: string,
+        storyId: string,
+        prompt?: string,
+    ) {
+        const story = await this.storyRepository.findOne({
+            where: { id: storyId, authorId: userId },
+            relations: ['generation'],
+        });
+
+        if (!story) {
+            throw new NotFoundException(
+                'Story not found or you do not have permission',
+            );
+        }
+
+        if (!story.generation) {
+            throw new BadRequestException(
+                'This story has no generation record',
+            );
+        }
+
+        let finalPrompt = prompt?.trim();
+
+        if (!finalPrompt) {
+            const metadata = story.generation.metadata as any;
+            finalPrompt = metadata?.coverImage;
+
+            if (
+                !finalPrompt ||
+                typeof finalPrompt !== 'string' ||
+                finalPrompt.trim() === ''
+            ) {
+                throw new BadRequestException(
+                    'No cover image prompt provided and no default cover prompt found in generation metadata',
+                );
+            }
+        }
+
+        let tempImageUrl: string;
+        try {
+            tempImageUrl =
+                await this.storyGenerationApiService.generateCoverImage(
+                    finalPrompt,
+                );
+        } catch (err) {
+            throw new BadRequestException(
+                `Failed to generate image: ${err.message}`,
+            );
+        }
+
+        let newCoverImageKey: string | null = null;
+        try {
+            newCoverImageKey =
+                await this.doSpacesService.uploadFromStream(tempImageUrl);
+        } catch (err) {
+            throw new InternalServerErrorException(
+                `Failed to upload cover image: ${err.message}`,
+            );
+        }
+
+        const newCoverImageUrl =
+            await this.doSpacesService.getImageUrl(newCoverImageKey);
+
+        await this.storyRepository.update(
+            { id: storyId },
+            {
+                coverImage: newCoverImageKey,
+            },
+        );
+
+        return {
+            coverImageUrl: newCoverImageUrl,
+            message: 'Cover image regenerated successfully',
         };
     }
 }

@@ -22,6 +22,8 @@ import {
     DialogContent,
     DialogActions,
 } from '@mui/material';
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
+import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import { useParams, useNavigate } from 'react-router-dom';
 import axios from '../api/axios';
@@ -46,6 +48,10 @@ const StoryOverviewPage = () => {
         title?: string;
     } | null>(null);
     const [deletingIndex, setDeletingIndex] = useState<number | null>(null);
+
+    const [openGenerateDialog, setOpenGenerateDialog] = useState(false);
+    const [coverPrompt, setCoverPrompt] = useState<string>('');
+    const [generatingCover, setGeneratingCover] = useState(false);
 
     const handleUploadCover = async (
         e: React.ChangeEvent<HTMLInputElement>,
@@ -116,6 +122,14 @@ const StoryOverviewPage = () => {
             setDeletingIndex(null);
         }
     };
+
+    useEffect(() => {
+        if (story?.generation?.metadata && openGenerateDialog) {
+            const defaultPrompt =
+                (story.generation.metadata as any)?.coverImage || '';
+            setCoverPrompt(defaultPrompt);
+        }
+    }, [story, openGenerateDialog]);
 
     useEffect(() => {
         const fetchStory = async () => {
@@ -226,6 +240,25 @@ const StoryOverviewPage = () => {
                         {uploadingCover
                             ? 'Đang tải lên...'
                             : 'Thay đổi ảnh bìa'}
+                    </Button>
+
+                    <Button
+                        fullWidth
+                        variant="outlined"
+                        color="secondary"
+                        startIcon={<AutoAwesomeIcon />}
+                        onClick={() => setOpenGenerateDialog(true)}
+                        disabled={
+                            uploadingCover ||
+                            generatingCover ||
+                            !story?.generation?.metadata ||
+                            !(story.generation.metadata as any)?.coverImage
+                        }
+                        sx={{ mb: 2 }}
+                    >
+                        {generatingCover
+                            ? 'Đang tạo...'
+                            : 'Tạo lại ảnh bìa bằng AI'}
                     </Button>
 
                     <Button
@@ -738,6 +771,133 @@ const StoryOverviewPage = () => {
                         disabled={deletingIndex !== null}
                     >
                         {deletingIndex !== null ? 'Deleting...' : 'Delete'}
+                    </Button>
+                </DialogActions>
+            </Dialog>
+            <Dialog
+                open={openGenerateDialog}
+                onClose={() => {
+                    if (!generatingCover) setOpenGenerateDialog(false);
+                }}
+                maxWidth="sm"
+                fullWidth
+            >
+                <DialogTitle>Tạo lại ảnh bìa bằng AI</DialogTitle>
+                <DialogContent>
+                    <DialogContentText sx={{ mb: 2 }}>
+                        Nhập mô tả (prompt) để AI tạo ảnh bìa mới. Nếu để trống,
+                        hệ thống sẽ dùng prompt mặc định từ lần tạo story ban
+                        đầu.
+                    </DialogContentText>
+
+                    <TextField
+                        fullWidth
+                        multiline
+                        minRows={3}
+                        label="Prompt cho ảnh bìa"
+                        value={coverPrompt}
+                        onChange={(e) => setCoverPrompt(e.target.value)}
+                        placeholder="Ví dụ: A mysterious dark fantasy forest with glowing runes, epic book cover style, cinematic lighting"
+                        disabled={generatingCover}
+                        sx={{ mt: 1 }}
+                        variant="outlined"
+                        InputProps={{
+                            endAdornment: coverPrompt && (
+                                <IconButton
+                                    size="small"
+                                    onClick={() => setCoverPrompt('')}
+                                    disabled={generatingCover}
+                                >
+                                    <EditIcon fontSize="small" />
+                                </IconButton>
+                            ),
+                        }}
+                    />
+
+                    {story?.generation?.metadata &&
+                        (story.generation.metadata as any).coverImage && (
+                            <Typography
+                                variant="caption"
+                                color="text.secondary"
+                                sx={{ mt: 1, display: 'block' }}
+                            >
+                                Prompt mặc định (từ lần tạo đầu):{' '}
+                                {(
+                                    story.generation.metadata as any
+                                ).coverImage.substring(0, 120)}
+                                {(story.generation.metadata as any).coverImage
+                                    .length > 120
+                                    ? '...'
+                                    : ''}
+                            </Typography>
+                        )}
+                </DialogContent>
+                <DialogActions>
+                    <Button
+                        onClick={() => setOpenGenerateDialog(false)}
+                        disabled={generatingCover}
+                    >
+                        Hủy
+                    </Button>
+                    <Button
+                        variant="contained"
+                        color="primary"
+                        startIcon={
+                            generatingCover ? (
+                                <CircularProgress size={20} color="inherit" />
+                            ) : (
+                                <AutoAwesomeIcon />
+                            )
+                        }
+                        onClick={async () => {
+                            if (!storyId || !userId) return;
+
+                            setGeneratingCover(true);
+                            try {
+                                const payload = coverPrompt.trim()
+                                    ? { prompt: coverPrompt.trim() }
+                                    : {};
+
+                                const res = await axios.post(
+                                    `/api/v1/story/${storyId}/generate/cover-image`,
+                                    payload,
+                                    {
+                                        headers: {
+                                            'x-user-id': userId,
+                                            'Content-Type': 'application/json',
+                                        },
+                                    },
+                                );
+
+                                const newCoverUrl = res.data?.coverImageUrl;
+
+                                if (newCoverUrl) {
+                                    setStory((prev) =>
+                                        prev
+                                            ? {
+                                                  ...prev,
+                                                  coverImageUrl: newCoverUrl,
+                                              }
+                                            : prev,
+                                    );
+                                    alert(
+                                        'Ảnh bìa đã được tạo lại thành công!',
+                                    );
+                                    setOpenGenerateDialog(false);
+                                }
+                            } catch (err: any) {
+                                console.error('Generate cover failed:', err);
+                                alert(
+                                    err.response?.data?.message ||
+                                        'Tạo ảnh thất bại. Vui lòng thử lại sau.',
+                                );
+                            } finally {
+                                setGeneratingCover(false);
+                            }
+                        }}
+                        disabled={generatingCover}
+                    >
+                        {generatingCover ? 'Đang tạo...' : 'Tạo ảnh mới'}
                     </Button>
                 </DialogActions>
             </Dialog>

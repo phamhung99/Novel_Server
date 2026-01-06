@@ -70,6 +70,10 @@ export class StoryService {
     getGeneratedChapterResults =
         this.generation.getGeneratedChapterResults.bind(this.generation);
 
+    generateStoryCoverImage = this.generation.generateStoryCoverImage.bind(
+        this.generation,
+    );
+
     // ========================
     // Discovery & Library
     // ========================

@@ -159,6 +159,19 @@ export class StoryController {
         return this.storyService.getAllCategories();
     }
 
+    @Post(':storyId/generate/cover-image')
+    generateCoverImage(
+        @Headers('x-user-id') userId: string,
+        @Param('storyId') storyId: string,
+        @Body('prompt') prompt: string,
+    ) {
+        return this.storyService.generateStoryCoverImage(
+            userId,
+            storyId,
+            prompt,
+        );
+    }
+
     // REQUEST 1: Initialize story with outline
     @Post('generate/initialize')
     async initializeStory(

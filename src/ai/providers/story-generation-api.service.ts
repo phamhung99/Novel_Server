@@ -39,9 +39,7 @@ export class StoryGenerationApiService {
             return imageUrl;
         } catch (error) {
             this.logger.error('Error generating cover image:', error);
-            throw new BadRequestException(
-                `Failed to generate cover image: ${error.message}`,
-            );
+            throw error;
         }
     }
 
