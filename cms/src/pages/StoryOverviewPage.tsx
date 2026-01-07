@@ -683,11 +683,6 @@ const StoryOverviewPage = () => {
                                                                     story
                                                                         .chapters
                                                                         .length,
-                                                                chapterIndexes:
-                                                                    story.chapters.map(
-                                                                        (c) =>
-                                                                            c.index,
-                                                                    ),
                                                             },
                                                         },
                                                     )

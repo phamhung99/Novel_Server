@@ -84,6 +84,10 @@ const ManualChaptersPage = () => {
     const [mainCategoryId, setMainCategoryId] = useState<string>('');
     const [subCategoryIds, setSubCategoryIds] = useState<string[]>([]);
 
+    const [existingChapters, setExistingChapters] = useState<
+        { id: string; index: number; title: string; newIndex?: number }[]
+    >([]);
+
     const userId = useMemo(() => {
         try {
             return JSON.parse(localStorage.getItem('user') || '{}').id || '';
@@ -100,7 +104,6 @@ const ManualChaptersPage = () => {
         { index: 1, title: '', content: '' },
     ]);
 
-    // ── Load existing story ─────────────────────────────────
     useEffect(() => {
         if (mode === 'new' || !storyId) {
             setStory(null);
@@ -118,7 +121,16 @@ const ManualChaptersPage = () => {
                 const s = res.data.data as StoryLite;
                 setStory(s);
 
-                const used = new Set(s.chapters?.map((c) => c.index) ?? []);
+                // Khởi tạo danh sách chapters hiện có + thêm trường newIndex để edit
+                setExistingChapters(
+                    s.chapters.map((ch) => ({
+                        ...ch,
+                        newIndex: ch.index, // ban đầu newIndex = index cũ
+                    })),
+                );
+
+                // Tính index tiếp theo cho draft mới
+                const used = new Set(s.chapters.map((c) => c.index));
                 let nextIndex = 1;
                 while (used.has(nextIndex)) nextIndex++;
                 setDrafts([{ index: nextIndex, title: '', content: '' }]);
@@ -233,6 +245,81 @@ const ManualChaptersPage = () => {
         }
     };
 
+    const handleUpdateChapterIndex = async (
+        chapterId: string,
+        oldIndex: number,
+        newIndexValue: number | undefined,
+    ) => {
+        // Case: no real change or invalid value
+        if (!newIndexValue || newIndexValue === oldIndex) return;
+
+        if (newIndexValue < 1) {
+            setError('Chapter index must be ≥ 1');
+            return;
+        }
+
+        // ── Check conflict with other existing chapters ───────────────────────
+        const conflictingChapter = existingChapters.find(
+            (ch) =>
+                ch.id !== chapterId &&
+                (ch.newIndex ?? ch.index) === newIndexValue,
+        );
+
+        if (conflictingChapter) {
+            setError(
+                `Index ${newIndexValue} is already used by chapter "${conflictingChapter.title || '…'}"`,
+            );
+            return;
+        }
+
+        // ── Check conflict with pending new drafts ─────────────────────────────
+        const draftUsingIndex = drafts.some((d) => d.index === newIndexValue);
+        if (draftUsingIndex) {
+            setError(
+                `Index ${newIndexValue} is already used by a new chapter draft`,
+            );
+            return;
+        }
+
+        setSaving(true); // optional — show loading state globally or per row
+        setError(null);
+
+        try {
+            await axios.put(
+                `/api/v1/story/${storyId}/chapter/${oldIndex}`,
+                { index: newIndexValue },
+                { headers: { 'x-user-id': userId } },
+            );
+
+            // Update local state — both index & newIndex
+            setExistingChapters((prev) =>
+                prev.map((ch) =>
+                    ch.id === chapterId
+                        ? {
+                              ...ch,
+                              index: newIndexValue,
+                              newIndex: newIndexValue,
+                          }
+                        : ch,
+                ),
+            );
+        } catch (err: any) {
+            const msg =
+                err?.response?.data?.message ||
+                'Failed to update chapter index';
+            setError(msg);
+
+            // Revert input value (important for UX)
+            setExistingChapters((prev) =>
+                prev.map((ch) =>
+                    ch.id === chapterId ? { ...ch, newIndex: ch.index } : ch,
+                ),
+            );
+        } finally {
+            setSaving(false);
+        }
+    };
+
     const handleSave = () => {
         if (mode === 'new') createNewStoryAndChapters();
         else saveToExistingStory();
@@ -288,6 +375,21 @@ const ManualChaptersPage = () => {
             if (d.index < 1) return 'Chapter index must be ≥ 1';
             if (usedExisting.has(d.index))
                 return `Index ${d.index} is already used by an existing chapter`;
+        }
+
+        const finalIndexes = [
+            ...existingChapters.map((ch) => ch.newIndex ?? ch.index),
+            ...drafts.map((d) => d.index),
+        ];
+
+        const unique = new Set(finalIndexes);
+        if (unique.size !== finalIndexes.length) {
+            return 'Duplicate chapter indexes detected (including changed indexes)';
+        }
+
+        // Optional: kiểm tra index < 1
+        if (finalIndexes.some((idx) => idx < 1)) {
+            return 'All chapter indexes must be >= 1';
         }
 
         return null;
@@ -574,13 +676,128 @@ const ManualChaptersPage = () => {
             )}
 
             {mode === 'existing' && story && (
-                <Box sx={{ mb: 3 }}>
-                    <Typography variant="h6">Story: {story.title}</Typography>
-                    <Typography variant="body2" color="text.secondary">
-                        ID: {story.id} • {story.chapters?.length || 0} chapters
-                        already exist
-                    </Typography>
-                </Box>
+                <Card sx={{ mb: 4 }}>
+                    <CardContent>
+                        <Typography variant="h6" gutterBottom>
+                            Existing Chapters
+                        </Typography>
+
+                        {existingChapters.length === 0 ? (
+                            <Typography color="text.secondary" sx={{ py: 2 }}>
+                                This story has no chapters yet.
+                            </Typography>
+                        ) : (
+                            <Stack spacing={1.5} divider={<Divider flexItem />}>
+                                {existingChapters.map((ch) => (
+                                    <Box
+                                        key={ch.id}
+                                        sx={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'space-between',
+                                            py: 1.5,
+                                            px: 2,
+                                            borderRadius: 1,
+                                            bgcolor: 'background.paper',
+                                            border: '1px solid',
+                                            borderColor: 'divider',
+                                            '&:hover': {
+                                                bgcolor: 'action.hover',
+                                            },
+                                        }}
+                                    >
+                                        {/* Left side - info */}
+                                        <Box sx={{ flex: 1 }}>
+                                            <Typography variant="subtitle1">
+                                                Chapter {ch.index} • {ch.title}
+                                            </Typography>
+                                        </Box>
+
+                                        {/* Right side - index editor + View button */}
+                                        <Stack
+                                            direction="row"
+                                            spacing={2}
+                                            alignItems="center"
+                                        >
+                                            {/* Index editor */}
+                                            <Box
+                                                sx={{
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                }}
+                                            >
+                                                <TextField
+                                                    type="number"
+                                                    size="small"
+                                                    label="Index"
+                                                    value={
+                                                        ch.newIndex ?? ch.index
+                                                    }
+                                                    onChange={(e) => {
+                                                        const val = Number(
+                                                            e.target.value,
+                                                        );
+                                                        if (
+                                                            !isNaN(val) &&
+                                                            val >= 1
+                                                        ) {
+                                                            setExistingChapters(
+                                                                (prev) =>
+                                                                    prev.map(
+                                                                        (c) =>
+                                                                            c.id ===
+                                                                            ch.id
+                                                                                ? {
+                                                                                      ...c,
+                                                                                      newIndex:
+                                                                                          val,
+                                                                                  }
+                                                                                : c,
+                                                                    ),
+                                                            );
+                                                        }
+                                                    }}
+                                                    onBlur={() =>
+                                                        handleUpdateChapterIndex(
+                                                            ch.id,
+                                                            ch.index,
+                                                            ch.newIndex,
+                                                        )
+                                                    }
+                                                    sx={{ width: 100 }}
+                                                    inputProps={{ min: 1 }}
+                                                />
+                                            </Box>
+
+                                            {/* View button */}
+                                            <Button
+                                                variant="outlined"
+                                                size="small"
+                                                onClick={() =>
+                                                    navigate(
+                                                        `${ROUTES.STORY_OVERVIEW}/${storyId}/chapters/${ch.index}`,
+                                                        {
+                                                            state: {
+                                                                storyTitle:
+                                                                    story.title,
+                                                                totalChapters:
+                                                                    story
+                                                                        .chapters
+                                                                        .length,
+                                                            },
+                                                        },
+                                                    )
+                                                }
+                                            >
+                                                View
+                                            </Button>
+                                        </Stack>
+                                    </Box>
+                                ))}
+                            </Stack>
+                        )}
+                    </CardContent>
+                </Card>
             )}
 
             {/* ── Chapters Section ── */}
