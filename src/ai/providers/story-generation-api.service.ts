@@ -99,7 +99,6 @@ You think in three dimensions simultaneously:
         chapterNumber: number;
         storyMetadata: string;
         aiProvider: string;
-        direction: string;
     }): Promise<ChapterStructureResponse> {
         const providerName = dto.aiProvider || 'grok';
         const aiProvider =

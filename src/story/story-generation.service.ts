@@ -466,7 +466,6 @@ export class StoryGenerationService {
                         storyId,
                         chapterNumber,
                         aiProvider: storyGeneration.aiProvider || 'grok',
-                        direction: dto.direction || '',
                         storyMetadata,
                     });
             } else if (chapterNumber > 1 && chapterNumber < totalChapters) {
