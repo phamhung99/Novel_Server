@@ -11,6 +11,7 @@ import { DoSpacesService } from 'src/upload/do-spaces.service';
 import { ERROR_MESSAGES } from 'src/common/constants/app.constant';
 import { MediaService } from 'src/media/media.service';
 import { StorySource } from 'src/common/enums/app.enum';
+import { StoryCategory } from './entities/story-category.entity';
 
 @Injectable()
 export class StoryCrudService {
@@ -18,6 +19,8 @@ export class StoryCrudService {
         @InjectRepository(Story)
         private storyRepository: Repository<Story>,
         private doSpacesService: DoSpacesService,
+        @InjectRepository(StoryCategory)
+        private storyCategoryRepository: Repository<StoryCategory>,
         private mediaService: MediaService,
     ) {}
 
@@ -25,12 +28,45 @@ export class StoryCrudService {
         authorId: string,
         createStoryDto: CreateStoryDto,
     ): Promise<Story> {
+        const { mainCategoryId, subCategoryIds, ...storyData } = createStoryDto;
+
+        // Create the story first
         const story = this.storyRepository.create({
-            ...createStoryDto,
+            ...storyData,
             authorId,
-            sourceType: StorySource.CRAWL,
+            sourceType: StorySource.MANUAL,
         });
-        return this.storyRepository.save(story);
+
+        const savedStory = await this.storyRepository.save(story);
+
+        // Create StoryCategory relations
+        const storyCategories: StoryCategory[] = [];
+
+        // Main category
+        storyCategories.push(
+            this.storyCategoryRepository.create({
+                storyId: savedStory.id,
+                categoryId: mainCategoryId,
+                isMainCategory: true,
+            }),
+        );
+
+        // Sub categories (if any)
+        if (subCategoryIds && subCategoryIds.length > 0) {
+            for (const catId of subCategoryIds) {
+                storyCategories.push(
+                    this.storyCategoryRepository.create({
+                        storyId: savedStory.id,
+                        categoryId: catId,
+                        isMainCategory: false,
+                    }),
+                );
+            }
+        }
+
+        await this.storyCategoryRepository.save(storyCategories);
+
+        return savedStory;
     }
 
     async findAllStories(paginationDto: PaginationDto) {

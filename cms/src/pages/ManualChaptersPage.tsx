@@ -40,6 +40,14 @@ type StoryLite = {
     chapters: { id: string; index: number; title: string }[];
 };
 
+// Assuming backend returns something like this
+type Category = {
+    id: string;
+    name: string;
+    // isMain?: boolean;     // optional — depending on your actual API
+    // parentId?: string;    // optional — if hierarchical
+};
+
 const STORY_TYPES = [
     'novel',
     'short_story',
@@ -47,36 +55,34 @@ const STORY_TYPES = [
     'poetry',
     'comic',
 ] as const;
-
 const VISIBILITIES = ['public', 'private', 'unlisted'] as const;
 
 const ManualChaptersPage = () => {
     const { storyId: storyIdFromUrl } = useParams<{ storyId?: string }>();
     const navigate = useNavigate();
 
-    // Mode: 'new' or 'existing'
     const [mode, setMode] = useState<'new' | 'existing'>(
         storyIdFromUrl ? 'existing' : 'new',
     );
 
-    // ── For existing mode ──
+    // ── Existing mode ───────────────────────────────────────
     const [storyIdInput, setStoryIdInput] = useState(storyIdFromUrl || '');
     const [storyId, setStoryId] = useState(storyIdFromUrl || '');
     const [story, setStory] = useState<StoryLite | null>(null);
 
-    // ── For new mode ──
+    // ── New mode ────────────────────────────────────────────
     const [newStoryTitle, setNewStoryTitle] = useState('');
     const [newStorySynopsis, setNewStorySynopsis] = useState('');
     const [newStoryType, setNewStoryType] = useState('novel');
     const [newStoryVisibility, setNewStoryVisibility] = useState('public');
 
-    // Thay thế AVAILABLE_GENRES hard-code
-    const [genresList, setGenresList] = useState<string[]>([]);
-    const [loadingGenres, setLoadingGenres] = useState(true);
-    const [genresError, setGenresError] = useState<string | null>(null);
+    // Categories
+    const [categories, setCategories] = useState<Category[]>([]);
+    const [loadingCategories, setLoadingCategories] = useState(true);
+    const [categoriesError, setCategoriesError] = useState<string | null>(null);
 
-    // (giữ nguyên) state cho genres đã chọn
-    const [selectedGenres, setSelectedGenres] = useState<string[]>([]);
+    const [mainCategoryId, setMainCategoryId] = useState<string>('');
+    const [subCategoryIds, setSubCategoryIds] = useState<string[]>([]);
 
     const userId = useMemo(() => {
         try {
@@ -94,7 +100,7 @@ const ManualChaptersPage = () => {
         { index: 1, title: '', content: '' },
     ]);
 
-    // Load story when storyId changes (only in existing mode)
+    // ── Load existing story ─────────────────────────────────
     useEffect(() => {
         if (mode === 'new' || !storyId) {
             setStory(null);
@@ -112,36 +118,53 @@ const ManualChaptersPage = () => {
                 const s = res.data.data as StoryLite;
                 setStory(s);
 
-                // Find next available index
                 const used = new Set(s.chapters?.map((c) => c.index) ?? []);
                 let nextIndex = 1;
                 while (used.has(nextIndex)) nextIndex++;
                 setDrafts([{ index: nextIndex, title: '', content: '' }]);
             } catch (e: any) {
-                setError(
-                    e?.response?.data?.message ||
-                        e?.message ||
-                        'Failed to load story information',
-                );
+                setError(e?.response?.data?.message || 'Failed to load story');
                 setStory(null);
             } finally {
                 setLoading(false);
             }
         };
-
         fetchStory();
     }, [storyId, userId, mode]);
 
+    // ── Load categories once ────────────────────────────────
+    useEffect(() => {
+        const fetchCategories = async () => {
+            try {
+                setLoadingCategories(true);
+                const res = await axios.get('/api/v1/story/categories', {
+                    headers: { 'x-user-id': userId },
+                });
+                // Adjust according to your real response shape
+                const cats = (res.data.data || []).sort(
+                    (a: any, b: any) =>
+                        (a.displayOrder || 0) - (b.displayOrder || 0),
+                );
+                setCategories(cats);
+            } catch (err: any) {
+                setCategoriesError('Failed to load categories');
+                console.error(err);
+            } finally {
+                setLoadingCategories(false);
+            }
+        };
+        fetchCategories();
+    }, [userId]);
+
     const loadExistingStory = () => {
-        if (!storyIdInput.trim()) {
+        const id = storyIdInput.trim();
+        if (!id) {
             setError('Please enter a Story ID');
             return;
         }
-        setStoryId(storyIdInput.trim());
-        if (storyIdInput.trim() !== storyIdFromUrl) {
-            navigate(`${ROUTES.MANUAL_CREATION}/${storyIdInput.trim()}`, {
-                replace: true,
-            });
+        setStoryId(id);
+        if (id !== storyIdFromUrl) {
+            navigate(`${ROUTES.MANUAL_CREATION}/${id}`, { replace: true });
         }
     };
 
@@ -156,33 +179,32 @@ const ManualChaptersPage = () => {
         setError(null);
 
         try {
-            // 1. Create new story
+            // 1. Create story — shape matches your backend DTO
             const storyPayload = {
                 title: newStoryTitle.trim(),
                 synopsis: newStorySynopsis.trim() || undefined,
                 type: newStoryType,
                 visibility: newStoryVisibility,
-                genres: [], // you can add genres input later
+                mainCategoryId,
+                subCategoryIds:
+                    subCategoryIds.length > 0 ? subCategoryIds : undefined,
             };
 
             const storyRes = await axios.post('/api/v1/story', storyPayload, {
                 headers: { 'x-user-id': userId },
             });
 
-            const newId = storyRes.data.data.id; // assuming response shape { data: { id, ... } }
+            const newId = storyRes.data.data.id;
 
             // 2. Bulk create chapters
             await axios.post(`/api/v1/story/${newId}/chapter/bulk`, drafts, {
                 headers: { 'x-user-id': userId },
             });
 
-            // Redirect to story detail page
             navigate(`${ROUTES.STORY_OVERVIEW}/${newId}`);
         } catch (e: any) {
             setError(
-                e?.response?.data?.message ||
-                    e?.message ||
-                    'Failed to create story/chapters',
+                e?.response?.data?.message || 'Failed to create story/chapters',
             );
         } finally {
             setSaving(false);
@@ -205,22 +227,15 @@ const ManualChaptersPage = () => {
             });
             navigate(`${ROUTES.STORY_OVERVIEW}/${storyId}`);
         } catch (e: any) {
-            setError(
-                e?.response?.data?.message ||
-                    e?.message ||
-                    'Failed to create chapters',
-            );
+            setError(e?.response?.data?.message || 'Failed to save chapters');
         } finally {
             setSaving(false);
         }
     };
 
     const handleSave = () => {
-        if (mode === 'new') {
-            createNewStoryAndChapters();
-        } else {
-            saveToExistingStory();
-        }
+        if (mode === 'new') createNewStoryAndChapters();
+        else saveToExistingStory();
     };
 
     const addRow = () => {
@@ -249,15 +264,17 @@ const ManualChaptersPage = () => {
         if (mode === 'new') {
             if (!newStoryTitle.trim()) return 'Story title is required';
             if (!newStoryType) return 'Story type is required';
-            if (!newStoryVisibility) return 'Story visibility is required';
-            if (genresList.length > 0 && selectedGenres.length === 0)
-                return 'At least one genre must be selected';
+            if (!newStoryVisibility) return 'Visibility is required';
+            if (!mainCategoryId) return 'Main category is required';
+            if (subCategoryIds.length === 0)
+                return 'At least one sub-category is recommended';
         } else {
             if (!storyId) return 'Story ID is required';
             if (!story && !loading) return 'Story not found';
         }
 
         if (drafts.length === 0) return 'At least one chapter is required';
+
         const indexes = drafts.map((d) => d.index);
         if (new Set(indexes).size !== indexes.length)
             return 'Duplicate chapter indexes found';
@@ -270,35 +287,11 @@ const ManualChaptersPage = () => {
             if (!d.content.trim()) return 'Chapter content is required';
             if (d.index < 1) return 'Chapter index must be ≥ 1';
             if (usedExisting.has(d.index))
-                return `Index ${d.index} is already used`;
+                return `Index ${d.index} is already used by an existing chapter`;
         }
 
         return null;
     };
-
-    useEffect(() => {
-        const fetchGenres = async () => {
-            try {
-                setLoadingGenres(true);
-                const response = await axios.get(`/api/v1/story/categories`);
-                const genres = response.data.data
-                    .sort((a: any, b: any) => a.displayOrder - b.displayOrder)
-                    .map((item: any) => item.name);
-
-                setGenresList(genres);
-            } catch (err: any) {
-                console.error('Failed to fetch genres:', err);
-                setGenresError(
-                    err.response?.data?.message ||
-                        'Failed to load genres. Using fallback list.',
-                );
-            } finally {
-                setLoadingGenres(false);
-            }
-        };
-
-        fetchGenres();
-    }, []);
 
     // ── RENDER ────────────────────────────────────────────────────────────────
     if (loading) {
@@ -362,13 +355,14 @@ const ManualChaptersPage = () => {
                 </Alert>
             )}
 
-            {/* ── Story info section ── */}
-            {mode === 'new' ? (
+            {/* ── New Story Info ── */}
+            {mode === 'new' && (
                 <Card sx={{ mb: 4 }}>
                     <CardContent>
                         <Typography variant="h6" gutterBottom>
                             New Story Information
                         </Typography>
+
                         <Stack spacing={3}>
                             <TextField
                                 fullWidth
@@ -379,6 +373,7 @@ const ManualChaptersPage = () => {
                                     setNewStoryTitle(e.target.value)
                                 }
                             />
+
                             <TextField
                                 fullWidth
                                 multiline
@@ -389,11 +384,20 @@ const ManualChaptersPage = () => {
                                     setNewStorySynopsis(e.target.value)
                                 }
                             />
+
                             <Stack
                                 direction={{ xs: 'column', sm: 'row' }}
                                 spacing={2}
+                                useFlexGap // ← helps with consistent gaps when wrapping
+                                sx={{
+                                    flexWrap: 'wrap', // ← allows items to wrap to next line instead of overflowing
+                                    alignItems: 'flex-start', // or 'center' – prevents stretching weirdness
+                                }}
                             >
-                                <FormControl sx={{ minWidth: 160 }}>
+                                {/* Story Type */}
+                                <FormControl
+                                    sx={{ minWidth: 160, flex: '1 1 160px' }}
+                                >
                                     <InputLabel>Story Type</InputLabel>
                                     <Select
                                         value={newStoryType}
@@ -404,59 +408,115 @@ const ManualChaptersPage = () => {
                                     >
                                         {STORY_TYPES.map((t) => (
                                             <MenuItem key={t} value={t}>
-                                                {t}
+                                                {t.replace('_', ' ')}
                                             </MenuItem>
                                         ))}
                                     </Select>
                                 </FormControl>
 
-                                <FormControl fullWidth error={!!genresError}>
-                                    <InputLabel id="genres-label">
-                                        Genres
-                                        {loadingGenres && ' (loading...)'}
-                                    </InputLabel>
-
+                                {/* Main Category */}
+                                <FormControl
+                                    sx={{ minWidth: 200, flex: '1 1 220px' }}
+                                    error={!!categoriesError}
+                                >
+                                    <InputLabel>Main Category</InputLabel>
                                     <Select
-                                        labelId="genres-label"
-                                        multiple
-                                        value={selectedGenres}
-                                        onChange={(e) =>
-                                            setSelectedGenres(
-                                                e.target.value as string[],
-                                            )
-                                        }
-                                        label="Genres"
-                                        disabled={loadingGenres}
-                                        renderValue={(selected) =>
-                                            selected.length === 0
-                                                ? 'Select genres'
-                                                : selected.join(', ')
-                                        }
-                                        MenuProps={{
-                                            PaperProps: {
-                                                sx: { maxHeight: 300 },
-                                            },
+                                        value={mainCategoryId}
+                                        label="Main Category"
+                                        onChange={(e) => {
+                                            setMainCategoryId(
+                                                e.target.value as string,
+                                            );
+                                            setSubCategoryIds([]);
                                         }}
+                                        disabled={
+                                            loadingCategories ||
+                                            !!categoriesError
+                                        }
                                     >
-                                        {genresList.map((genre) => (
-                                            <MenuItem key={genre} value={genre}>
-                                                {genre}
+                                        <MenuItem value="" disabled>
+                                            Select main category
+                                        </MenuItem>
+                                        {categories.map((cat) => (
+                                            <MenuItem
+                                                key={cat.id}
+                                                value={cat.id}
+                                            >
+                                                {cat.name}
                                             </MenuItem>
                                         ))}
                                     </Select>
-
-                                    {genresError && (
+                                    {categoriesError && (
                                         <Typography
                                             variant="caption"
                                             color="error"
                                             sx={{ mt: 0.5 }}
                                         >
-                                            {genresError}
+                                            {categoriesError}
                                         </Typography>
                                     )}
                                 </FormControl>
 
-                                <FormControl sx={{ minWidth: 160 }}>
+                                {/* Sub Categories */}
+                                <FormControl
+                                    sx={{ minWidth: 260, flex: '1 1 300px' }}
+                                >
+                                    <InputLabel>Sub Categories</InputLabel>
+                                    <Select
+                                        multiple
+                                        value={subCategoryIds}
+                                        label="Sub Categories"
+                                        onChange={(e) =>
+                                            setSubCategoryIds(
+                                                e.target.value as string[],
+                                            )
+                                        }
+                                        renderValue={(selected) =>
+                                            selected.length === 0
+                                                ? 'Optional — select sub-categories'
+                                                : selected
+                                                      .map(
+                                                          (id) =>
+                                                              categories.find(
+                                                                  (c) =>
+                                                                      c.id ===
+                                                                      id,
+                                                              )?.name ?? id,
+                                                      )
+                                                      .join(', ')
+                                        }
+                                        disabled={
+                                            loadingCategories ||
+                                            !!categoriesError ||
+                                            !mainCategoryId
+                                        }
+                                        MenuProps={{
+                                            PaperProps: {
+                                                sx: { maxHeight: 320 },
+                                            },
+                                        }}
+                                    >
+                                        {categories
+                                            .filter(
+                                                (c) =>
+                                                    !mainCategoryId ||
+                                                    c.id !== mainCategoryId,
+                                            )
+                                            .map((cat) => (
+                                                <MenuItem
+                                                    key={cat.id}
+                                                    value={cat.id}
+                                                >
+                                                    {cat.name}
+                                                </MenuItem>
+                                            ))}
+                                    </Select>
+                                </FormControl>
+
+                                {/* Visibility */}
+                                <FormControl
+                                    sx={{ minWidth: 160, flex: '1 1 160px' }}
+                                >
                                     <InputLabel>Visibility</InputLabel>
                                     <Select
                                         value={newStoryVisibility}
@@ -478,41 +538,41 @@ const ManualChaptersPage = () => {
                         </Stack>
                     </CardContent>
                 </Card>
-            ) : (
-                !story && (
-                    <Card sx={{ mb: 4 }}>
-                        <CardContent>
-                            <Typography variant="h6" gutterBottom>
-                                Enter Existing Story ID
-                            </Typography>
-                            <Stack
-                                direction={{ xs: 'column', sm: 'row' }}
-                                spacing={2}
-                                sx={{ mt: 2 }}
-                            >
-                                <TextField
-                                    fullWidth
-                                    label="Story ID"
-                                    value={storyIdInput}
-                                    onChange={(e) =>
-                                        setStoryIdInput(e.target.value)
-                                    }
-                                    placeholder="e.g. 64f8a2b9c3d4e5f678901234"
-                                />
-                                <Button
-                                    variant="contained"
-                                    onClick={loadExistingStory}
-                                    disabled={!storyIdInput.trim()}
-                                >
-                                    Load Story
-                                </Button>
-                            </Stack>
-                        </CardContent>
-                    </Card>
-                )
             )}
 
-            {/* Loaded story info (existing mode) */}
+            {/* ── Existing Story ID Input ── */}
+            {mode === 'existing' && !story && (
+                <Card sx={{ mb: 4 }}>
+                    <CardContent>
+                        <Typography variant="h6" gutterBottom>
+                            Enter Existing Story ID
+                        </Typography>
+                        <Stack
+                            direction={{ xs: 'column', sm: 'row' }}
+                            spacing={2}
+                            sx={{ mt: 2 }}
+                        >
+                            <TextField
+                                fullWidth
+                                label="Story ID"
+                                value={storyIdInput}
+                                onChange={(e) =>
+                                    setStoryIdInput(e.target.value)
+                                }
+                                placeholder="e.g. 64f8a2b9c3d4e5f678901234"
+                            />
+                            <Button
+                                variant="contained"
+                                onClick={loadExistingStory}
+                                disabled={!storyIdInput.trim()}
+                            >
+                                Load Story
+                            </Button>
+                        </Stack>
+                    </CardContent>
+                </Card>
+            )}
+
             {mode === 'existing' && story && (
                 <Box sx={{ mb: 3 }}>
                     <Typography variant="h6">Story: {story.title}</Typography>
@@ -523,7 +583,7 @@ const ManualChaptersPage = () => {
                 </Box>
             )}
 
-            {/* Chapters input (common for both modes) */}
+            {/* ── Chapters Section ── */}
             {(mode === 'new' || (mode === 'existing' && story)) && (
                 <Card>
                     <CardContent>
@@ -599,6 +659,7 @@ const ManualChaptersPage = () => {
                                             <DeleteOutlineIcon />
                                         </IconButton>
                                     </Stack>
+
                                     <TextField
                                         fullWidth
                                         required
