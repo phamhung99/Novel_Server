@@ -32,6 +32,9 @@ export class CreateStoryDto {
     visibility: StoryVisibility;
 
     @IsOptional()
+    canEdit: boolean;
+
+    @IsOptional()
     @IsUrl()
     coverImage?: string;
 }
