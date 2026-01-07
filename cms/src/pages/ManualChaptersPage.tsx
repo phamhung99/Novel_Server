@@ -40,12 +40,9 @@ type StoryLite = {
     chapters: { id: string; index: number; title: string }[];
 };
 
-// Assuming backend returns something like this
 type Category = {
     id: string;
     name: string;
-    // isMain?: boolean;     // optional — depending on your actual API
-    // parentId?: string;    // optional — if hierarchical
 };
 
 const STORY_TYPES = [
