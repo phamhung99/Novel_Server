@@ -53,6 +53,10 @@ const StoryOverviewPage = () => {
     const [coverPrompt, setCoverPrompt] = useState<string>('');
     const [generatingCover, setGeneratingCover] = useState(false);
 
+    const handleAddChapter = () => {
+        navigate(`${ROUTES.MANUAL_CREATION}/${storyId}`);
+    };
+
     const handleUploadCover = async (
         e: React.ChangeEvent<HTMLInputElement>,
     ) => {
@@ -248,9 +252,7 @@ const StoryOverviewPage = () => {
                         onClick={() => setOpenGenerateDialog(true)}
                         disabled={
                             uploadingCover ||
-                            generatingCover ||
-                            !story?.generation?.metadata ||
-                            !(story.generation.metadata as any)?.coverImage
+                            generatingCover
                         }
                         sx={{ mb: 2 }}
                     >
@@ -650,9 +652,29 @@ const StoryOverviewPage = () => {
                     {/* Chapters List */}
                     <Card>
                         <CardContent>
-                            <Typography variant="h5" gutterBottom>
-                                Chapters ({story.chapters.length})
-                            </Typography>
+                            <Box
+                                sx={{
+                                    display: 'flex',
+                                    justifyContent: 'space-between',
+                                    alignItems: 'center',
+                                    mb: 2,
+                                }}
+                            >
+                                <Typography variant="h5">
+                                    Chapters ({story.chapters.length})
+                                </Typography>
+
+                                <Button
+                                    variant="contained"
+                                    color="primary"
+                                    startIcon={<AutoAwesomeIcon />}
+                                    onClick={handleAddChapter}
+                                    disabled={editMode || loading}
+                                >
+                                    Add Chapter
+                                </Button>
+                            </Box>
+
                             <Divider sx={{ my: 2 }} />
 
                             {story.chapters.length === 0 ? (
@@ -683,11 +705,6 @@ const StoryOverviewPage = () => {
                                                                     story
                                                                         .chapters
                                                                         .length,
-                                                                chapterIndexes:
-                                                                    story.chapters.map(
-                                                                        (c) =>
-                                                                            c.index,
-                                                                    ),
                                                             },
                                                         },
                                                     )

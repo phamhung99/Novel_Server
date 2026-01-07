@@ -42,7 +42,6 @@ const ChapterReaderPage = () => {
     const navState = location.state as {
         storyTitle?: string;
         totalChapters?: number;
-        chapterIndexes?: number[];
     } | null;
 
     const [chapter, setChapter] = useState<FullChapterDto | null>(null);
