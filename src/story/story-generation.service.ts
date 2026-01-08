@@ -286,6 +286,15 @@ export class StoryGenerationService {
                     aiProvider: dto.aiProvider || 'grok',
                 });
 
+            await this.storyGenerationRepository.update(
+                { id: savedStoryGeneration.id },
+                {
+                    response: {
+                        outline: outlineResponse.outline,
+                    } as any,
+                },
+            );
+
             const storyCategoryEntities = await this.buildStoryCategories(
                 outlineResponse.storyContext?.meta,
                 dto.genres,
@@ -329,9 +338,6 @@ export class StoryGenerationService {
                 { id: savedStoryGeneration.id },
                 {
                     storyId: savedStory.id,
-                    response: {
-                        outline: outlineResponse.outline,
-                    } as any,
                     title: outlineResponse.title,
                     synopsis: outlineResponse.synopsis,
                     metadata: {
