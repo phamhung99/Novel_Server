@@ -44,7 +44,6 @@ import { diskStorage } from 'multer';
 import { extname, join } from 'path';
 import { CustomMaxFileSizeValidator } from 'src/common/validators/custom-max-file-size.validator';
 import { MimeTypeValidator } from 'src/common/validators/mime-type.validator';
-import { MediaService } from 'src/media/media.service';
 
 @Controller('story')
 export class StoryController {
@@ -52,7 +51,6 @@ export class StoryController {
         private readonly storyService: StoryService,
         private readonly userService: UserService,
         private readonly chapterService: ChapterService,
-        private readonly mediaService: MediaService,
     ) {}
 
     @Post(':storyId/upload-cover')

@@ -274,11 +274,17 @@ export class UserService extends BaseCrudService<User> {
                 );
             }
 
-            const items = stories.map((story) => ({
-                ...story,
-                chapters: chaptersMap[story.storyId] || [],
-                canEdit: story.authorId === userId,
-            }));
+            const items = await Promise.all(
+                stories.map(async (story) => ({
+                    ...story,
+                    coverImage: undefined,
+                    coverImageUrl: story.coverImage
+                        ? await this.mediaService.getMediaUrl(story.coverImage)
+                        : null,
+                    chapters: chaptersMap[story.storyId] || [],
+                    canEdit: story.authorId === userId,
+                })),
+            );
 
             return { page, limit, total, items };
         } catch (error) {
@@ -337,13 +343,15 @@ export class UserService extends BaseCrudService<User> {
                 }))
                 ?.sort((a, b) => a.displayOrder - b.displayOrder) ?? [];
 
-        const profileImage = await this.mediaService.getMediaUrl(
+        const profileImageUrl = await this.mediaService.getMediaUrl(
             user.profileImage,
         );
 
+        user.profileImage = undefined;
+
         return {
             ...user,
-            profileImage,
+            profileImageUrl,
             subscription: {
                 isSubUser: false,
                 basePlanId: null,

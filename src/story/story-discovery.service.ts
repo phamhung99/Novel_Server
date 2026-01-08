@@ -13,6 +13,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Story } from './entities/story.entity';
 import { Chapter } from './entities/chapter.entity';
 import { ChapterViews } from './entities/chapter-views.entity';
+import { MediaService } from 'src/media/media.service';
 
 @Injectable()
 export class StoryDiscoveryService {
@@ -20,6 +21,7 @@ export class StoryDiscoveryService {
         private dataSource: DataSource,
         @InjectRepository(Category)
         private categoryRepository: Repository<Category>,
+        private mediaService: MediaService,
     ) {}
 
     async getUserLibrary(
@@ -150,13 +152,23 @@ export class StoryDiscoveryService {
             );
         }
 
-        const items = stories.map((story) => ({
-            ...story,
-            chapters: chaptersMap[story.storyId] || [],
-            lastReadAt: story.lastReadAt || null,
-            lastReadChapter: story.lastReadChapter || null,
-            canEdit: story.authorId === userId,
-        }));
+        const items = await Promise.all(
+            stories.map(async (story) => ({
+                ...story,
+                coverImage: undefined,
+                profileImage: undefined,
+                profileImageUrl: story.profileImage
+                    ? await this.mediaService.getMediaUrl(story.profileImage)
+                    : null,
+                coverImageUrl: story.coverImage
+                    ? await this.mediaService.getMediaUrl(story.coverImage)
+                    : null,
+                chapters: chaptersMap[story.storyId] || [],
+                lastReadAt: story.lastReadAt || null,
+                lastReadChapter: story.lastReadChapter || null,
+                canEdit: story.authorId === userId,
+            })),
+        );
 
         return { page, limit, total, items };
     }
@@ -287,13 +299,23 @@ export class StoryDiscoveryService {
             );
         }
 
-        const items = stories.map((story) => ({
-            ...story,
-            chapters: chaptersMap[story.storyId] || [],
-            lastReadAt: story.lastReadAt || null,
-            lastReadChapter: story.lastReadChapter || null,
-            canEdit: story.authorId === userId,
-        }));
+        const items = await Promise.all(
+            stories.map(async (story) => ({
+                ...story,
+                coverImage: undefined,
+                profileImage: undefined,
+                profileImageUrl: story.profileImage
+                    ? await this.mediaService.getMediaUrl(story.profileImage)
+                    : null,
+                coverImageUrl: story.coverImage
+                    ? await this.mediaService.getMediaUrl(story.coverImage)
+                    : null,
+                chapters: chaptersMap[story.storyId] || [],
+                lastReadAt: story.lastReadAt || null,
+                lastReadChapter: story.lastReadChapter || null,
+                canEdit: story.authorId === userId,
+            })),
+        );
 
         return { page, limit, total, items };
     }
@@ -433,13 +455,23 @@ export class StoryDiscoveryService {
             );
         }
 
-        const items = stories.map((story) => ({
-            ...story,
-            chapters: chaptersMap[story.storyId] || [],
-            lastReadAt: story.lastReadAt || null,
-            lastReadChapter: story.lastReadChapter || null,
-            canEdit: story.authorId === userId,
-        }));
+        const items = await Promise.all(
+            stories.map(async (story) => ({
+                ...story,
+                coverImage: undefined,
+                profileImage: undefined,
+                profileImageUrl: story.profileImage
+                    ? await this.mediaService.getMediaUrl(story.profileImage)
+                    : null,
+                coverImageUrl: story.coverImage
+                    ? await this.mediaService.getMediaUrl(story.coverImage)
+                    : null,
+                chapters: chaptersMap[story.storyId] || [],
+                lastReadAt: story.lastReadAt || null,
+                lastReadChapter: story.lastReadChapter || null,
+                canEdit: story.authorId === userId,
+            })),
+        );
 
         return { page, limit, total, items };
     }
@@ -694,13 +726,23 @@ export class StoryDiscoveryService {
             );
         }
 
-        const items = stories.map((story) => ({
-            ...story,
-            chapters: chaptersMap[story.storyId] || [],
-            lastReadAt: story.lastReadAt || null,
-            lastReadChapter: story.lastReadChapter || null,
-            canEdit: story.authorId === userId,
-        }));
+        const items = await Promise.all(
+            stories.map(async (story) => ({
+                ...story,
+                coverImage: undefined,
+                profileImage: undefined,
+                profileImageUrl: story.profileImage
+                    ? await this.mediaService.getMediaUrl(story.profileImage)
+                    : null,
+                coverImageUrl: story.coverImage
+                    ? await this.mediaService.getMediaUrl(story.coverImage)
+                    : null,
+                chapters: chaptersMap[story.storyId] || [],
+                lastReadAt: story.lastReadAt || null,
+                lastReadChapter: story.lastReadChapter || null,
+                canEdit: story.authorId === userId,
+            })),
+        );
 
         return {
             page,
