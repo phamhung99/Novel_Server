@@ -30,7 +30,7 @@ export class StoryGenerationApiService {
     ) {}
 
     async generateCoverImage(prompt: string): Promise<string> {
-        const providerName = 'grok'; // Currently only GPT provider supports image generation
+        const providerName = 'gemini';
         const aiProvider =
             this.storyGenerationProviderFactory.getProvider(providerName);
 

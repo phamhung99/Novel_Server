@@ -9,7 +9,7 @@ export class GeminiApiService implements IStoryGenerationProvider {
     private client: AxiosInstance;
     private readonly apiKey: string;
     private readonly modelName = 'gemini-3-pro-preview';
-    // private readonly modelName = 'gemini-2.0-flash-lite';
+    private readonly imageModel = 'imagen-4.0-generate-001';
     private readonly providerName = 'gemini';
 
     constructor(private configService: ConfigService) {
@@ -70,8 +70,53 @@ export class GeminiApiService implements IStoryGenerationProvider {
         }
     }
 
-    async generateImage(prompt: string, size): Promise<string> {
-        return 'text-to-image generation not supported yet';
+    async generateImage(prompt: string): Promise<string> {
+        try {
+            const requestBody = {
+                instances: [
+                    {
+                        prompt,
+                    },
+                ],
+                parameters: {
+                    sampleCount: 1,
+                    // Optional: add more parameters if needed (aspectRatio, addWatermark: false, etc.)
+                    // Example: aspectRatio: "1:1", imageSize: "1K" (depends on exact model support)
+                },
+            };
+
+            const response = await this.client.post(
+                `/models/${this.imageModel}:predict?key=${this.apiKey}`,
+                requestBody,
+            );
+
+            const predictions = response.data.predictions;
+            if (!predictions || predictions.length === 0) {
+                throw new Error('No predictions returned from Imagen API');
+            }
+
+            // Imagen /predict usually returns base64 PNG/JPEG in bytesBase64Encoded
+            const firstPrediction = predictions[0];
+            const b64Image = firstPrediction.bytesBase64Encoded;
+
+            if (!b64Image) {
+                throw new Error('No valid image data returned from Imagen API');
+            }
+
+            console.log('base64: ', b64Image.substring(0, 30) + '...');
+
+            return b64Image;
+        } catch (error) {
+            if (axios.isAxiosError(error) && error.response) {
+                this.logger.error('Gemini Imagen API failed:', {
+                    status: error.response.status,
+                    data: error.response.data,
+                });
+            } else {
+                this.logger.error('Gemini image generation error:', error);
+            }
+            throw error;
+        }
     }
 
     getProviderName(): string {
