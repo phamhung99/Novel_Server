@@ -65,7 +65,6 @@ export class ChapterService {
     async findChapterById(id: string): Promise<Chapter> {
         const chapter = await this.chapterRepository.findOne({
             where: { id },
-            relations: ['story'],
         });
 
         if (!chapter) {
@@ -91,10 +90,15 @@ export class ChapterService {
         }
     }
 
-    async findChapterByIndex(storyId: string, index: number): Promise<Chapter> {
+    async findChapterByIndex(storyId: string, index: number) {
         const chapter = await this.chapterRepository.findOne({
             where: { storyId, index },
-            relations: ['story'],
+            relations: ['chapterGenerations'],
+            order: {
+                chapterGenerations: {
+                    createdAt: 'DESC',
+                },
+            },
         });
 
         if (!chapter) {
@@ -103,7 +107,16 @@ export class ChapterService {
             );
         }
 
-        return chapter;
+        const generation = chapter.chapterGenerations?.[0];
+        const nextOptions = generation?.structure?.nextOptions ?? [];
+
+        const { chapterGenerations: _chapterGenerations, ...chapterData } =
+            chapter;
+
+        return {
+            ...chapterData,
+            nextOptions,
+        };
     }
 
     async updateChapterByIndex(
