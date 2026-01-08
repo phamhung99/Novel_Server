@@ -10,6 +10,7 @@ import {
     OneToMany,
 } from 'typeorm';
 import { UserCategoryPreference } from './user-category-preference.entity';
+import { DEFAULT_PROFILE_IMAGE_URL } from 'src/common/constants/app.constant';
 
 @Entity('users')
 export class User {
@@ -34,8 +35,15 @@ export class User {
     @Column({ default: 'user', type: 'varchar' })
     role: string;
 
-    @Column({ name: 'profile_image', nullable: true })
+    @Column({
+        name: 'profile_image',
+        default: DEFAULT_PROFILE_IMAGE_URL,
+        nullable: true,
+    })
     profileImage: string;
+
+    @Column({ nullable: true })
+    platform: string;
 
     @Column({ name: 'deleted_at', type: 'timestamptz', nullable: true })
     deletedAt: Date;

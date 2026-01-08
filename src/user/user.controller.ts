@@ -17,6 +17,7 @@ import { User } from './entities/user.entity';
 import { parseQueryOptions } from 'src/common/utils/parse-query-options.util';
 import { ERROR_MESSAGES } from 'src/common/constants/app.constant';
 import { UpdateUserGenresDto } from './dto/update-user-genres.dto';
+import { IapStore } from 'src/common/enums/app.enum';
 
 @Controller('users')
 export class UserController {
@@ -58,14 +59,20 @@ export class UserController {
     async getUserInfo(
         @Headers('x-user-id') userId: string,
         @Headers('x-language') language: string,
+        @Headers('x-platform') platform: IapStore,
     ): Promise<any> {
         if (!userId) {
             throw new BadRequestException(ERROR_MESSAGES.USER_ID_REQUIRED);
         }
 
+        if (!Object.values(IapStore).includes(platform as IapStore)) {
+            throw new BadRequestException('Invalid platform.');
+        }
+
         const user = await this.userService.createOrUpdateUser({
             userId,
             language,
+            platform,
         });
 
         return await this.userService.getUserInfo(user);
