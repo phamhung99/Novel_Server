@@ -742,6 +742,7 @@ export class StoryGenerationService {
         userId: string,
         storyId: string,
         prompt?: string,
+        model?: string,
     ) {
         const story = await this.storyRepository.findOne({
             where: { id: storyId, authorId: userId },
@@ -782,6 +783,7 @@ export class StoryGenerationService {
             tempImageUrl =
                 await this.storyGenerationApiService.generateCoverImage(
                     finalPrompt,
+                    model,
                 );
         } catch (err) {
             throw new BadRequestException(

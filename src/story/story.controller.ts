@@ -44,6 +44,7 @@ import { diskStorage } from 'multer';
 import { extname, join } from 'path';
 import { CustomMaxFileSizeValidator } from 'src/common/validators/custom-max-file-size.validator';
 import { MimeTypeValidator } from 'src/common/validators/mime-type.validator';
+import { GenerateCoverImageDto } from './dto/generate-cover-image.dto';
 
 @Controller('story')
 export class StoryController {
@@ -161,12 +162,13 @@ export class StoryController {
     generateCoverImage(
         @Headers('x-user-id') userId: string,
         @Param('storyId') storyId: string,
-        @Body('prompt') prompt: string,
+        @Body() dto: GenerateCoverImageDto,
     ) {
         return this.storyService.generateStoryCoverImage(
             userId,
             storyId,
-            prompt,
+            dto.prompt,
+            dto.model,
         );
     }
 

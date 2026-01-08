@@ -29,13 +29,13 @@ export class StoryGenerationApiService {
         private storyGenerationProviderFactory: StoryGenerationProviderFactory,
     ) {}
 
-    async generateCoverImage(prompt: string): Promise<string> {
+    async generateCoverImage(prompt: string, model?: string): Promise<string> {
         const providerName = 'gemini';
         const aiProvider =
             this.storyGenerationProviderFactory.getProvider(providerName);
 
         try {
-            const imageUrl = await aiProvider.generateImage(prompt);
+            const imageUrl = await aiProvider.generateImage(prompt, model);
             return imageUrl;
         } catch (error) {
             this.logger.error('Error generating cover image:', error);
