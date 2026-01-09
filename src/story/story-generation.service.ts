@@ -27,7 +27,10 @@ import {
     GenerateChapterResponseDto,
 } from './dto/generate-chapter.dto';
 import { StoryGenerationApiService } from '../ai/providers/story-generation-api.service';
-import { DEFAULT_COVER_IMAGE_URL } from 'src/common/constants/app.constant';
+import {
+    DEFAULT_AI_PROVIDER,
+    DEFAULT_COVER_IMAGE_URL,
+} from 'src/common/constants/app.constant';
 import { ChapterService } from './chapter.service';
 import { UserService } from 'src/user/user.service';
 import { ILike } from 'typeorm';
@@ -235,9 +238,9 @@ export class StoryGenerationService {
             requestId,
             type: GenerationType.CHAPTER,
             status: GenerationStatus.IN_PROGRESS,
-            aiProvider: dto.aiProvider,
+            aiProvider: dto.aiProvider || DEFAULT_AI_PROVIDER,
             aiModel: (() => {
-                switch (dto.aiProvider) {
+                switch (dto.aiProvider || DEFAULT_AI_PROVIDER) {
                     case 'grok':
                         return 'grok-4';
                     case 'gpt':
@@ -282,7 +285,7 @@ export class StoryGenerationService {
                     storyPrompt: sanitizedPrompt,
                     genres: dto.genres,
                     numberOfChapters: dto.numberOfChapters,
-                    aiProvider: dto.aiProvider,
+                    aiProvider: dto.aiProvider || DEFAULT_AI_PROVIDER,
                 });
 
             await this.storyGenerationRepository.update(
