@@ -21,7 +21,7 @@ export class GeminiApiService implements IStoryGenerationProvider {
     ]);
     private readonly providerName = 'gemini';
 
-    private readonly defaultModel = 'imagen-4.0-fast-generate-001';
+    private readonly defaultModel = 'gemini-3-pro-image-preview';
     private readonly sampleCount = 1;
 
     constructor(private configService: ConfigService) {
