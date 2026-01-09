@@ -455,7 +455,7 @@ export class StoryGenerationService {
                         aiProvider: storyGeneration.aiProvider,
                         storyMetadata,
                     });
-            } else if (chapterNumber > 1 && chapterNumber < totalChapters) {
+            } else if (chapterNumber > 1 && chapterNumber <= totalChapters) {
                 chapterStructureResponse =
                     await this.storyGenerationApiService.generateRemainChapters(
                         {
