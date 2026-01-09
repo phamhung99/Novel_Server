@@ -68,7 +68,7 @@ const StoryOverviewPage = () => {
     type ModelType = (typeof availableModels)[number];
 
     const [selectedModel, setSelectedModel] = useState<ModelType>(
-        'imagen-4.0-generate-001',
+        'imagen-4.0-fast-generate-001',
     );
 
     const handleAddChapter = () => {
@@ -104,7 +104,7 @@ const StoryOverviewPage = () => {
                 setStory((prev) =>
                     prev ? { ...prev, coverImageUrl: newCoverUrl } : prev,
                 );
-                alert('Cover image uploaded successfully!');
+                setOpenGenerateDialog(false);
             }
         } catch (err) {
             console.error('Upload cover failed:', err);
@@ -141,7 +141,9 @@ const StoryOverviewPage = () => {
                 },
             );
 
-            const newCoverUrl = res.data?.coverImageUrl;
+            const newCoverUrl = res.data?.data?.coverImageUrl;
+
+            console.log(newCoverUrl, res.data);
 
             if (newCoverUrl) {
                 setStory((prev) =>
@@ -152,7 +154,6 @@ const StoryOverviewPage = () => {
                           }
                         : prev,
                 );
-                alert('Cover image was regenerated successfully!');
                 setOpenGenerateDialog(false);
             }
         } catch (err: any) {

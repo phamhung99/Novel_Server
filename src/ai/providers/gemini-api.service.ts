@@ -86,8 +86,6 @@ export class GeminiApiService implements IStoryGenerationProvider {
         // Default model logic moved inside
         const effectiveModel = model ?? this.defaultModel;
 
-        console.log('Using this model: ', effectiveModel);
-
         if (
             !this.imagenModels.has(effectiveModel) &&
             !this.geminiImageModels.has(effectiveModel)

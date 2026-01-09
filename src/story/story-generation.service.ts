@@ -224,7 +224,6 @@ export class StoryGenerationService {
     async initializeStoryWithOutline(
         userId: string,
         requestId: string,
-        skipImage: boolean,
         dto: InitializeStoryDto,
     ): Promise<InitializeStoryResponseDto> {
         const exists = await this.storyGenerationRepository.findOne({
@@ -236,7 +235,7 @@ export class StoryGenerationService {
             requestId,
             type: GenerationType.CHAPTER,
             status: GenerationStatus.IN_PROGRESS,
-            aiProvider: dto.aiProvider || 'grok',
+            aiProvider: dto.aiProvider,
             aiModel: (() => {
                 switch (dto.aiProvider) {
                     case 'grok':
@@ -246,7 +245,7 @@ export class StoryGenerationService {
                     case 'gemini':
                         return 'gemini-3-pro-preview';
                     default:
-                        return 'grok-4';
+                        return 'gemini-3-pro-preview';
                 }
             })(),
             prompt: {
@@ -283,7 +282,7 @@ export class StoryGenerationService {
                     storyPrompt: sanitizedPrompt,
                     genres: dto.genres,
                     numberOfChapters: dto.numberOfChapters,
-                    aiProvider: dto.aiProvider || 'grok',
+                    aiProvider: dto.aiProvider,
                 });
 
             await this.storyGenerationRepository.update(
@@ -300,27 +299,10 @@ export class StoryGenerationService {
                 dto.genres,
             );
 
-            let coverImageKey: string | null = null;
-
-            if (!skipImage) {
-                const tempImageUrl =
-                    await this.storyGenerationApiService.generateCoverImage(
-                        outlineResponse.coverImage,
-                    );
-
-                coverImageKey =
-                    await this.doSpacesService.uploadFromStream(tempImageUrl);
-            }
-
-            const coverImageUrl = skipImage
-                ? DEFAULT_COVER_IMAGE_URL
-                : await this.doSpacesService.getImageUrl(coverImageKey);
-
             const story = this.storyRepository.create({
                 title: outlineResponse.title,
                 synopsis: outlineResponse.synopsis,
                 authorId: userId,
-                coverImage: coverImageKey,
             });
 
             const savedStory = await this.storyRepository.save(story);
@@ -356,7 +338,6 @@ export class StoryGenerationService {
                 id: savedStory.id,
                 title: story.title,
                 synopsis: story.synopsis,
-                coverImageUrl: coverImageUrl,
                 metadata: {
                     coverImage: outlineResponse.coverImage,
                     storyContext: outlineResponse.storyContext,
@@ -471,7 +452,7 @@ export class StoryGenerationService {
                     await this.storyGenerationApiService.generateFirstChapter({
                         storyId,
                         chapterNumber,
-                        aiProvider: storyGeneration.aiProvider || 'grok',
+                        aiProvider: storyGeneration.aiProvider,
                         storyMetadata,
                     });
             } else if (chapterNumber > 1 && chapterNumber < totalChapters) {
@@ -480,7 +461,7 @@ export class StoryGenerationService {
                         {
                             storyId,
                             chapterNumber,
-                            aiProvider: storyGeneration.aiProvider || 'grok',
+                            aiProvider: storyGeneration.aiProvider,
                             direction: dto.direction || '',
                             storyMetadata,
                             previousChapterMetadata,
@@ -499,7 +480,7 @@ export class StoryGenerationService {
                     await this.storyGenerationApiService.generateChapterSummary(
                         {
                             storyId,
-                            aiProvider: storyGeneration.aiProvider || 'grok',
+                            aiProvider: storyGeneration.aiProvider,
                             chapterSummary:
                                 chapterStructureResponse.structure.summary,
                             storyMetadata,

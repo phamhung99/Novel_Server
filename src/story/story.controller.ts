@@ -32,6 +32,7 @@ import {
 } from './dto/generate-story-outline.dto';
 import { AllowedImageMimeTypes, LibraryType } from 'src/common/enums/app.enum';
 import {
+    DEFAULT_COVER_IMAGE_URL,
     ERROR_MESSAGES,
     MAX_FILE_SIZE_UPLOAD,
 } from 'src/common/constants/app.constant';
@@ -161,9 +162,16 @@ export class StoryController {
     @Post(':storyId/generate/cover-image')
     generateCoverImage(
         @Headers('x-user-id') userId: string,
+        @Headers('x-skip-image') skipImage: boolean = false,
         @Param('storyId') storyId: string,
         @Body() dto: GenerateCoverImageDto,
     ) {
+        if (skipImage) {
+            return {
+                coverImageUrl: DEFAULT_COVER_IMAGE_URL,
+                message: 'Cover image regenerated successfully',
+            };
+        }
         return this.storyService.generateStoryCoverImage(
             userId,
             storyId,
