@@ -161,20 +161,11 @@ const ManageStories = () => {
                             },
                         }),
                     restoreStory: (id) => restoreStory(id),
-                    approveStory: (id) =>
-                        setInputDialog({
-                            open: true,
-                            title: 'Approve story?',
-                            content: 'Optional note',
-                            inputLabel: 'Note',
-                            onConfirm: async (note) => {
-                                await approveStory(id, note);
-                                setInputDialog((prev) => ({
-                                    ...prev,
-                                    open: false,
-                                }));
-                            },
-                        }),
+                    approveStory: (id) => {
+                        approveStory(id);
+
+                        handleMenuClose();
+                    },
                     rejectStory: (id) =>
                         setInputDialog({
                             open: true,
