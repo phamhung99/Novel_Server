@@ -1,6 +1,10 @@
 import { IsOptional, IsString, IsInt, Min, IsEnum } from 'class-validator';
 import { Type } from 'class-transformer';
-import { StorySort, StoryStatusFilter } from 'src/common/enums/app.enum';
+import {
+    PublishedWithin,
+    StorySort,
+    StoryStatusFilter,
+} from 'src/common/enums/app.enum';
 
 export class DiscoverStoriesDto {
     @IsOptional()
@@ -20,10 +24,17 @@ export class DiscoverStoriesDto {
     sort?: StorySort;
 
     @IsOptional()
-    @Type(() => Number)
-    @IsInt()
-    @Min(1)
-    minchapters?: number = 1;
+    @IsString()
+    minchapters?: string;
+
+    // lets keep both naming conventions for backward compatibility
+    @IsOptional()
+    @IsEnum(PublishedWithin)
+    published_within?: PublishedWithin;
+
+    @IsOptional()
+    @IsEnum(PublishedWithin)
+    publishedWithin?: PublishedWithin;
 
     @IsOptional()
     @Type(() => Number)

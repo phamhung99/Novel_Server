@@ -3,6 +3,7 @@ import { Brackets, DataSource, Repository } from 'typeorm';
 import { DiscoverStoriesDto } from './dto/discover-stories.dto';
 import {
     LibraryType,
+    PublishedWithin,
     StorySort,
     StoryStatusFilter,
 } from 'src/common/enums/app.enum';
@@ -502,11 +503,18 @@ export class StoryDiscoveryService {
             status,
             sort = StorySort.POPULAR,
             minchapters,
+            publishedWithin,
+            published_within,
             page = 1,
             limit = 20,
         }: DiscoverStoriesDto,
     ) {
         const offset = (page - 1) * limit;
+
+        // Handle deprecated 'published_within' parameter
+        if (published_within) {
+            publishedWithin = published_within;
+        }
 
         // Subquery đếm chính xác số chapter của từng story
         const chapterCountSubQuery = this.dataSource
@@ -610,10 +618,29 @@ export class StoryDiscoveryService {
             );
         }
 
-        if (minchapters !== undefined && minchapters > 0) {
+        let chapterFilterValue: number | undefined = undefined;
+        let chapterFilterOperator: string | undefined = undefined;
+
+        if (minchapters && minchapters.toLowerCase() !== 'all') {
+            const value = Number(minchapters);
+
+            if (!isNaN(value)) {
+                chapterFilterValue = Math.abs(value); // lấy giá trị tuyệt đối để query
+
+                if (value > 0) {
+                    // dương → >= (ít nhất)
+                    chapterFilterOperator = '>=';
+                } else if (value < 0) {
+                    // âm → < (ít hơn)
+                    chapterFilterOperator = '<';
+                }
+            }
+        }
+
+        if (chapterFilterValue !== undefined && chapterFilterOperator) {
             qb.andWhere(
-                'COALESCE(chapcnt.chapter_count::integer, 0) >= :minchapters',
-                { minchapters },
+                `COALESCE(chapcnt.chapter_count::integer, 0) ${chapterFilterOperator} :chapterFilterValue`,
+                { chapterFilterValue },
             );
         }
 
@@ -649,16 +676,61 @@ export class StoryDiscoveryService {
                 break;
             case StorySort.RECENTLY_UPDATED:
                 qb.orderBy('s.updatedAt', 'DESC');
+
+                if (
+                    publishedWithin &&
+                    publishedWithin !== PublishedWithin.ALL
+                ) {
+                    if (publishedWithin === PublishedWithin.DAYS_400) {
+                        qb.andWhere(
+                            `s.updatedAt < NOW() - INTERVAL '365 days'`,
+                        );
+                    } else {
+                        const days = Number(publishedWithin);
+
+                        if (!isNaN(days) && days > 0) {
+                            qb.andWhere(
+                                's.updatedAt >= NOW() - INTERVAL :days DAY',
+                                {
+                                    days,
+                                },
+                            );
+                        }
+                    }
+                }
                 break;
             case StorySort.RECENTLY_ADDED:
                 qb.orderBy('s.createdAt', 'DESC');
                 break;
             case StorySort.RELEASE_DATE:
-                // sort theo ngày phê duyệt xuất bản
                 qb.orderBy('s.approvedAt', 'DESC');
+
+                if (
+                    publishedWithin &&
+                    publishedWithin !== PublishedWithin.ALL
+                ) {
+                    if (publishedWithin === PublishedWithin.DAYS_400) {
+                        qb.andWhere(
+                            `s.approvedAt < NOW() - INTERVAL '365 days'`,
+                        );
+                    } else {
+                        const days = Number(publishedWithin);
+
+                        if (!isNaN(days) && days > 0) {
+                            qb.andWhere(
+                                's.approvedAt >= NOW() - INTERVAL :days DAY',
+                                {
+                                    days,
+                                },
+                            );
+                        }
+                    }
+                }
                 break;
             default:
-                qb.orderBy('recent_views.views_count', 'DESC', 'NULLS LAST');
+                qb.orderBy('recent_views.views_count', 'DESC', 'NULLS LAST')
+                    .addOrderBy('s.likes_count', 'DESC', 'NULLS LAST')
+                    .addOrderBy('s.updatedAt', 'DESC');
         }
 
         qb.groupBy('s.id')
