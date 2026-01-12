@@ -21,6 +21,10 @@ import {
     DialogContentText,
     DialogContent,
     DialogActions,
+    FormControl,
+    InputLabel,
+    Select,
+    MenuItem,
 } from '@mui/material';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import EditIcon from '@mui/icons-material/Edit';
@@ -52,6 +56,20 @@ const StoryOverviewPage = () => {
     const [openGenerateDialog, setOpenGenerateDialog] = useState(false);
     const [coverPrompt, setCoverPrompt] = useState<string>('');
     const [generatingCover, setGeneratingCover] = useState(false);
+
+    const availableModels = [
+        'imagen-4.0-generate-001',
+        'imagen-4.0-ultra-generate-001',
+        'imagen-4.0-fast-generate-001',
+        'gemini-2.5-flash-image',
+        'gemini-3-pro-image-preview',
+    ] as const;
+
+    type ModelType = (typeof availableModels)[number];
+
+    const [selectedModel, setSelectedModel] = useState<ModelType>(
+        'imagen-4.0-fast-generate-001',
+    );
 
     const handleAddChapter = () => {
         navigate(`${ROUTES.MANUAL_CREATION}/${storyId}`);
@@ -86,7 +104,7 @@ const StoryOverviewPage = () => {
                 setStory((prev) =>
                     prev ? { ...prev, coverImageUrl: newCoverUrl } : prev,
                 );
-                alert('Cover image uploaded successfully!');
+                setOpenGenerateDialog(false);
             }
         } catch (err) {
             console.error('Upload cover failed:', err);
@@ -96,6 +114,56 @@ const StoryOverviewPage = () => {
             if (fileInputRef.current) {
                 fileInputRef.current.value = '';
             }
+        }
+    };
+
+    const handleGenerateCover = async () => {
+        if (!storyId || !userId) return;
+
+        setGeneratingCover(true);
+        try {
+            const payload: any = {
+                model: selectedModel,
+            };
+
+            if (coverPrompt.trim()) {
+                payload.prompt = coverPrompt.trim();
+            }
+
+            const res = await axios.post(
+                `/api/v1/story/${storyId}/generate/cover-image`,
+                payload,
+                {
+                    headers: {
+                        'x-user-id': userId,
+                        'Content-Type': 'application/json',
+                    },
+                },
+            );
+
+            const newCoverUrl = res.data?.data?.coverImageUrl;
+
+            console.log(newCoverUrl, res.data);
+
+            if (newCoverUrl) {
+                setStory((prev) =>
+                    prev
+                        ? {
+                              ...prev,
+                              coverImageUrl: newCoverUrl,
+                          }
+                        : prev,
+                );
+                setOpenGenerateDialog(false);
+            }
+        } catch (err: any) {
+            console.error('Generate cover failed:', err);
+            alert(
+                err.response?.data?.message ||
+                    'Generation failed. Please try again later.',
+            );
+        } finally {
+            setGeneratingCover(false);
         }
     };
 
@@ -250,10 +318,7 @@ const StoryOverviewPage = () => {
                         color="secondary"
                         startIcon={<AutoAwesomeIcon />}
                         onClick={() => setOpenGenerateDialog(true)}
-                        disabled={
-                            uploadingCover ||
-                            generatingCover
-                        }
+                        disabled={uploadingCover || generatingCover}
                         sx={{ mb: 2 }}
                     >
                         {generatingCover
@@ -803,6 +868,26 @@ const StoryOverviewPage = () => {
                         prompt from the original story generation.
                     </DialogContentText>
 
+                    {/* Model selection */}
+                    <FormControl fullWidth sx={{ mt: 2, mb: 3 }}>
+                        <InputLabel id="cover-model-label">AI Model</InputLabel>
+                        <Select
+                            labelId="cover-model-label"
+                            value={selectedModel}
+                            label="AI Model"
+                            onChange={(e) =>
+                                setSelectedModel(e.target.value as ModelType)
+                            }
+                            disabled={generatingCover}
+                        >
+                            {availableModels.map((model) => (
+                                <MenuItem key={model} value={model}>
+                                    {model}
+                                </MenuItem>
+                            ))}
+                        </Select>
+                    </FormControl>
+
                     <TextField
                         fullWidth
                         multiline
@@ -812,7 +897,6 @@ const StoryOverviewPage = () => {
                         onChange={(e) => setCoverPrompt(e.target.value)}
                         placeholder="Example: A mysterious dark fantasy forest with glowing runes, epic book cover style, cinematic lighting"
                         disabled={generatingCover}
-                        sx={{ mt: 1 }}
                         variant="outlined"
                         InputProps={{
                             endAdornment: coverPrompt && (
@@ -849,7 +933,11 @@ const StoryOverviewPage = () => {
 
                 <DialogActions>
                     <Button
-                        onClick={() => setOpenGenerateDialog(false)}
+                        onClick={() => {
+                            setOpenGenerateDialog(false);
+                            // Optional: reset model to default when closing
+                            // setSelectedModel('imagen-4.0-generate-001');
+                        }}
                         disabled={generatingCover}
                     >
                         Cancel
@@ -864,52 +952,7 @@ const StoryOverviewPage = () => {
                                 <AutoAwesomeIcon />
                             )
                         }
-                        onClick={async () => {
-                            if (!storyId || !userId) return;
-
-                            setGeneratingCover(true);
-                            try {
-                                const payload = coverPrompt.trim()
-                                    ? { prompt: coverPrompt.trim() }
-                                    : {};
-
-                                const res = await axios.post(
-                                    `/api/v1/story/${storyId}/generate/cover-image`,
-                                    payload,
-                                    {
-                                        headers: {
-                                            'x-user-id': userId,
-                                            'Content-Type': 'application/json',
-                                        },
-                                    },
-                                );
-
-                                const newCoverUrl = res.data?.coverImageUrl;
-
-                                if (newCoverUrl) {
-                                    setStory((prev) =>
-                                        prev
-                                            ? {
-                                                  ...prev,
-                                                  coverImageUrl: newCoverUrl,
-                                              }
-                                            : prev,
-                                    );
-                                    alert(
-                                        'Cover image was regenerated successfully!',
-                                    );
-                                    setOpenGenerateDialog(false);
-                                }
-                            } catch (err: any) {
-                                console.error('Generate cover failed:', err);
-                                alert(
-                                    err.response?.data?.message ||
-                                        'Generation failed. Please try again later.',
-                                );
-                            } finally {
-                                setGeneratingCover(false);
-                            }
-                        }}
+                        onClick={handleGenerateCover}
                         disabled={generatingCover}
                     >
                         {generatingCover

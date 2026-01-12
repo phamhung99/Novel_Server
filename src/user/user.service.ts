@@ -14,6 +14,7 @@ import { StoryStatus } from 'src/common/enums/story-status.enum';
 import { Chapter } from 'src/story/entities/chapter.entity';
 import { UserCoins } from './entities/user-coins.entity';
 import { CoinType } from 'src/common/enums/app.enum';
+import { MediaService } from 'src/media/media.service';
 
 @Injectable()
 export class UserService extends BaseCrudService<User> {
@@ -24,6 +25,7 @@ export class UserService extends BaseCrudService<User> {
         private readonly dataSource: DataSource,
         @InjectRepository(UserCoins)
         private readonly userCoinsRepository: Repository<UserCoins>,
+        private mediaService: MediaService,
     ) {
         super(userRepo);
     }
@@ -34,6 +36,51 @@ export class UserService extends BaseCrudService<User> {
 
     protected getUniqueField(): keyof User {
         return;
+    }
+
+    private generateRandomUsername(): string {
+        const adjectives = [
+            'Sunny',
+            'Happy',
+            'Cute',
+            'Cool',
+            'Wild',
+            'Brave',
+            'Swift',
+            'Gentle',
+            'Quiet',
+            'Bright',
+            'Mystic',
+            'Silver',
+            'Golden',
+            'Shadow',
+            'Frost',
+        ];
+
+        const nouns = [
+            'Panda',
+            'Tiger',
+            'Fox',
+            'Wolf',
+            'Eagle',
+            'Shark',
+            'Dragon',
+            'Cat',
+            'Rabbit',
+            'Penguin',
+            'Koala',
+            'Lion',
+            'Bear',
+            'Owl',
+            'Phoenix',
+        ];
+
+        const adjective =
+            adjectives[Math.floor(Math.random() * adjectives.length)];
+        const noun = nouns[Math.floor(Math.random() * nouns.length)];
+        const number = Math.floor(Math.random() * 9000) + 1000; // 1000-9999
+
+        return `${adjective}${noun}_${number}`;
     }
 
     async findByEmail(email: string): Promise<User> {
@@ -51,9 +98,11 @@ export class UserService extends BaseCrudService<User> {
     async createOrUpdateUser({
         userId,
         language,
+        platform,
     }: {
         userId: string;
         language: string;
+        platform: string;
     }): Promise<User> {
         let user = await this.repository.findOne({
             where: { id: userId },
@@ -64,9 +113,13 @@ export class UserService extends BaseCrudService<User> {
         });
 
         if (!user) {
+            const randomUsername = this.generateRandomUsername();
+
             user = this.repository.create({
                 id: userId,
+                username: randomUsername,
                 country: language,
+                platform: platform,
             });
         }
         await this.repository.save(user);
@@ -221,11 +274,17 @@ export class UserService extends BaseCrudService<User> {
                 );
             }
 
-            const items = stories.map((story) => ({
-                ...story,
-                chapters: chaptersMap[story.storyId] || [],
-                canEdit: story.authorId === userId,
-            }));
+            const items = await Promise.all(
+                stories.map(async (story) => ({
+                    ...story,
+                    coverImage: undefined,
+                    coverImageUrl: story.coverImage
+                        ? await this.mediaService.getMediaUrl(story.coverImage)
+                        : null,
+                    chapters: chaptersMap[story.storyId] || [],
+                    canEdit: story.authorId === userId,
+                })),
+            );
 
             return { page, limit, total, items };
         } catch (error) {
@@ -274,30 +333,35 @@ export class UserService extends BaseCrudService<User> {
         const totalCoins = permanentCoins + activeTemporaryAmount;
 
         // Preferred categories (sorted by some order — you may want to add order column later)
-        const preferredCategories = user.userCategoryPreferences
-            .map((pref) => ({
-                id: pref.categoryId,
-                name: pref.category?.name || 'Unknown',
-                displayOrder: pref.category?.displayOrder,
-            }))
-            .sort((a, b) => a.displayOrder - b.displayOrder);
+        const preferredCategories =
+            user.userCategoryPreferences
+                ?.map((pref) => ({
+                    id: pref.categoryId,
+                    name: pref.category?.name ?? 'Unknown',
+                    displayOrder:
+                        pref.category?.displayOrder ?? Number.MAX_SAFE_INTEGER,
+                }))
+                ?.sort((a, b) => a.displayOrder - b.displayOrder) ?? [];
 
-        user.userCategoryPreferences = undefined;
+        const profileImageUrl = await this.mediaService.getMediaUrl(
+            user.profileImage,
+        );
+
+        user.profileImage = undefined;
 
         return {
-            user: {
-                ...user,
-                subscription: {
-                    isSubUser: false,
-                    basePlanId: null,
-                },
-                wallet: {
-                    totalCoins,
-                    permanentCoins,
-                    temporaryCoins: temporaryCoinsForDisplay,
-                },
-                preferredCategories,
+            ...user,
+            profileImageUrl,
+            subscription: {
+                isSubUser: false,
+                basePlanId: null,
             },
+            wallet: {
+                totalCoins,
+                permanentCoins,
+                temporaryCoins: temporaryCoinsForDisplay,
+            },
+            preferredCategories,
         };
     }
 }

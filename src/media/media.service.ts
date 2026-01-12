@@ -58,7 +58,13 @@ export class MediaService {
         }
     }
 
+    uploadFromStream = this.storage.uploadFromStream.bind(this.storage);
+
     async delete(key: string): Promise<void> {
         await this.storage.deleteImage(key);
+    }
+
+    async getMediaUrl(key: string): Promise<string> {
+        return this.storage.getImageUrl(key);
     }
 }

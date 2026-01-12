@@ -87,6 +87,7 @@ export enum GenerationStatus {
 export enum StoryStatusFilter {
     COMPLETED = 'completed',
     ONGOING = 'ongoing',
+    ALL = 'all',
 }
 
 export enum StorySort {
@@ -94,4 +95,14 @@ export enum StorySort {
     RECENTLY_UPDATED = 'recently_updated',
     RECENTLY_ADDED = 'recently_added',
     RELEASE_DATE = 'release_date',
+}
+
+export enum PublishedWithin {
+    ALL = 'all',
+    DAYS_7 = '7',
+    DAYS_30 = '30',
+    DAYS_60 = '60',
+    DAYS_90 = '90',
+    DAYS_365 = '365',
+    DAYS_400 = '400',
 }

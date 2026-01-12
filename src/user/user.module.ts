@@ -8,10 +8,12 @@ import { ReadingHistory } from './entities/reading-history.entity';
 import { StoryGeneration } from 'src/story/entities/story-generation.entity';
 import { Chapter } from 'src/story/entities/chapter.entity';
 import { UserCoins } from './entities/user-coins.entity';
+import { MediaService } from 'src/media/media.service';
+import { DoSpacesService } from 'src/upload/do-spaces.service';
 
 @Module({
     controllers: [UserController],
-    providers: [UserService],
+    providers: [UserService, MediaService, DoSpacesService],
     imports: [
         TypeOrmModule.forFeature([
             User,

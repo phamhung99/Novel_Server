@@ -26,15 +26,36 @@ export class DoSpacesService {
     }
 
     async uploadFromStream(
-        imageUrl: string,
-        mimeType = 'image/jpeg',
+        source: string,
+        mimeType: string = 'image/jpeg',
     ): Promise<string> {
         const key = `covers/${uuidv4()}.jpg`;
 
-        const response = await axios.get(imageUrl, {
-            responseType: 'arraybuffer',
-        });
-        const buffer = Buffer.from(response.data);
+        let buffer: Buffer;
+
+        // Trường hợp 1: source là base64 (có hoặc không có data URI prefix)
+        if (source.startsWith('data:image')) {
+            // Cắt bỏ phần header data:image/png;base64,
+            const base64Data = source.split(';base64,').pop() || source;
+            buffer = Buffer.from(base64Data, 'base64');
+        } else if (
+            source.startsWith('http://') ||
+            source.startsWith('https://')
+        ) {
+            // Trường hợp 2: source là URL
+            const response = await axios.get(source, {
+                responseType: 'arraybuffer',
+            });
+            buffer = Buffer.from(response.data);
+        } else {
+            // Giả định source là base64 thuần (không có prefix)
+            buffer = Buffer.from(source, 'base64');
+        }
+
+        // Kiểm tra buffer có hợp lệ không
+        if (buffer.length === 0) {
+            throw new Error('Invalid image data: empty buffer');
+        }
 
         await this.client.send(
             new PutObjectCommand({
@@ -46,7 +67,7 @@ export class DoSpacesService {
             }),
         );
 
-        return `${key}`;
+        return key;
     }
 
     async uploadFromBuffer(

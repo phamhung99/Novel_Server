@@ -32,6 +32,7 @@ import {
 } from './dto/generate-story-outline.dto';
 import { AllowedImageMimeTypes, LibraryType } from 'src/common/enums/app.enum';
 import {
+    DEFAULT_COVER_IMAGE_URL,
     ERROR_MESSAGES,
     MAX_FILE_SIZE_UPLOAD,
 } from 'src/common/constants/app.constant';
@@ -44,7 +45,7 @@ import { diskStorage } from 'multer';
 import { extname, join } from 'path';
 import { CustomMaxFileSizeValidator } from 'src/common/validators/custom-max-file-size.validator';
 import { MimeTypeValidator } from 'src/common/validators/mime-type.validator';
-import { MediaService } from 'src/media/media.service';
+import { GenerateCoverImageDto } from './dto/generate-cover-image.dto';
 
 @Controller('story')
 export class StoryController {
@@ -52,7 +53,6 @@ export class StoryController {
         private readonly storyService: StoryService,
         private readonly userService: UserService,
         private readonly chapterService: ChapterService,
-        private readonly mediaService: MediaService,
     ) {}
 
     @Post(':storyId/upload-cover')
@@ -162,13 +162,21 @@ export class StoryController {
     @Post(':storyId/generate/cover-image')
     generateCoverImage(
         @Headers('x-user-id') userId: string,
+        @Headers('x-skip-image') skipImage: boolean = false,
         @Param('storyId') storyId: string,
-        @Body('prompt') prompt: string,
+        @Body() dto: GenerateCoverImageDto,
     ) {
+        if (skipImage) {
+            return {
+                coverImageUrl: DEFAULT_COVER_IMAGE_URL,
+                message: 'Cover image regenerated successfully',
+            };
+        }
         return this.storyService.generateStoryCoverImage(
             userId,
             storyId,
-            prompt,
+            dto.prompt,
+            dto.model,
         );
     }
 
@@ -177,7 +185,6 @@ export class StoryController {
     async initializeStory(
         @Headers('x-user-id') userId: string,
         @Headers('x-request-id') requestId: string,
-        @Headers('x-skip-image') skipImage: boolean = false,
         @Body() initializeStoryDto: InitializeStoryDto,
     ): Promise<InitializeStoryResponseDto> {
         if (!requestId) {
@@ -186,7 +193,6 @@ export class StoryController {
         return this.storyService.initializeStoryWithOutline(
             userId,
             requestId,
-            skipImage,
             initializeStoryDto,
         );
     }

@@ -1,10 +1,3 @@
-import { LightningActionType } from '../enums/app.enum';
-
-export const LIGHTNING_VALUES: Record<LightningActionType, number> = {
-    [LightningActionType.COMIC_STORY_GENERATION]: 10,
-    [LightningActionType.COMIC_IMAGE_GENERATION]: 50,
-};
-
 export const MAX_MSG_COUNT_PER_DAY = 3;
 export const COMIC_COOLDOWN_MS = 20 * 1000; // 20 seconds
 
@@ -16,6 +9,10 @@ export const MAX_FILE_SIZE_UPLOAD = {
 
 export const DEFAULT_COVER_IMAGE_URL =
     'https://myapp-assets.sfo3.cdn.digitaloceanspaces.com/covers/cbba6c8b-744e-47fc-b5ad-a3ec8d7ccfe3.jpg';
+
+export const DEFAULT_PROFILE_IMAGE_URL = 'avatars/default_avatar.png';
+
+export const DEFAULT_AI_PROVIDER = 'gemini';
 
 export const ERROR_MESSAGES = {
     // File Upload

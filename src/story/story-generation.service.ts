@@ -27,13 +27,16 @@ import {
     GenerateChapterResponseDto,
 } from './dto/generate-chapter.dto';
 import { StoryGenerationApiService } from '../ai/providers/story-generation-api.service';
-import { DoSpacesService } from 'src/upload/do-spaces.service';
-import { DEFAULT_COVER_IMAGE_URL } from 'src/common/constants/app.constant';
+import {
+    DEFAULT_AI_PROVIDER,
+    DEFAULT_COVER_IMAGE_URL,
+} from 'src/common/constants/app.constant';
 import { ChapterService } from './chapter.service';
 import { UserService } from 'src/user/user.service';
 import { ILike } from 'typeorm';
 import { Category } from './entities/categories.entity';
 import { StoryCategory } from './entities/story-category.entity';
+import { MediaService } from 'src/media/media.service';
 
 @Injectable()
 export class StoryGenerationService {
@@ -54,7 +57,7 @@ export class StoryGenerationService {
         @InjectRepository(StoryCategory)
         private storyCategoryRepository: Repository<StoryCategory>,
         private storyGenerationApiService: StoryGenerationApiService,
-        private doSpacesService: DoSpacesService,
+        private mediaService: MediaService,
         private chapterService: ChapterService,
         private userService: UserService,
     ) {}
@@ -224,7 +227,6 @@ export class StoryGenerationService {
     async initializeStoryWithOutline(
         userId: string,
         requestId: string,
-        skipImage: boolean,
         dto: InitializeStoryDto,
     ): Promise<InitializeStoryResponseDto> {
         const exists = await this.storyGenerationRepository.findOne({
@@ -236,9 +238,9 @@ export class StoryGenerationService {
             requestId,
             type: GenerationType.CHAPTER,
             status: GenerationStatus.IN_PROGRESS,
-            aiProvider: dto.aiProvider || 'grok',
+            aiProvider: dto.aiProvider || DEFAULT_AI_PROVIDER,
             aiModel: (() => {
-                switch (dto.aiProvider) {
+                switch (dto.aiProvider || DEFAULT_AI_PROVIDER) {
                     case 'grok':
                         return 'grok-4';
                     case 'gpt':
@@ -246,7 +248,7 @@ export class StoryGenerationService {
                     case 'gemini':
                         return 'gemini-3-pro-preview';
                     default:
-                        return 'grok-4';
+                        return 'gemini-3-pro-preview';
                 }
             })(),
             prompt: {
@@ -283,35 +285,27 @@ export class StoryGenerationService {
                     storyPrompt: sanitizedPrompt,
                     genres: dto.genres,
                     numberOfChapters: dto.numberOfChapters,
-                    aiProvider: dto.aiProvider || 'grok',
+                    aiProvider: dto.aiProvider || DEFAULT_AI_PROVIDER,
                 });
+
+            await this.storyGenerationRepository.update(
+                { id: savedStoryGeneration.id },
+                {
+                    response: {
+                        outline: outlineResponse.outline,
+                    } as any,
+                },
+            );
 
             const storyCategoryEntities = await this.buildStoryCategories(
                 outlineResponse.storyContext?.meta,
                 dto.genres,
             );
 
-            let coverImageKey: string | null = null;
-
-            if (!skipImage) {
-                const tempImageUrl =
-                    await this.storyGenerationApiService.generateCoverImage(
-                        outlineResponse.coverImage,
-                    );
-
-                coverImageKey =
-                    await this.doSpacesService.uploadFromStream(tempImageUrl);
-            }
-
-            const coverImageUrl = skipImage
-                ? DEFAULT_COVER_IMAGE_URL
-                : await this.doSpacesService.getImageUrl(coverImageKey);
-
             const story = this.storyRepository.create({
                 title: outlineResponse.title,
                 synopsis: outlineResponse.synopsis,
                 authorId: userId,
-                coverImage: coverImageKey,
             });
 
             const savedStory = await this.storyRepository.save(story);
@@ -329,9 +323,6 @@ export class StoryGenerationService {
                 { id: savedStoryGeneration.id },
                 {
                     storyId: savedStory.id,
-                    response: {
-                        outline: outlineResponse.outline,
-                    } as any,
                     title: outlineResponse.title,
                     synopsis: outlineResponse.synopsis,
                     metadata: {
@@ -350,7 +341,6 @@ export class StoryGenerationService {
                 id: savedStory.id,
                 title: story.title,
                 synopsis: story.synopsis,
-                coverImageUrl: coverImageUrl,
                 metadata: {
                     coverImage: outlineResponse.coverImage,
                     storyContext: outlineResponse.storyContext,
@@ -465,16 +455,16 @@ export class StoryGenerationService {
                     await this.storyGenerationApiService.generateFirstChapter({
                         storyId,
                         chapterNumber,
-                        aiProvider: storyGeneration.aiProvider || 'grok',
+                        aiProvider: storyGeneration.aiProvider,
                         storyMetadata,
                     });
-            } else if (chapterNumber > 1 && chapterNumber < totalChapters) {
+            } else if (chapterNumber > 1 && chapterNumber <= totalChapters) {
                 chapterStructureResponse =
                     await this.storyGenerationApiService.generateRemainChapters(
                         {
                             storyId,
                             chapterNumber,
-                            aiProvider: storyGeneration.aiProvider || 'grok',
+                            aiProvider: storyGeneration.aiProvider,
                             direction: dto.direction || '',
                             storyMetadata,
                             previousChapterMetadata,
@@ -493,7 +483,7 @@ export class StoryGenerationService {
                     await this.storyGenerationApiService.generateChapterSummary(
                         {
                             storyId,
-                            aiProvider: storyGeneration.aiProvider || 'grok',
+                            aiProvider: storyGeneration.aiProvider,
                             chapterSummary:
                                 chapterStructureResponse.structure.summary,
                             storyMetadata,
@@ -658,7 +648,7 @@ export class StoryGenerationService {
             metadata: story.generation?.metadata.storyContext || {},
             coverImageUrl: skipImage
                 ? DEFAULT_COVER_IMAGE_URL
-                : await this.doSpacesService.getImageUrl(story.coverImage),
+                : await this.mediaService.getMediaUrl(story.coverImage),
         };
     }
 
@@ -736,6 +726,7 @@ export class StoryGenerationService {
         userId: string,
         storyId: string,
         prompt?: string,
+        model?: string,
     ) {
         const story = await this.storyRepository.findOne({
             where: { id: storyId, authorId: userId },
@@ -776,6 +767,7 @@ export class StoryGenerationService {
             tempImageUrl =
                 await this.storyGenerationApiService.generateCoverImage(
                     finalPrompt,
+                    model,
                 );
         } catch (err) {
             throw new BadRequestException(
@@ -786,7 +778,7 @@ export class StoryGenerationService {
         let newCoverImageKey: string | null = null;
         try {
             newCoverImageKey =
-                await this.doSpacesService.uploadFromStream(tempImageUrl);
+                await this.mediaService.uploadFromStream(tempImageUrl);
         } catch (err) {
             throw new InternalServerErrorException(
                 `Failed to upload cover image: ${err.message}`,
@@ -794,14 +786,25 @@ export class StoryGenerationService {
         }
 
         const newCoverImageUrl =
-            await this.doSpacesService.getImageUrl(newCoverImageKey);
+            await this.mediaService.getMediaUrl(newCoverImageKey);
 
+        // Lấy key cũ trước khi update
+        const oldCoverKey = story.coverImage;
+
+        // Update database
         await this.storyRepository.update(
             { id: storyId },
-            {
-                coverImage: newCoverImageKey,
-            },
+            { coverImage: newCoverImageKey },
         );
+
+        if (oldCoverKey && oldCoverKey !== newCoverImageKey) {
+            this.mediaService.delete(oldCoverKey).catch((err) => {
+                console.error(
+                    `Failed to delete old cover image: ${oldCoverKey}`,
+                    err,
+                );
+            });
+        }
 
         return {
             coverImageUrl: newCoverImageUrl,
