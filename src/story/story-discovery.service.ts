@@ -60,6 +60,7 @@ export class StoryDiscoveryService {
                 's.visibility AS "visibility"',
                 's.likes_count AS "likesCount"',
                 's.views_count AS "viewsCount"',
+                's.sourceType AS "sourceType"',
 
                 `json_agg(DISTINCT jsonb_build_object('id', cat.id, 'name', cat.name)) AS "categories"`,
 
