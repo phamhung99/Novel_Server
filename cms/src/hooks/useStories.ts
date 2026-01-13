@@ -7,6 +7,7 @@ export const useStories = (
     page: number,
     rowsPerPage: number,
     keyword: string = '',
+    sourceFilter: string | undefined,
 ) => {
     const [stories, setStories] = useState<StoryDto[]>([]);
     const [totalStories, setTotalStories] = useState(0);
@@ -23,7 +24,15 @@ export const useStories = (
 
             if (keyword.trim()) {
                 params.keyword = keyword.trim().toLowerCase();
-            } else if (statusFilter === 'pending') {
+            }
+
+            console.log(sourceFilter);
+
+            if (sourceFilter) {
+                params.source = sourceFilter;
+            }
+
+            if (statusFilter === 'pending') {
                 url = '/api/v1/story/pending';
             } else if (statusFilter === 'deleted') {
                 url = '/api/v1/story/deleted/all';
@@ -51,7 +60,7 @@ export const useStories = (
 
     useEffect(() => {
         fetchStories();
-    }, [statusFilter, page, rowsPerPage, keyword]);
+    }, [statusFilter, page, rowsPerPage, keyword, sourceFilter]);
 
     return { stories, totalStories, loading, setStories, fetchStories };
 };

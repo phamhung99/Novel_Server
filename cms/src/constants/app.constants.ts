@@ -37,3 +37,11 @@ export const STORY_VISIBILITY = {
 
 export type StoryVisibility =
     (typeof STORY_VISIBILITY)[keyof typeof STORY_VISIBILITY];
+
+export const STORY_SOURCE = {
+    ALL: 'all' as const,
+    AI: 'AI' as const,
+    MANUAL: 'Manual' as const,
+} satisfies Record<string, string>;
+
+export type StorySource = (typeof STORY_SOURCE)[keyof typeof STORY_SOURCE];

@@ -75,7 +75,7 @@ export class StoryCrudService {
         total: number;
         items: any[];
     }> {
-        const { page = 1, limit = 10, keyword } = paginationDto;
+        const { page = 1, limit = 10, keyword, source } = paginationDto;
         const skip = (page - 1) * limit;
 
         const qb = this.storyRepository
@@ -91,6 +91,10 @@ export class StoryCrudService {
             const searchTerm = `${keyword.trim().toLowerCase()}%`;
 
             qb.andWhere('LOWER(story.title) LIKE :searchTerm', { searchTerm });
+        }
+
+        if (source) {
+            qb.andWhere('story.sourceType = :source', { source });
         }
 
         const [stories, total] = await Promise.all([

@@ -14,7 +14,7 @@ import {
     InputAdornment,
 } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
-import { ROUTES } from '../constants/app.constants';
+import { ROUTES, STORY_SOURCE, type StorySource } from '../constants/app.constants';
 import { useStories } from '../hooks/useStories';
 import { useStoryActions } from '../hooks/useStoryActions';
 import { StoryTable } from '../components/StoryTable';
@@ -47,7 +47,7 @@ const ManageStories = () => {
         onConfirm: (_value: string) => {},
     });
 
-    const [aiFilter, setAiFilter] = useState<'all' | 'manual' | 'ai'>('all');
+    const [aiFilter, setAiFilter] = useState<StorySource>(STORY_SOURCE.ALL);
     const [searchKeyword, setSearchKeyword] = useState('');
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
@@ -65,10 +65,11 @@ const ManageStories = () => {
     const debouncedKeyword = useDebounce(searchKeyword, 500);
 
     const { stories, totalStories, loading, fetchStories } = useStories(
-        statusFilter === 'all' ? undefined : statusFilter,
+        statusFilter === STORY_SOURCE.ALL ? undefined : statusFilter,
         page + 1,
         rowsPerPage,
         debouncedKeyword,
+        aiFilter === STORY_SOURCE.ALL ? undefined : aiFilter,
     );
 
     const {
@@ -112,6 +113,11 @@ const ManageStories = () => {
         fetchStories();
     };
 
+    const handleAiFilterChange = (e: any) => {
+        setAiFilter(e.target.value as StorySource);
+        setPage(0);
+    };
+
     useEffect(() => {
         setPage(0);
     }, [debouncedKeyword]);
@@ -147,16 +153,11 @@ const ManageStories = () => {
                     <FormControl sx={{ minWidth: 140 }}>
                         <Select
                             value={aiFilter}
-                            onChange={(e) => {
-                                setAiFilter(
-                                    e.target.value as 'all' | 'manual' | 'ai',
-                                );
-                                setPage(0);
-                            }}
+                            onChange={handleAiFilterChange}
                         >
-                            <MenuItem value="all">All (AI + Manual)</MenuItem>
-                            <MenuItem value="manual">Manual</MenuItem>
-                            <MenuItem value="ai">AI Generated</MenuItem>
+                            <MenuItem value={STORY_SOURCE.ALL}>All (AI + Manual)</MenuItem>
+                            <MenuItem value={STORY_SOURCE.MANUAL}>Manual</MenuItem>
+                            <MenuItem value={STORY_SOURCE.AI}>AI Generated</MenuItem>
                         </Select>
                     </FormControl>
 
