@@ -80,4 +80,20 @@ export class StoryPublicationService {
 
         return this.storyRepository.save(story);
     }
+
+    async publishDirectlyAsAdmin(id: string, adminId: string): Promise<Story> {
+        const story = await this.storyCrudService.findStoryById(id);
+
+        if (story.status === StoryStatus.PUBLISHED) {
+            throw new BadRequestException('Story is already published');
+        }
+
+        story.status = StoryStatus.PUBLISHED;
+        story.visibility = StoryVisibility.PUBLIC;
+        story.approvedBy = adminId;
+        story.approvedAt = new Date();
+        story.rejectionReason = null;
+
+        return this.storyRepository.save(story);
+    }
 }

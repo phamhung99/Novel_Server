@@ -40,6 +40,9 @@ export class StoryService {
     approveStory = this.publication.approveStory.bind(this.publication);
     rejectStory = this.publication.rejectStory.bind(this.publication);
     unpublishStory = this.publication.unpublishStory.bind(this.publication);
+    publishDirectlyAsAdmin = this.publication.publishDirectlyAsAdmin.bind(
+        this.publication,
+    );
 
     // ========================
     // User Interactions
