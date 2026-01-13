@@ -1,5 +1,11 @@
-import { Drawer, List, ListItemButton, ListItemText } from '@mui/material';
-import { useLocation } from 'react-router-dom';
+import {
+    Divider,
+    Drawer,
+    List,
+    ListItemButton,
+    ListItemText,
+} from '@mui/material';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { ROUTES } from '../constants/app.constants';
 
 const menuItems = [
@@ -15,6 +21,13 @@ export default function Sidebar({
     onNavigate: (path: string) => void;
 }) {
     const location = useLocation();
+    const navigate = useNavigate();
+
+    const handleLogout = () => {
+        localStorage.clear();
+
+        navigate(ROUTES.LOGIN);
+    };
 
     return (
         <Drawer
@@ -63,6 +76,29 @@ export default function Sidebar({
                         </ListItemButton>
                     );
                 })}
+            </List>
+
+            <Divider sx={{ bgcolor: 'rgba(255,255,255,0.12)', mx: 2 }} />
+
+            <List sx={{ pb: 2 }}>
+                <ListItemButton
+                    onClick={handleLogout}
+                    sx={{
+                        mx: 1,
+                        mt: 1,
+                        borderRadius: 2,
+                        color: 'rgba(255,255,255,0.7)',
+                        '&:hover': {
+                            backgroundColor: 'rgba(255,100,100,0.15)',
+                            color: '#ff8a80',
+                        },
+                    }}
+                >
+                    <ListItemText
+                        primary="Logout"
+                        primaryTypographyProps={{ fontWeight: 500 }}
+                    />
+                </ListItemButton>
             </List>
         </Drawer>
     );

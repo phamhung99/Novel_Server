@@ -1,4 +1,5 @@
 export const ROUTES = {
+    LOGIN: '/login',
     DASHBOARD: '/dashboard',
     USERS: '/dashboard/users',
     STORY_UPLOAD: '/dashboard/stories/upload',
@@ -45,3 +46,10 @@ export const STORY_SOURCE = {
 } satisfies Record<string, string>;
 
 export type StorySource = (typeof STORY_SOURCE)[keyof typeof STORY_SOURCE];
+
+export const USER_ROLES = {
+    ADMIN: 'admin',
+    EDITOR: 'editor',
+} as const;
+
+export type UserRole = (typeof USER_ROLES)[keyof typeof USER_ROLES];

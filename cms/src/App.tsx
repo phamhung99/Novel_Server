@@ -10,6 +10,7 @@ import LoginPage from './pages/loginPage';
 import PrivateRoute from './utils/PrivateRoute';
 import ChapterReaderPage from './pages/ChapterReaderPage';
 import ManualChaptersPage from './pages/ManualChaptersPage';
+import { USER_ROLES } from './constants/app.constants';
 
 export default function App() {
     return (
@@ -17,7 +18,13 @@ export default function App() {
             <Routes>
                 <Route path="/login" element={<LoginPage />} />
 
-                <Route element={<PrivateRoute roles={['admin']} />}>
+                <Route
+                    element={
+                        <PrivateRoute
+                            roles={[USER_ROLES.ADMIN, USER_ROLES.EDITOR]}
+                        />
+                    }
+                >
                     <Route
                         path="/"
                         element={<Navigate to="/dashboard/users" replace />}
