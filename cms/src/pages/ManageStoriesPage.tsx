@@ -14,7 +14,11 @@ import {
     InputAdornment,
 } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
-import { ROUTES, STORY_SOURCE, type StorySource } from '../constants/app.constants';
+import {
+    ROUTES,
+    STORY_SOURCE,
+    type StorySource,
+} from '../constants/app.constants';
 import { useStories } from '../hooks/useStories';
 import { useStoryActions } from '../hooks/useStoryActions';
 import { StoryTable } from '../components/StoryTable';
@@ -27,7 +31,7 @@ import { useDebounce } from '../hooks/useDebounce';
 const ManageStories = () => {
     const [statusFilter, setStatusFilter] = useState('all');
     const [page, setPage] = useState(0);
-    const [rowsPerPage, setRowsPerPage] = useState(10);
+    const [rowsPerPage, setRowsPerPage] = useState(20);
 
     const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
     const [selectedStoryId, setSelectedStoryId] = useState<string | null>(null);
@@ -39,6 +43,7 @@ const ManageStories = () => {
         content: '',
         onConfirm: () => {},
     });
+    
     const [inputDialog, setInputDialog] = useState({
         open: false,
         title: '',
@@ -143,6 +148,7 @@ const ManageStories = () => {
                             }}
                         >
                             <MenuItem value="all">All Stories</MenuItem>
+                            <MenuItem value="me">My Stories</MenuItem>
                             <MenuItem value="public">Public</MenuItem>
                             <MenuItem value="pending">Pending</MenuItem>
                             <MenuItem value="deleted">Deleted</MenuItem>
@@ -150,14 +156,23 @@ const ManageStories = () => {
                     </FormControl>
 
                     {/* AI / Manual filter */}
-                    <FormControl sx={{ minWidth: 140 }}>
+                    <FormControl
+                        sx={{ minWidth: 140 }}
+                        disabled={statusFilter !== 'all'}
+                    >
                         <Select
                             value={aiFilter}
                             onChange={handleAiFilterChange}
                         >
-                            <MenuItem value={STORY_SOURCE.ALL}>All (AI + Manual)</MenuItem>
-                            <MenuItem value={STORY_SOURCE.MANUAL}>Manual</MenuItem>
-                            <MenuItem value={STORY_SOURCE.AI}>AI Generated</MenuItem>
+                            <MenuItem value={STORY_SOURCE.ALL}>
+                                All (AI + Manual)
+                            </MenuItem>
+                            <MenuItem value={STORY_SOURCE.MANUAL}>
+                                Manual
+                            </MenuItem>
+                            <MenuItem value={STORY_SOURCE.AI}>
+                                AI Generated
+                            </MenuItem>
                         </Select>
                     </FormControl>
 
@@ -165,6 +180,7 @@ const ManageStories = () => {
                     <TextField
                         placeholder="Tìm theo tên truyện..."
                         value={searchKeyword}
+                        disabled={statusFilter !== 'all'}
                         onChange={(e) => setSearchKeyword(e.target.value)}
                         sx={{ minWidth: 280 }}
                         InputProps={{
@@ -237,7 +253,7 @@ const ManageStories = () => {
                                 setRowsPerPage(parseInt(e.target.value, 10));
                                 setPage(0);
                             }}
-                            rowsPerPageOptions={[5, 10, 25, 50, 100]}
+                            rowsPerPageOptions={[20, 50, 100, 200]}
                         />
                     </Paper>
                 )}

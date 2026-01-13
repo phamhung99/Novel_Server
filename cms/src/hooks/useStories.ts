@@ -16,6 +16,9 @@ export const useStories = (
     const fetchStories = async () => {
         setLoading(true);
         try {
+            const user = JSON.parse(localStorage.getItem('user') || '{}');
+            const userId = user?.id || '';
+
             let url = '/api/v1/story';
             let params: Record<string, any> = {
                 page,
@@ -38,9 +41,16 @@ export const useStories = (
                 url = '/api/v1/story/deleted/all';
             } else if (statusFilter === 'public') {
                 url = '/api/v1/story/public';
+            } else if (statusFilter === 'me') {
+                url = '/api/v1/story/library?type=created';
             }
 
-            const res = await axios.get(url, { params });
+            const res = await axios.get(url, {
+                params,
+                headers: {
+                    'x-user-id': userId,
+                },
+            });
 
             const items = res?.data?.data?.items ?? [];
             const total = res?.data?.data?.total ?? 0;

@@ -121,8 +121,9 @@ export class StoryController {
     async getUserLibrary(
         @Headers('x-user-id') userId: string,
         @Query('type') type: LibraryType,
+        @Query() paginationDto: PaginationDto,
     ) {
-        return this.storyService.getUserLibrary(userId, type);
+        return this.storyService.getUserLibrary(userId, type, paginationDto);
     }
 
     @Get('/top-trending')
