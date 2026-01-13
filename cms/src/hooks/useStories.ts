@@ -6,6 +6,7 @@ export const useStories = (
     statusFilter: string | undefined,
     page: number,
     rowsPerPage: number,
+    keyword: string = '',
 ) => {
     const [stories, setStories] = useState<StoryDto[]>([]);
     const [totalStories, setTotalStories] = useState(0);
@@ -15,8 +16,14 @@ export const useStories = (
         setLoading(true);
         try {
             let url = '/api/v1/story';
+            let params: Record<string, any> = {
+                page,
+                limit: rowsPerPage,
+            };
 
-            if (statusFilter === 'pending') {
+            if (keyword.trim()) {
+                params.keyword = keyword.trim().toLowerCase();
+            } else if (statusFilter === 'pending') {
                 url = '/api/v1/story/pending';
             } else if (statusFilter === 'deleted') {
                 url = '/api/v1/story/deleted/all';
@@ -24,17 +31,12 @@ export const useStories = (
                 url = '/api/v1/story/public';
             }
 
-            const res = await axios.get(url, {
-                params: {
-                    page: page,
-                    limit: rowsPerPage,
-                },
-            });
-
-            console.log(res);
+            const res = await axios.get(url, { params });
 
             const items = res?.data?.data?.items ?? [];
             const total = res?.data?.data?.total ?? 0;
+
+            console.log('items', items);
 
             setStories(Array.isArray(items) ? items : []);
             setTotalStories(Number(total) || 0);
@@ -49,7 +51,7 @@ export const useStories = (
 
     useEffect(() => {
         fetchStories();
-    }, [statusFilter, page, rowsPerPage]);
+    }, [statusFilter, page, rowsPerPage, keyword]);
 
     return { stories, totalStories, loading, setStories, fetchStories };
 };

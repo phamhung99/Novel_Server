@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import {
     Box,
     Container,
@@ -9,6 +9,9 @@ import {
     Typography,
     Paper,
     TablePagination,
+    Button,
+    TextField,
+    InputAdornment,
 } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import { ROUTES } from '../constants/app.constants';
@@ -18,6 +21,8 @@ import { StoryTable } from '../components/StoryTable';
 import { StoryMenu } from '../components/StoryMenu';
 import ConfirmDialog from '../components/ConfirmDialog';
 import ConfirmDialogWithInput from '../components/ConfirmDialogWithInput';
+import SearchIcon from '@mui/icons-material/Search';
+import { useDebounce } from '../hooks/useDebounce';
 
 const ManageStories = () => {
     const [statusFilter, setStatusFilter] = useState('all');
@@ -42,6 +47,10 @@ const ManageStories = () => {
         onConfirm: (_value: string) => {},
     });
 
+    const [aiFilter, setAiFilter] = useState<'all' | 'manual' | 'ai'>('all');
+    const [searchKeyword, setSearchKeyword] = useState('');
+    const [selectedIds, setSelectedIds] = useState<string[]>([]);
+
     const navigate = useNavigate();
 
     const userId = useMemo(() => {
@@ -53,10 +62,13 @@ const ManageStories = () => {
         }
     }, []);
 
+    const debouncedKeyword = useDebounce(searchKeyword, 500);
+
     const { stories, totalStories, loading, fetchStories } = useStories(
         statusFilter === 'all' ? undefined : statusFilter,
         page + 1,
         rowsPerPage,
+        debouncedKeyword,
     );
 
     const {
@@ -84,6 +96,30 @@ const ManageStories = () => {
         ? stories.find((s) => s.id === selectedStoryId) || null
         : null;
 
+    const handleBulkDelete = async () => {
+        if (!selectedIds.length) return;
+        if (!window.confirm(`Xóa ${selectedIds.length} truyện?`)) return;
+
+        await Promise.all(selectedIds.map((id) => deleteStory(id)));
+        setSelectedIds([]);
+        fetchStories();
+    };
+
+    const handleBulkApprove = async () => {
+        if (!selectedIds.length) return;
+        await Promise.all(selectedIds.map((id) => approveStory(id)));
+        setSelectedIds([]);
+        fetchStories();
+    };
+
+    useEffect(() => {
+        setPage(0);
+    }, [debouncedKeyword]);
+
+    useEffect(() => {
+        setSelectedIds([]);
+    }, [statusFilter, aiFilter, searchKeyword, page, rowsPerPage]);
+
     return (
         <Container>
             <Box my={4}>
@@ -91,20 +127,86 @@ const ManageStories = () => {
                     Manage Stories
                 </Typography>
 
-                <FormControl sx={{ mb: 2, minWidth: 200 }}>
-                    <Select
-                        value={statusFilter}
-                        onChange={(e) => {
-                            setStatusFilter(e.target.value);
-                            setPage(0);
+                <Box display="flex" gap={2} flexWrap="wrap" mb={3}>
+                    <FormControl sx={{ mb: 2, minWidth: 200 }}>
+                        <Select
+                            value={statusFilter}
+                            onChange={(e) => {
+                                setStatusFilter(e.target.value);
+                                setPage(0);
+                            }}
+                        >
+                            <MenuItem value="all">All Stories</MenuItem>
+                            <MenuItem value="public">Public</MenuItem>
+                            <MenuItem value="pending">Pending</MenuItem>
+                            <MenuItem value="deleted">Deleted</MenuItem>
+                        </Select>
+                    </FormControl>
+
+                    {/* AI / Manual filter */}
+                    <FormControl sx={{ minWidth: 140 }}>
+                        <Select
+                            value={aiFilter}
+                            onChange={(e) => {
+                                setAiFilter(
+                                    e.target.value as 'all' | 'manual' | 'ai',
+                                );
+                                setPage(0);
+                            }}
+                        >
+                            <MenuItem value="all">All (AI + Manual)</MenuItem>
+                            <MenuItem value="manual">Manual</MenuItem>
+                            <MenuItem value="ai">AI Generated</MenuItem>
+                        </Select>
+                    </FormControl>
+
+                    {/* Search */}
+                    <TextField
+                        placeholder="Tìm theo tên truyện..."
+                        value={searchKeyword}
+                        onChange={(e) => setSearchKeyword(e.target.value)}
+                        sx={{ minWidth: 280 }}
+                        InputProps={{
+                            startAdornment: (
+                                <InputAdornment position="start">
+                                    <SearchIcon />
+                                </InputAdornment>
+                            ),
                         }}
-                    >
-                        <MenuItem value="all">All Stories</MenuItem>
-                        <MenuItem value="public">Public</MenuItem>
-                        <MenuItem value="pending">Pending</MenuItem>
-                        <MenuItem value="deleted">Deleted</MenuItem>
-                    </Select>
-                </FormControl>
+                    />
+
+                    {/* Bulk actions */}
+                    {selectedIds.length > 0 && (
+                        <Box
+                            ml="auto"
+                            display="flex"
+                            gap={1}
+                            alignItems="center"
+                        >
+                            <Typography variant="body2" color="text.secondary">
+                                Đã chọn: {selectedIds.length}
+                            </Typography>
+                            <Button
+                                variant="outlined"
+                                color="error"
+                                size="small"
+                                onClick={handleBulkDelete}
+                            >
+                                Xóa
+                            </Button>
+                            {statusFilter === 'pending' && (
+                                <Button
+                                    variant="contained"
+                                    color="success"
+                                    size="small"
+                                    onClick={handleBulkApprove}
+                                >
+                                    Duyệt tất cả
+                                </Button>
+                            )}
+                        </Box>
+                    )}
+                </Box>
 
                 {loading ? (
                     <CircularProgress />
@@ -120,6 +222,9 @@ const ManageStories = () => {
                         <StoryTable
                             stories={stories}
                             onMenuOpen={handleMenuOpen}
+                            selectedIds={selectedIds}
+                            onSelectChange={setSelectedIds}
+                            showAiColumn={true} // hoặc false nếu muốn ẩn cột Type
                         />
                         <TablePagination
                             component="div"
@@ -131,7 +236,7 @@ const ManageStories = () => {
                                 setRowsPerPage(parseInt(e.target.value, 10));
                                 setPage(0);
                             }}
-                            rowsPerPageOptions={[5, 10, 25, 50]}
+                            rowsPerPageOptions={[5, 10, 25, 50, 100]}
                         />
                     </Paper>
                 )}

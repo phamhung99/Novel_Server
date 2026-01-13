@@ -14,3 +14,26 @@ export const SERVER_URL = import.meta.env.VITE_SERVER_URL;
 // in milliseconds
 export const POLL_INTERVAL = 10000;
 export const POLL_INITIALIZATION_DELAY = 10000;
+
+export const STORY_SOURCE_TYPES = {
+    AI: 'AI',
+    MANUAL: 'MANUAL',
+};
+
+export const STORY_STATUS = {
+    DRAFT: 'draft',
+    PENDING: 'pending',
+    PUBLISHED: 'published',
+    REJECTED: 'rejected',
+} as const;
+
+export type StoryStatus = (typeof STORY_STATUS)[keyof typeof STORY_STATUS];
+
+export const STORY_VISIBILITY = {
+    PUBLIC: 'public',
+    PRIVATE: 'private',
+    UNLISTED: 'unlisted',
+} as const;
+
+export type StoryVisibility =
+    (typeof STORY_VISIBILITY)[keyof typeof STORY_VISIBILITY];

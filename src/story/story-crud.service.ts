@@ -69,11 +69,16 @@ export class StoryCrudService {
         return savedStory;
     }
 
-    async findAllStories(paginationDto: PaginationDto) {
-        const { page = 1, limit = 10 } = paginationDto;
+    async findAllStories(paginationDto: PaginationDto): Promise<{
+        page: number;
+        limit: number;
+        total: number;
+        items: any[];
+    }> {
+        const { page = 1, limit = 10, keyword } = paginationDto;
         const skip = (page - 1) * limit;
 
-        const queryBuilder = this.storyRepository
+        const qb = this.storyRepository
             .createQueryBuilder('story')
             .leftJoinAndSelect('story.author', 'author')
             .leftJoinAndSelect('story.storyCategories', 'storyCategories')
@@ -82,18 +87,22 @@ export class StoryCrudService {
             .skip(skip)
             .take(limit);
 
+        if (keyword && keyword.trim()) {
+            const searchTerm = `${keyword.trim().toLowerCase()}%`;
+
+            qb.andWhere('LOWER(story.title) LIKE :searchTerm', { searchTerm });
+        }
+
         const [stories, total] = await Promise.all([
-            queryBuilder.getMany(),
-            queryBuilder.clone().getCount(),
+            qb.getMany(),
+            qb.clone().getCount(),
         ]);
 
         const items = stories.map((story) => ({
             ...story,
             coverImage: undefined,
-            author: {
-                ...story.author,
-                profileImage: undefined,
-            },
+            authorId: story.author.id,
+            authorUsername: story.author.username,
             mainCategory:
                 story.storyCategories.find((sc) => sc.isMainCategory)
                     ?.category || null,
@@ -137,10 +146,8 @@ export class StoryCrudService {
         const items = stories.map((story) => ({
             ...story,
             coverImage: undefined,
-            author: {
-                ...story.author,
-                profileImage: undefined,
-            },
+            authorId: story.author.id,
+            authorUsername: story.author.username,
             mainCategory:
                 story.storyCategories.find((sc) => sc.isMainCategory)
                     ?.category || null,
@@ -183,10 +190,8 @@ export class StoryCrudService {
         const items = stories.map((story) => ({
             ...story,
             coverImage: undefined,
-            author: {
-                ...story.author,
-                profileImage: undefined,
-            },
+            authorId: story.author.id,
+            authorUsername: story.author.username,
             mainCategory:
                 story.storyCategories.find((sc) => sc.isMainCategory)
                     ?.category || null,
@@ -235,10 +240,9 @@ export class StoryCrudService {
         const items = stories.map((story) => ({
             ...story,
             coverImage: undefined,
-            author: {
-                ...story.author,
-                profileImage: undefined,
-            },
+            author: undefined,
+            authorId: story.author.id,
+            authorUsername: story.author.username,
             mainCategory:
                 story.storyCategories.find((sc) => sc.isMainCategory)
                     ?.category || null,
