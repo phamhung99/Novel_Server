@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import axios from '../api/axios';
+import { axiosPrivate } from '../api/axios';
 import type { StoryDto } from '../types/app';
 
 export const useStories = (
@@ -29,8 +29,6 @@ export const useStories = (
                 params.keyword = keyword.trim().toLowerCase();
             }
 
-            console.log(sourceFilter);
-
             if (sourceFilter) {
                 params.source = sourceFilter;
             }
@@ -45,7 +43,7 @@ export const useStories = (
                 url = '/api/v1/story/library?type=created';
             }
 
-            const res = await axios.get(url, {
+            const res = await axiosPrivate.get(url, {
                 params,
                 headers: {
                     'x-user-id': userId,
@@ -54,8 +52,6 @@ export const useStories = (
 
             const items = res?.data?.data?.items ?? [];
             const total = res?.data?.data?.total ?? 0;
-
-            console.log('items', items);
 
             setStories(Array.isArray(items) ? items : []);
             setTotalStories(Number(total) || 0);
