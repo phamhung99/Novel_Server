@@ -31,6 +31,10 @@ export class StoryService {
     restoreStory = this.crud.restoreStory.bind(this.crud);
     updateStoryCoverImage = this.crud.updateStoryCoverImage.bind(this.crud);
 
+    bulkApproveStories = this.publication.bulkApproveStories.bind(
+        this.publication,
+    );
+
     // ========================
     // Publication Workflow
     // ========================

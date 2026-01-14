@@ -47,7 +47,7 @@ export const useStoryActions = (userId: string, refetch: () => void) => {
     const approveStory = async (id: string, note?: string) => {
         try {
             console.log(id);
-            
+
             await axiosPrivate.post(
                 `/api/v1/story/${id}/approve`,
                 { note: note || null },
@@ -55,6 +55,50 @@ export const useStoryActions = (userId: string, refetch: () => void) => {
             );
             refetch();
         } catch (err) {
+            throw handleError(err);
+        }
+    };
+
+    const bulkApproveStories = async (storyIds: string[], note?: string) => {
+        if (!storyIds || storyIds.length === 0) {
+            throw new Error('No stories selected to approve');
+        }
+
+        try {
+            console.log(`Bulk approving ${storyIds.length} stories`);
+
+            const response = await axiosPrivate.post(
+                '/api/v1/story/bulk-approve',
+                { storyIds },
+                {
+                    headers: { 'x-user-id': userId },
+                },
+            );
+
+            const { data } = response;
+
+            console.log('Bulk approve result:', data);
+
+            refetch();
+
+            return {
+                success: true,
+                approvedCount: data.approvedCount,
+                approvedIds: data.approvedIds,
+                failedCount: data.failedCount || 0,
+                invalidIds: data.invalidIds || [],
+                message: data.message,
+            };
+        } catch (err: any) {
+            const errorData = err.response?.data;
+
+            if (errorData?.invalidIds?.length > 0) {
+                console.warn(
+                    'Some stories could not be approved:',
+                    errorData.invalidIds,
+                );
+            }
+
             throw handleError(err);
         }
     };
@@ -88,5 +132,6 @@ export const useStoryActions = (userId: string, refetch: () => void) => {
         rejectStory,
         unpublishStory,
         bulkDeleteStories,
+        bulkApproveStories,
     };
 };

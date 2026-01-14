@@ -3,7 +3,7 @@ import { StoryCrudService } from './story-crud.service';
 import { StoryStatus } from 'src/common/enums/story-status.enum';
 import { StoryVisibility } from 'src/common/enums/story-visibility.enum';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { Story } from './entities/story.entity';
 
 @Injectable()
@@ -51,6 +51,87 @@ export class StoryPublicationService {
         story.rejectionReason = null;
 
         return this.storyRepository.save(story);
+    }
+
+    async bulkApproveStories(
+        storyIds: string[],
+        adminId: string,
+    ): Promise<{
+        affected: number;
+        approvedIds: string[];
+        invalid?: { id: string; status: StoryStatus; reason?: string }[];
+    }> {
+        if (!storyIds.length) {
+            return { affected: 0, approvedIds: [] };
+        }
+
+        const stories = await this.storyRepository.find({
+            where: { id: In(storyIds) },
+            select: ['id', 'status', 'authorId'],
+        });
+
+        if (!stories.length) {
+            throw new BadRequestException(
+                'No stories found with the provided IDs',
+            );
+        }
+
+        // Phân loại story hợp lệ & không hợp lệ
+        const validStoryIds: string[] = [];
+        const invalidStories: {
+            id: string;
+            status: StoryStatus;
+            reason?: string;
+        }[] = [];
+
+        for (const story of stories) {
+            const canApprove =
+                story.status === StoryStatus.PENDING ||
+                (story.status === StoryStatus.DRAFT &&
+                    story.authorId === adminId);
+
+            if (canApprove) {
+                validStoryIds.push(story.id);
+            } else {
+                invalidStories.push({
+                    id: story.id,
+                    status: story.status,
+                    reason:
+                        story.authorId !== adminId
+                            ? 'Not author (for DRAFT)'
+                            : undefined,
+                });
+            }
+        }
+
+        if (validStoryIds.length === 0) {
+            throw new BadRequestException({
+                message: 'No stories can be approved',
+                invalid: invalidStories,
+            });
+        }
+
+        // Thực hiện update hàng loạt – rất nhanh
+        const now = new Date();
+
+        const updateResult = await this.storyRepository
+            .createQueryBuilder()
+            .update(Story)
+            .set({
+                status: StoryStatus.PUBLISHED,
+                visibility: StoryVisibility.PUBLIC,
+                approvedBy: adminId,
+                approvedAt: now,
+                rejectionReason: null,
+            })
+            .whereInIds(validStoryIds)
+            .execute();
+
+        return {
+            affected: updateResult.affected || 0,
+            approvedIds: validStoryIds,
+            invalid: invalidStories,
+        };
     }
 
     async rejectStory(

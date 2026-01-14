@@ -17,7 +17,6 @@ import { useNavigate } from 'react-router-dom';
 import {
     ROUTES,
     STORY_SOURCE,
-    USER_ROLES,
     type StorySource,
 } from '../constants/app.constants';
 import { useStories } from '../hooks/useStories';
@@ -38,6 +37,8 @@ const ManageStories = () => {
 
     const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
     const [selectedStoryId, setSelectedStoryId] = useState<string | null>(null);
+
+    const [bulkActionLoading, setBulkActionLoading] = useState(false);
     const openMenu = Boolean(anchorEl);
 
     const [confirmDialog, setConfirmDialog] = useState({
@@ -81,7 +82,32 @@ const ManageStories = () => {
         aiFilter === STORY_SOURCE.ALL ? undefined : aiFilter,
     );
 
-    console.log(stories);
+    const handleBulkApprove = () => {
+        if (!selectedIds.length) return;
+
+        setConfirmDialog({
+            open: true,
+            title: `Approve ${selectedIds.length} stories?`,
+            content: 'This action will make them publicly visible.',
+            onConfirm: async () => {
+                setBulkActionLoading(true);
+                try {
+                    await bulkApproveStories(selectedIds);
+                    setSelectedIds([]);
+                    setConfirmDialog((p) => ({ ...p, open: false }));
+                } catch (err: any) {
+                    setErrorMessage(err?.message || 'Bulk approve failed');
+                } finally {
+                    setBulkActionLoading(false);
+                }
+            },
+        });
+    };
+
+    const selectedStory = useMemo(
+        () => stories?.find((s) => s.id === selectedStoryId) ?? null,
+        [stories, selectedStoryId],
+    );
 
     const {
         deleteStory,
@@ -90,6 +116,7 @@ const ManageStories = () => {
         rejectStory,
         unpublishStory,
         bulkDeleteStories,
+        bulkApproveStories,
     } = useStoryActions(user.id, fetchStories);
 
     const handleMenuOpen = (
@@ -104,10 +131,6 @@ const ManageStories = () => {
         setAnchorEl(null);
         setSelectedStoryId(null);
     };
-
-    const selectedStory = Array.isArray(stories)
-        ? stories.find((s) => s.id === selectedStoryId) || null
-        : null;
 
     const withErrorHandling = async (action: () => Promise<void>) => {
         try {
@@ -214,13 +237,30 @@ const ManageStories = () => {
                             <Typography variant="body2" color="text.secondary">
                                 Selected: {selectedIds.length}
                             </Typography>
+
+                            {(statusFilter === 'pending' ||
+                                statusFilter === 'me') && (
+                                <Button
+                                    variant="contained"
+                                    color="success"
+                                    size="small"
+                                    onClick={handleBulkApprove}
+                                    disabled={bulkActionLoading}
+                                >
+                                    Approve Selected
+                                </Button>
+                            )}
+
                             {statusFilter !== 'deleted' && (
                                 <Button
                                     variant="outlined"
                                     color="error"
                                     size="small"
                                     onClick={handleBulkDelete}
-                                    disabled={statusFilter === 'deleted'}
+                                    disabled={
+                                        bulkActionLoading ||
+                                        statusFilter === 'deleted'
+                                    }
                                 >
                                     Delete
                                 </Button>

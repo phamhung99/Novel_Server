@@ -367,6 +367,37 @@ export class StoryController {
         };
     }
 
+    @Post('bulk-approve')
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles(UserRole.ADMIN)
+    async bulkApproveStories(
+        @Headers('x-user-id') adminId: string,
+        @Body('storyIds') storyIds: string[],
+    ) {
+        if (!adminId) {
+            throw new BadRequestException('Admin ID is required');
+        }
+
+        if (!Array.isArray(storyIds) || storyIds.length === 0) {
+            throw new BadRequestException(
+                'storyIds must be a non-empty array of strings',
+            );
+        }
+
+        const result = await this.storyService.bulkApproveStories(
+            storyIds,
+            adminId,
+        );
+
+        return {
+            message: `Successfully approved and published ${result.affected} stories`,
+            approvedCount: result.affected,
+            approvedIds: result.approvedIds,
+            invalidIds: result.invalidIds,
+            failedCount: result.invalid?.length || 0,
+        };
+    }
+
     @Post(':id/reject')
     @UseGuards(JwtAuthGuard, RolesGuard)
     @Roles(UserRole.ADMIN)

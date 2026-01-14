@@ -7,7 +7,6 @@ import {
     IconButton,
     Chip,
     Checkbox,
-    TableSortLabel,
 } from '@mui/material';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import type { StoryDto } from '../types/app';
