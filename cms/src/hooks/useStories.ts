@@ -8,6 +8,7 @@ export const useStories = (
     rowsPerPage: number,
     keyword: string = '',
     sourceFilter: string | undefined,
+    sort: string | undefined,
 ) => {
     const [stories, setStories] = useState<StoryDto[]>([]);
     const [totalStories, setTotalStories] = useState(0);
@@ -35,6 +36,10 @@ export const useStories = (
 
             if (statusFilter === 'me') {
                 params.authorId = userId;
+            }
+
+            if (sort) {
+                params.sort = sort;
             }
 
             if (statusFilter === 'pending') {
@@ -68,7 +73,7 @@ export const useStories = (
 
     useEffect(() => {
         fetchStories();
-    }, [statusFilter, page, rowsPerPage, keyword, sourceFilter]);
+    }, [statusFilter, page, rowsPerPage, keyword, sourceFilter, sort]);
 
     return { stories, totalStories, loading, setStories, fetchStories };
 };

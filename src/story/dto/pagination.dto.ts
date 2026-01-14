@@ -24,4 +24,8 @@ export class PaginationDto {
     @IsOptional()
     @IsString()
     authorId?: string;
+
+    @IsOptional()
+    @IsString()
+    sort?: string;
 }

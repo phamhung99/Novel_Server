@@ -59,6 +59,7 @@ const ManageStories = () => {
 
     const [aiFilter, setAiFilter] = useState<StorySource>(STORY_SOURCE.ALL);
     const [searchKeyword, setSearchKeyword] = useState('');
+    const [sort, setSort] = useState<string>('createdAt');
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -67,7 +68,7 @@ const ManageStories = () => {
         message: string;
         requestedCount: number;
         failedCount: number;
-        failedDetails?: Record<string, string>; // hoặc array tùy backend trả
+        failedDetails?: Record<string, string>;
     } | null>(null);
 
     const navigate = useNavigate();
@@ -89,6 +90,7 @@ const ManageStories = () => {
         rowsPerPage,
         debouncedKeyword,
         aiFilter === STORY_SOURCE.ALL ? undefined : aiFilter,
+        sort,
     );
 
     const selectedStory = useMemo(
@@ -234,7 +236,6 @@ const ManageStories = () => {
                         </Select>
                     </FormControl>
 
-                    {/* AI / Manual filter */}
                     <FormControl
                         sx={{ minWidth: 180 }}
                         disabled={statusFilter !== 'all'}
@@ -255,7 +256,6 @@ const ManageStories = () => {
                         </Select>
                     </FormControl>
 
-                    {/* Search */}
                     <TextField
                         placeholder="Search by story title..."
                         value={searchKeyword}
@@ -271,7 +271,6 @@ const ManageStories = () => {
                         }}
                     />
 
-                    {/* Bulk actions */}
                     {selectedIds.length > 0 && (
                         <Box
                             ml="auto"
@@ -283,7 +282,6 @@ const ManageStories = () => {
                                 Selected: {selectedIds.length}
                             </Typography>
 
-                            {/* Bulk Approve – chỉ admin hoặc người có quyền approve */}
                             {(statusFilter === 'pending' ||
                                 statusFilter === 'me') &&
                                 user.role === USER_ROLES.ADMIN && (
@@ -298,7 +296,6 @@ const ManageStories = () => {
                                     </Button>
                                 )}
 
-                            {/* Bulk Request Publication – dành cho EDITOR */}
                             {statusFilter === 'me' &&
                                 user.role === USER_ROLES.EDITOR && (
                                     <Button
@@ -347,6 +344,8 @@ const ManageStories = () => {
                             selectedIds={selectedIds}
                             onSelectChange={setSelectedIds}
                             showAiColumn={true}
+                            sort={sort}
+                            onSortChange={setSort}
                         />
                         <TablePagination
                             component="div"

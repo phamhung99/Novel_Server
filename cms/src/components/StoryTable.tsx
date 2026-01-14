@@ -7,6 +7,7 @@ import {
     IconButton,
     Chip,
     Checkbox,
+    TableSortLabel,
 } from '@mui/material';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import type { StoryDto } from '../types/app';
@@ -21,6 +22,8 @@ interface StoryTableProps {
     selectedIds: string[];
     onSelectChange: (newSelected: string[]) => void;
     showAiColumn?: boolean;
+    sort: string;
+    onSortChange: (newSort: string) => void;
 }
 
 export const StoryTable = ({
@@ -29,6 +32,8 @@ export const StoryTable = ({
     selectedIds,
     onSelectChange,
     showAiColumn = true,
+    sort,
+    onSortChange,
 }: StoryTableProps) => {
     const handleSelectAllClick = (
         event: React.ChangeEvent<HTMLInputElement>,
@@ -71,6 +76,25 @@ export const StoryTable = ({
         return { label: 'Unknown', color: 'default' as const };
     };
 
+    const createSortHandler = (property: string) => () => {
+        if (sort === property) {
+            onSortChange(`-${property}`);
+        } else if (sort === `-${property}`) {
+            onSortChange('');
+        } else {
+            onSortChange(property);
+        }
+    };
+
+    const isActive = (property: string) =>
+        sort === property || sort === `-${property}`;
+
+    const getDirection = (property: string): 'asc' | 'desc' | undefined => {
+        if (sort === property) return 'asc';
+        if (sort === `-${property}`) return 'desc';
+        return undefined;
+    };
+
     return (
         <Table size="small" aria-label="stories table">
             <TableHead>
@@ -93,18 +117,124 @@ export const StoryTable = ({
                         />
                     </TableCell>
 
-                    <TableCell>Title</TableCell>
-                    <TableCell>Author</TableCell>
+                    <TableCell sortDirection={getDirection('title') ?? false}>
+                        <TableSortLabel
+                            active={isActive('title')}
+                            direction={getDirection('title')}
+                            onClick={createSortHandler('title')}
+                        >
+                            Title
+                        </TableSortLabel>
+                    </TableCell>
 
-                    {showAiColumn && <TableCell>Type</TableCell>}
+                    <TableCell
+                        sortDirection={getDirection('authorUsername') ?? false}
+                    >
+                        <TableSortLabel
+                            active={isActive('authorUsername')}
+                            direction={getDirection('authorUsername')}
+                            onClick={createSortHandler('authorUsername')}
+                        >
+                            Author
+                        </TableSortLabel>
+                    </TableCell>
 
-                    <TableCell>Genres</TableCell>
-                    <TableCell>Views</TableCell>
-                    <TableCell>Likes</TableCell>
-                    <TableCell>Rating</TableCell>
-                    <TableCell>Status</TableCell>
-                    <TableCell>Created At</TableCell>
-                    <TableCell>Updated At</TableCell>
+                    {showAiColumn && (
+                        <TableCell
+                            sortDirection={getDirection('sourceType') ?? false}
+                        >
+                            <TableSortLabel
+                                active={isActive('sourceType')}
+                                direction={getDirection('sourceType')}
+                                onClick={createSortHandler('sourceType')}
+                            >
+                                Type
+                            </TableSortLabel>
+                        </TableCell>
+                    )}
+
+                    <TableCell
+                        sortDirection={
+                            getDirection('mainCategory.name') ?? false
+                        }
+                    >
+                        <TableSortLabel
+                            active={isActive('mainCategory.name')}
+                            direction={getDirection('mainCategory.name')}
+                            onClick={createSortHandler('mainCategory.name')}
+                        >
+                            Genres
+                        </TableSortLabel>
+                    </TableCell>
+
+                    <TableCell
+                        sortDirection={getDirection('viewsCount') ?? false}
+                    >
+                        <TableSortLabel
+                            active={isActive('viewsCount')}
+                            direction={getDirection('viewsCount')}
+                            onClick={createSortHandler('viewsCount')}
+                        >
+                            Views
+                        </TableSortLabel>
+                    </TableCell>
+
+                    <TableCell
+                        sortDirection={getDirection('likesCount') ?? false}
+                    >
+                        <TableSortLabel
+                            active={isActive('likesCount')}
+                            direction={getDirection('likesCount')}
+                            onClick={createSortHandler('likesCount')}
+                        >
+                            Likes
+                        </TableSortLabel>
+                    </TableCell>
+
+                    <TableCell sortDirection={getDirection('rating') ?? false}>
+                        <TableSortLabel
+                            active={isActive('rating')}
+                            direction={getDirection('rating')}
+                            onClick={createSortHandler('rating')}
+                        >
+                            Rating
+                        </TableSortLabel>
+                    </TableCell>
+
+                    <TableCell sortDirection={getDirection('status') ?? false}>
+                        <TableSortLabel
+                            active={isActive('status')}
+                            direction={getDirection('status')}
+                            onClick={createSortHandler('status')}
+                        >
+                            Status
+                        </TableSortLabel>
+                    </TableCell>
+
+                    <TableCell
+                        sortDirection={getDirection('createdAt') ?? false}
+                    >
+                        <TableSortLabel
+                            active={isActive('createdAt')}
+                            direction={getDirection('createdAt')}
+                            onClick={createSortHandler('createdAt')}
+                        >
+                            Created At
+                        </TableSortLabel>
+                    </TableCell>
+
+                    <TableCell
+                        sortDirection={getDirection('updatedAt') ?? false}
+                    >
+                        <TableSortLabel
+                            active={isActive('updatedAt')}
+                            direction={getDirection('updatedAt')}
+                            onClick={createSortHandler('updatedAt')}
+                        >
+                            Updated At
+                        </TableSortLabel>
+                    </TableCell>
+
                     <TableCell align="right">Actions</TableCell>
                 </TableRow>
             </TableHead>
@@ -123,7 +253,7 @@ export const StoryTable = ({
                             key={story.id}
                             selected={isItemSelected}
                             sx={{ cursor: 'pointer' }}
-                            onClick={() => handleClick(story.id)} // click row để chọn
+                            onClick={() => handleClick(story.id)}
                         >
                             <TableCell padding="checkbox">
                                 <Checkbox
