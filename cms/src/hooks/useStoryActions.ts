@@ -59,14 +59,12 @@ export const useStoryActions = (userId: string, refetch: () => void) => {
         }
     };
 
-    const bulkApproveStories = async (storyIds: string[], note?: string) => {
+    const bulkApproveStories = async (storyIds: string[]) => {
         if (!storyIds || storyIds.length === 0) {
             throw new Error('No stories selected to approve');
         }
 
         try {
-            console.log(`Bulk approving ${storyIds.length} stories`);
-
             const response = await axiosPrivate.post(
                 '/api/v1/story/bulk-approve',
                 { storyIds },
@@ -76,8 +74,6 @@ export const useStoryActions = (userId: string, refetch: () => void) => {
             );
 
             const { data } = response;
-
-            console.log('Bulk approve result:', data);
 
             refetch();
 
@@ -96,6 +92,46 @@ export const useStoryActions = (userId: string, refetch: () => void) => {
                 console.warn(
                     'Some stories could not be approved:',
                     errorData.invalidIds,
+                );
+            }
+
+            throw handleError(err);
+        }
+    };
+
+    const bulkRequestPublication = async (storyIds: string[]) => {
+        if (!storyIds || storyIds.length === 0) {
+            throw new Error('No stories selected to request publication');
+        }
+
+        try {
+            const response = await axiosPrivate.post(
+                '/api/v1/story/bulk-request-publication',
+                { storyIds },
+                {
+                    headers: { 'x-user-id': userId },
+                },
+            );
+
+            const { data } = response;
+
+            refetch();
+
+            return {
+                success: true,
+                requestedCount: data.requestedCount,
+                requestedIds: data.requestedIds,
+                failedCount: data.failedCount || 0,
+                failedDetails: data.failedDetails || [],
+                message: data.message,
+            };
+        } catch (err: any) {
+            const errorData = err.response?.data;
+
+            if (errorData?.failedDetails) {
+                console.warn(
+                    'Some stories could not be requested:',
+                    errorData.failedDetails,
                 );
             }
 
@@ -133,5 +169,6 @@ export const useStoryActions = (userId: string, refetch: () => void) => {
         unpublishStory,
         bulkDeleteStories,
         bulkApproveStories,
+        bulkRequestPublication,
     };
 };

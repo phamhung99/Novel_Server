@@ -35,6 +35,10 @@ export class StoryService {
         this.publication,
     );
 
+    bulkRequestPublication = this.publication.bulkRequestPublication.bind(
+        this.publication,
+    );
+
     // ========================
     // Publication Workflow
     // ========================

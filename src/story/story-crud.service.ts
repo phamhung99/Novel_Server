@@ -103,8 +103,6 @@ export class StoryCrudService {
             qb.andWhere('story.sourceType = :source', { source });
         }
 
-        console.log(authorId);
-
         if (authorId) {
             qb.andWhere('author.id = :authorId', { authorId });
         }

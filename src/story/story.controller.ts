@@ -20,7 +20,6 @@ import { CreateStoryDto } from './dto/create-story.dto';
 import { UpdateStoryDto } from './dto/update-story.dto';
 import { CreateChapterDto } from './dto/create-chapter.dto';
 import { UpdateChapterDto } from './dto/update-chapter.dto';
-import { RequestPublicationDto } from './dto/request-publication.dto';
 import { RejectStoryDto } from './dto/reject-story.dto';
 import {
     GenerateChapterDto,
@@ -339,14 +338,39 @@ export class StoryController {
 
     // Publication workflow endpoints
     @Post(':id/request-publication')
-    async requestPublication(
-        @Param('id') id: string,
-        @Body() requestDto: RequestPublicationDto,
-    ) {
+    async requestPublication(@Param('id') id: string) {
         const story = await this.storyService.requestPublication(id);
         return {
             message: 'Publication request submitted successfully',
             story,
+        };
+    }
+
+    @Post('bulk-request-publication')
+    @UseGuards(JwtAuthGuard)
+    async bulkRequestPublication(
+        @Headers('x-user-id') userId: string,
+        @Body('storyIds') storyIds: string[],
+    ) {
+        if (!userId) {
+            throw new BadRequestException('User ID is required');
+        }
+
+        if (!Array.isArray(storyIds) || storyIds.length === 0) {
+            throw new BadRequestException('storyIds must be a non-empty array');
+        }
+
+        const result = await this.storyService.bulkRequestPublication(
+            storyIds,
+            userId,
+        );
+
+        return {
+            message: `Successfully requested publication for ${result.requested} stories`,
+            requestedCount: result.requested,
+            requestedIds: result.requestedIds,
+            failedCount: result.invalidIds.length,
+            failedDetails: result.invalidReasons,
         };
     }
 

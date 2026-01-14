@@ -20,7 +20,6 @@ export class RolesGuard implements CanActivate {
             [context.getHandler(), context.getClass()],
         );
 
-        // Nếu route không yêu cầu role nào → cho qua (hoặc bạn có thể throw nếu muốn strict)
         if (!requiredRoles || requiredRoles.length === 0) {
             return true;
         }

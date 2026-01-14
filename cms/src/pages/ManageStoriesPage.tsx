@@ -17,6 +17,7 @@ import { useNavigate } from 'react-router-dom';
 import {
     ROUTES,
     STORY_SOURCE,
+    USER_ROLES,
     type StorySource,
 } from '../constants/app.constants';
 import { useStories } from '../hooks/useStories';
@@ -61,6 +62,14 @@ const ManageStories = () => {
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+    const [bulkRequestResult, setBulkRequestResult] = useState<{
+        open: boolean;
+        message: string;
+        requestedCount: number;
+        failedCount: number;
+        failedDetails?: Record<string, string>; // hoặc array tùy backend trả
+    } | null>(null);
+
     const navigate = useNavigate();
 
     const user = useMemo(() => {
@@ -81,6 +90,57 @@ const ManageStories = () => {
         debouncedKeyword,
         aiFilter === STORY_SOURCE.ALL ? undefined : aiFilter,
     );
+
+    const selectedStory = useMemo(
+        () => stories?.find((s) => s.id === selectedStoryId) ?? null,
+        [stories, selectedStoryId],
+    );
+
+    const {
+        deleteStory,
+        restoreStory,
+        approveStory,
+        rejectStory,
+        unpublishStory,
+        bulkDeleteStories,
+        bulkApproveStories,
+        bulkRequestPublication,
+    } = useStoryActions(user.id, fetchStories);
+
+    const handleBulkRequestPublication = () => {
+        if (!selectedIds.length) return;
+
+        setConfirmDialog({
+            open: true,
+            title: `Request publication for ${selectedIds.length} stories?`,
+            content:
+                'This will send a publication request to admins/moderators.',
+            onConfirm: async () => {
+                setBulkActionLoading(true);
+
+                try {
+                    const result = await bulkRequestPublication(selectedIds);
+
+                    setBulkRequestResult({
+                        open: true,
+                        message: result.message,
+                        requestedCount: result.requestedCount,
+                        failedCount: result.failedCount,
+                        failedDetails: result.failedDetails,
+                    });
+
+                    setSelectedIds([]);
+                } catch (err: any) {
+                    setErrorMessage(
+                        err?.message || 'Bulk request publication failed',
+                    );
+                } finally {
+                    setBulkActionLoading(false);
+                    setConfirmDialog((prev) => ({ ...prev, open: false }));
+                }
+            },
+        });
+    };
 
     const handleBulkApprove = () => {
         if (!selectedIds.length) return;
@@ -103,21 +163,6 @@ const ManageStories = () => {
             },
         });
     };
-
-    const selectedStory = useMemo(
-        () => stories?.find((s) => s.id === selectedStoryId) ?? null,
-        [stories, selectedStoryId],
-    );
-
-    const {
-        deleteStory,
-        restoreStory,
-        approveStory,
-        rejectStory,
-        unpublishStory,
-        bulkDeleteStories,
-        bulkApproveStories,
-    } = useStoryActions(user.id, fetchStories);
 
     const handleMenuOpen = (
         e: React.MouseEvent<HTMLButtonElement>,
@@ -238,18 +283,34 @@ const ManageStories = () => {
                                 Selected: {selectedIds.length}
                             </Typography>
 
+                            {/* Bulk Approve – chỉ admin hoặc người có quyền approve */}
                             {(statusFilter === 'pending' ||
-                                statusFilter === 'me') && (
-                                <Button
-                                    variant="contained"
-                                    color="success"
-                                    size="small"
-                                    onClick={handleBulkApprove}
-                                    disabled={bulkActionLoading}
-                                >
-                                    Approve Selected
-                                </Button>
-                            )}
+                                statusFilter === 'me') &&
+                                user.role === USER_ROLES.ADMIN && (
+                                    <Button
+                                        variant="contained"
+                                        color="success"
+                                        size="small"
+                                        onClick={handleBulkApprove}
+                                        disabled={bulkActionLoading}
+                                    >
+                                        Approve Selected
+                                    </Button>
+                                )}
+
+                            {/* Bulk Request Publication – dành cho EDITOR */}
+                            {statusFilter === 'me' &&
+                                user.role === USER_ROLES.EDITOR && (
+                                    <Button
+                                        variant="contained"
+                                        color="primary"
+                                        size="small"
+                                        onClick={handleBulkRequestPublication}
+                                        disabled={bulkActionLoading}
+                                    >
+                                        Request Publication
+                                    </Button>
+                                )}
 
                             {statusFilter !== 'deleted' && (
                                 <Button
@@ -302,7 +363,6 @@ const ManageStories = () => {
                     </Paper>
                 )}
             </Box>
-
             <StoryMenu
                 anchorEl={anchorEl}
                 open={openMenu}
@@ -370,7 +430,6 @@ const ManageStories = () => {
                     },
                 }}
             />
-
             <ConfirmDialog
                 open={confirmDialog.open}
                 title={confirmDialog.title}
@@ -380,7 +439,6 @@ const ManageStories = () => {
                     setConfirmDialog((prev) => ({ ...prev, open: false }))
                 }
             />
-
             <ConfirmDialogWithInput
                 open={inputDialog.open}
                 title={inputDialog.title}
@@ -391,7 +449,6 @@ const ManageStories = () => {
                     setInputDialog((prev) => ({ ...prev, open: false }))
                 }
             />
-
             <Snackbar
                 open={!!errorMessage}
                 autoHideDuration={6000}
@@ -405,6 +462,45 @@ const ManageStories = () => {
                     variant="filled"
                 >
                     {errorMessage}
+                </Alert>
+            </Snackbar>
+
+            <Snackbar
+                open={bulkRequestResult?.open ?? false}
+                autoHideDuration={8000}
+                onClose={() => setBulkRequestResult(null)}
+                anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+            >
+                <Alert
+                    onClose={() => setBulkRequestResult(null)}
+                    severity={
+                        bulkRequestResult?.failedCount ? 'warning' : 'success'
+                    }
+                    sx={{ width: '100%' }}
+                    variant="filled"
+                    action={
+                        bulkRequestResult?.failedCount ? (
+                            <Button
+                                color="inherit"
+                                size="small"
+                                onClick={() => {
+                                    console.log(
+                                        bulkRequestResult.failedDetails,
+                                    );
+                                }}
+                            >
+                                Details
+                            </Button>
+                        ) : undefined
+                    }
+                >
+                    {bulkRequestResult && (
+                        <>
+                            {bulkRequestResult.message}
+                            {bulkRequestResult.failedCount > 0 &&
+                                ` (${bulkRequestResult.failedCount} failed)`}
+                        </>
+                    )}
                 </Alert>
             </Snackbar>
         </Container>

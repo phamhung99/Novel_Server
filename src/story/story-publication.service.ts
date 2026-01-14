@@ -30,6 +30,77 @@ export class StoryPublicationService {
         return this.storyRepository.save(story);
     }
 
+    async bulkRequestPublication(
+        storyIds: string[],
+        authorId: string,
+    ): Promise<{
+        requested: number;
+        requestedIds: string[];
+        invalidIds: string[];
+        invalidReasons: Record<string, string>;
+    }> {
+        if (!storyIds?.length) {
+            return {
+                requested: 0,
+                requestedIds: [],
+                invalidIds: [],
+                invalidReasons: {},
+            };
+        }
+
+        const stories = await this.storyRepository.find({
+            where: {
+                id: In(storyIds),
+                authorId,
+            },
+            select: ['id', 'status'],
+        });
+
+        if (!stories.length) {
+            throw new BadRequestException(
+                'No stories found or you are not the author',
+            );
+        }
+
+        const validIds: string[] = [];
+        const invalid: Record<string, string> = {};
+
+        for (const story of stories) {
+            if (story.status === StoryStatus.PENDING) {
+                invalid[story.id] = 'Already pending approval';
+                continue;
+            }
+            if (story.status === StoryStatus.PUBLISHED) {
+                invalid[story.id] = 'Already published';
+                continue;
+            }
+            validIds.push(story.id);
+        }
+
+        if (validIds.length === 0) {
+            throw new BadRequestException({
+                message: 'No stories are eligible for publication request',
+                invalid,
+            });
+        }
+
+        const updateResult = await this.storyRepository
+            .createQueryBuilder()
+            .update(Story)
+            .set({
+                status: StoryStatus.PENDING,
+            })
+            .whereInIds(validIds)
+            .execute();
+
+        return {
+            requested: updateResult.affected || 0,
+            requestedIds: validIds,
+            invalidIds: Object.keys(invalid),
+            invalidReasons: invalid,
+        };
+    }
+
     async approveStory(id: string, adminId: string): Promise<Story> {
         const story = await this.storyCrudService.findStoryById(id);
 
