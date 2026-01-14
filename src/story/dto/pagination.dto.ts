@@ -20,4 +20,8 @@ export class PaginationDto {
     @IsOptional()
     @IsEnum(StorySource)
     source?: StorySource;
+
+    @IsOptional()
+    @IsString()
+    authorId?: string;
 }

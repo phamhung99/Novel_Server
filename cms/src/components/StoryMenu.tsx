@@ -16,6 +16,7 @@ interface StoryMenuProps {
         generateChapter: (id: string) => void;
         copyStoryId: (id: string) => void;
     };
+    user: any;
 }
 
 export const StoryMenu = ({
@@ -24,6 +25,7 @@ export const StoryMenu = ({
     onClose,
     story,
     actions,
+    user,
 }: StoryMenuProps) => {
     if (!story) return null;
 
@@ -31,6 +33,8 @@ export const StoryMenu = ({
         navigator.clipboard.writeText(story.id);
         onClose();
     };
+
+    const isAdmin = user.role === 'admin';
 
     return (
         <Menu anchorEl={anchorEl} open={open} onClose={onClose}>
@@ -66,8 +70,9 @@ export const StoryMenu = ({
                     Restore
                 </MenuItem>
             )}
-            {story.status === 'pending' && (
-                <>
+
+            {isAdmin &&
+                (story.status === 'pending' || story.status === 'draft') && (
                     <MenuItem
                         onClick={() => {
                             onClose();
@@ -76,16 +81,19 @@ export const StoryMenu = ({
                     >
                         Approve
                     </MenuItem>
-                    <MenuItem
-                        onClick={() => {
-                            onClose();
-                            actions.rejectStory(story.id);
-                        }}
-                    >
-                        Reject
-                    </MenuItem>
-                </>
+                )}
+
+            {story.status === 'pending' && isAdmin && (
+                <MenuItem
+                    onClick={() => {
+                        onClose();
+                        actions.rejectStory(story.id);
+                    }}
+                >
+                    Reject
+                </MenuItem>
             )}
+
             {story.status === 'published' && (
                 <MenuItem
                     onClick={() => {

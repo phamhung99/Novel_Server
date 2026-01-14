@@ -352,7 +352,7 @@ export class StoryController {
 
     @Post(':id/approve')
     @UseGuards(JwtAuthGuard, RolesGuard)
-    @Roles(UserRole.ADMIN, UserRole.EDITOR)
+    @Roles(UserRole.ADMIN)
     async approveStory(
         @Headers('x-user-id') adminId: string,
         @Param('id') id: string,
@@ -369,7 +369,7 @@ export class StoryController {
 
     @Post(':id/reject')
     @UseGuards(JwtAuthGuard, RolesGuard)
-    @Roles(UserRole.ADMIN, UserRole.EDITOR)
+    @Roles(UserRole.ADMIN)
     async rejectStory(
         @Headers('x-user-id') adminId: string,
         @Param('id') id: string,
@@ -391,33 +391,11 @@ export class StoryController {
 
     @Post(':id/unpublish')
     @UseGuards(JwtAuthGuard, RolesGuard)
-    @Roles(UserRole.ADMIN, UserRole.EDITOR)
+    @Roles(UserRole.ADMIN)
     async unpublishStory(@Param('id') id: string) {
         const story = await this.storyService.unpublishStory(id);
         return {
             message: 'Story unpublished successfully',
-            story,
-        };
-    }
-
-    @Post(':id/publish-direct')
-    @UseGuards(JwtAuthGuard, RolesGuard)
-    @Roles(UserRole.ADMIN, UserRole.EDITOR)
-    async publishDirectly(
-        @Headers('x-user-id') adminId: string,
-        @Param('id') id: string,
-    ) {
-        if (!adminId) {
-            throw new BadRequestException('Admin ID is required');
-        }
-
-        const story = await this.storyService.publishDirectlyAsAdmin(
-            id,
-            adminId,
-        );
-
-        return {
-            message: 'Story published directly by admin',
             story,
         };
     }

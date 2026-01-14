@@ -17,6 +17,7 @@ import { useNavigate } from 'react-router-dom';
 import {
     ROUTES,
     STORY_SOURCE,
+    USER_ROLES,
     type StorySource,
 } from '../constants/app.constants';
 import { useStories } from '../hooks/useStories';
@@ -27,6 +28,8 @@ import ConfirmDialog from '../components/ConfirmDialog';
 import ConfirmDialogWithInput from '../components/ConfirmDialogWithInput';
 import SearchIcon from '@mui/icons-material/Search';
 import { useDebounce } from '../hooks/useDebounce';
+import Snackbar from '@mui/material/Snackbar';
+import Alert from '@mui/material/Alert';
 
 const ManageStories = () => {
     const [statusFilter, setStatusFilter] = useState('all');
@@ -43,7 +46,7 @@ const ManageStories = () => {
         content: '',
         onConfirm: () => {},
     });
-    
+
     const [inputDialog, setInputDialog] = useState({
         open: false,
         title: '',
@@ -55,27 +58,30 @@ const ManageStories = () => {
     const [aiFilter, setAiFilter] = useState<StorySource>(STORY_SOURCE.ALL);
     const [searchKeyword, setSearchKeyword] = useState('');
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
+    const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
     const navigate = useNavigate();
 
-    const userId = useMemo(() => {
+    const user = useMemo(() => {
         try {
             const user = JSON.parse(localStorage.getItem('user') || '{}');
-            return user.id || '';
+            return user;
         } catch {
-            return '';
+            return {};
         }
     }, []);
 
     const debouncedKeyword = useDebounce(searchKeyword, 500);
 
     const { stories, totalStories, loading, fetchStories } = useStories(
-        statusFilter === STORY_SOURCE.ALL ? undefined : statusFilter,
+        statusFilter === 'all' ? undefined : statusFilter,
         page + 1,
         rowsPerPage,
         debouncedKeyword,
         aiFilter === STORY_SOURCE.ALL ? undefined : aiFilter,
     );
+
+    console.log(stories);
 
     const {
         deleteStory,
@@ -83,7 +89,8 @@ const ManageStories = () => {
         approveStory,
         rejectStory,
         unpublishStory,
-    } = useStoryActions(userId, fetchStories);
+        bulkDeleteStories,
+    } = useStoryActions(user.id, fetchStories);
 
     const handleMenuOpen = (
         e: React.MouseEvent<HTMLButtonElement>,
@@ -102,21 +109,25 @@ const ManageStories = () => {
         ? stories.find((s) => s.id === selectedStoryId) || null
         : null;
 
-    const handleBulkDelete = async () => {
-        if (!selectedIds.length) return;
-        if (!window.confirm(`Xóa ${selectedIds.length} truyện?`)) return;
-
-        await Promise.all(selectedIds.map((id) => deleteStory(id)));
-        setSelectedIds([]);
-        fetchStories();
+    const withErrorHandling = async (action: () => Promise<void>) => {
+        try {
+            await action();
+            setErrorMessage(null);
+        } catch (err: any) {
+            setErrorMessage(
+                err?.message || 'Connection error or unknown error',
+            );
+        }
     };
 
-    const handleBulkApprove = async () => {
-        if (!selectedIds.length) return;
-        await Promise.all(selectedIds.map((id) => approveStory(id)));
-        setSelectedIds([]);
-        fetchStories();
-    };
+    const handleBulkDelete = () =>
+        withErrorHandling(async () => {
+            if (!selectedIds.length) return;
+            if (!window.confirm(`Delete ${selectedIds.length} stories?`))
+                return;
+            await bulkDeleteStories(selectedIds);
+            setSelectedIds([]);
+        });
 
     const handleAiFilterChange = (e: any) => {
         setAiFilter(e.target.value as StorySource);
@@ -157,7 +168,7 @@ const ManageStories = () => {
 
                     {/* AI / Manual filter */}
                     <FormControl
-                        sx={{ minWidth: 140 }}
+                        sx={{ minWidth: 180 }}
                         disabled={statusFilter !== 'all'}
                     >
                         <Select
@@ -178,7 +189,7 @@ const ManageStories = () => {
 
                     {/* Search */}
                     <TextField
-                        placeholder="Tìm theo tên truyện..."
+                        placeholder="Search by story title..."
                         value={searchKeyword}
                         disabled={statusFilter !== 'all'}
                         onChange={(e) => setSearchKeyword(e.target.value)}
@@ -201,24 +212,17 @@ const ManageStories = () => {
                             alignItems="center"
                         >
                             <Typography variant="body2" color="text.secondary">
-                                Đã chọn: {selectedIds.length}
+                                Selected: {selectedIds.length}
                             </Typography>
-                            <Button
-                                variant="outlined"
-                                color="error"
-                                size="small"
-                                onClick={handleBulkDelete}
-                            >
-                                Xóa
-                            </Button>
-                            {statusFilter === 'pending' && (
+                            {statusFilter !== 'deleted' && (
                                 <Button
-                                    variant="contained"
-                                    color="success"
+                                    variant="outlined"
+                                    color="error"
                                     size="small"
-                                    onClick={handleBulkApprove}
+                                    onClick={handleBulkDelete}
+                                    disabled={statusFilter === 'deleted'}
                                 >
-                                    Duyệt tất cả
+                                    Delete
                                 </Button>
                             )}
                         </Box>
@@ -232,7 +236,7 @@ const ManageStories = () => {
                         variant="body1"
                         sx={{ mt: 2, color: 'text.secondary' }}
                     >
-                        No stories
+                        No stories found
                     </Typography>
                 ) : (
                     <Paper>
@@ -241,7 +245,7 @@ const ManageStories = () => {
                             onMenuOpen={handleMenuOpen}
                             selectedIds={selectedIds}
                             onSelectChange={setSelectedIds}
-                            showAiColumn={true} // hoặc false nếu muốn ẩn cột Type
+                            showAiColumn={true}
                         />
                         <TablePagination
                             component="div"
@@ -264,47 +268,56 @@ const ManageStories = () => {
                 open={openMenu}
                 onClose={handleMenuClose}
                 story={selectedStory}
+                user={user}
                 actions={{
                     viewDetails: (id) => {
                         handleMenuClose();
                         navigate(`${ROUTES.STORY_OVERVIEW}/${id}`);
                     },
-                    deleteStory: (id) =>
+                    deleteStory: (id: string) =>
                         setConfirmDialog({
                             open: true,
-                            title: 'Delete story?',
-                            content: 'Are you sure?',
-                            onConfirm: async () => {
-                                await deleteStory(id);
-                                setConfirmDialog((prev) => ({
-                                    ...prev,
-                                    open: false,
-                                }));
-                            },
+                            title: 'Delete Story?',
+                            content: 'This action cannot be undone.',
+                            onConfirm: () =>
+                                withErrorHandling(async () => {
+                                    await deleteStory(id);
+                                    setConfirmDialog((p) => ({
+                                        ...p,
+                                        open: false,
+                                    }));
+                                }),
                         }),
                     restoreStory: (id) => restoreStory(id),
-                    approveStory: (id) => {
-                        approveStory(id);
-
-                        handleMenuClose();
-                    },
-                    rejectStory: (id) =>
+                    approveStory: (id: string) =>
+                        withErrorHandling(async () => {
+                            await approveStory(id);
+                            handleMenuClose();
+                        }),
+                    rejectStory: (id: string) =>
                         setInputDialog({
                             open: true,
-                            title: 'Reject story?',
-                            content: 'Enter reason',
+                            title: 'Reject Story?',
+                            content: 'Please enter the reason for rejection',
                             inputLabel: 'Reason',
-                            onConfirm: async (reason) => {
-                                if (!reason.trim())
-                                    return alert('Reason required');
-                                await rejectStory(id, reason);
-                                setInputDialog((prev) => ({
-                                    ...prev,
-                                    open: false,
-                                }));
-                            },
+                            onConfirm: (reason: string) =>
+                                withErrorHandling(async () => {
+                                    if (!reason.trim()) {
+                                        alert('Please enter a reason');
+                                        return;
+                                    }
+                                    await rejectStory(id, reason);
+                                    setInputDialog((p) => ({
+                                        ...p,
+                                        open: false,
+                                    }));
+                                }),
                         }),
-                    unpublishStory: (id) => unpublishStory(id),
+                    unpublishStory: (id: string) =>
+                        withErrorHandling(async () => {
+                            await unpublishStory(id);
+                            handleMenuClose();
+                        }),
                     generateChapter: (id) => {
                         handleMenuClose();
                         navigate(ROUTES.CHAPTER_GENERATOR, {
@@ -338,6 +351,22 @@ const ManageStories = () => {
                     setInputDialog((prev) => ({ ...prev, open: false }))
                 }
             />
+
+            <Snackbar
+                open={!!errorMessage}
+                autoHideDuration={6000}
+                onClose={() => setErrorMessage(null)}
+                anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+            >
+                <Alert
+                    onClose={() => setErrorMessage(null)}
+                    severity="error"
+                    sx={{ width: '100%' }}
+                    variant="filled"
+                >
+                    {errorMessage}
+                </Alert>
+            </Snackbar>
         </Container>
     );
 };

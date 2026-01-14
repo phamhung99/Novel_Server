@@ -75,7 +75,13 @@ export class StoryCrudService {
         total: number;
         items: any[];
     }> {
-        const { page = 1, limit = 10, keyword, source } = paginationDto;
+        const {
+            page = 1,
+            limit = 10,
+            keyword,
+            source,
+            authorId,
+        } = paginationDto;
         const skip = (page - 1) * limit;
 
         const qb = this.storyRepository
@@ -95,6 +101,12 @@ export class StoryCrudService {
 
         if (source) {
             qb.andWhere('story.sourceType = :source', { source });
+        }
+
+        console.log(authorId);
+
+        if (authorId) {
+            qb.andWhere('author.id = :authorId', { authorId });
         }
 
         const [stories, total] = await Promise.all([

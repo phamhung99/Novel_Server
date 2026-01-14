@@ -202,13 +202,19 @@ export const StoryTable = ({
                                     : '—'}
                             </TableCell>
 
-                            <TableCell align="right">
+                            <TableCell align="right" sx={{ pr: 2, pl: 1 }}>
                                 <IconButton
                                     onClick={(e) => {
-                                        e.stopPropagation(); // ngăn click row khi bấm nút actions
+                                        e.stopPropagation();
                                         onMenuOpen(e, story.id);
                                     }}
                                     size="small"
+                                    sx={{
+                                        padding: '10px',
+                                        '&:hover': {
+                                            backgroundColor: 'action.hover',
+                                        },
+                                    }}
                                 >
                                     <MoreVertIcon fontSize="small" />
                                 </IconButton>

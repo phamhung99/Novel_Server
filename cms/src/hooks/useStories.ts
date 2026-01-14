@@ -33,14 +33,16 @@ export const useStories = (
                 params.source = sourceFilter;
             }
 
+            if (statusFilter === 'me') {
+                params.authorId = userId;
+            }
+
             if (statusFilter === 'pending') {
                 url = '/api/v1/story/pending';
             } else if (statusFilter === 'deleted') {
                 url = '/api/v1/story/deleted/all';
             } else if (statusFilter === 'public') {
                 url = '/api/v1/story/public';
-            } else if (statusFilter === 'me') {
-                url = '/api/v1/story/library?type=created';
             }
 
             const res = await axiosPrivate.get(url, {

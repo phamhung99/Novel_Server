@@ -33,8 +33,14 @@ export class StoryPublicationService {
     async approveStory(id: string, adminId: string): Promise<Story> {
         const story = await this.storyCrudService.findStoryById(id);
 
-        if (story.status !== StoryStatus.PENDING) {
-            throw new BadRequestException('Story is not pending approval');
+        const canApprove =
+            story.status === StoryStatus.PENDING ||
+            (story.status === StoryStatus.DRAFT && story.authorId === adminId);
+
+        if (!canApprove) {
+            throw new BadRequestException(
+                `Cannot approve story ${id} in status: ${story.status}`,
+            );
         }
 
         // Approve = Publish directly
@@ -77,22 +83,6 @@ export class StoryPublicationService {
         // Unpublish returns to private state
         story.status = StoryStatus.DRAFT;
         story.visibility = StoryVisibility.PRIVATE;
-
-        return this.storyRepository.save(story);
-    }
-
-    async publishDirectlyAsAdmin(id: string, adminId: string): Promise<Story> {
-        const story = await this.storyCrudService.findStoryById(id);
-
-        if (story.status === StoryStatus.PUBLISHED) {
-            throw new BadRequestException('Story is already published');
-        }
-
-        story.status = StoryStatus.PUBLISHED;
-        story.visibility = StoryVisibility.PUBLIC;
-        story.approvedBy = adminId;
-        story.approvedAt = new Date();
-        story.rejectionReason = null;
 
         return this.storyRepository.save(story);
     }
