@@ -1,5 +1,6 @@
-import { IsOptional, IsPositive } from 'class-validator';
+import { IsEnum, IsOptional, IsPositive, IsString } from 'class-validator';
 import { Type } from 'class-transformer';
+import { StorySource } from 'src/common/enums/app.enum';
 
 export class PaginationDto {
     @IsOptional()
@@ -11,4 +12,16 @@ export class PaginationDto {
     @IsPositive()
     @Type(() => Number)
     limit?: number = 20;
+
+    @IsOptional()
+    @IsString()
+    keyword?: string;
+
+    @IsOptional()
+    @IsEnum(StorySource)
+    source?: StorySource;
+
+    @IsOptional()
+    @IsString()
+    authorId?: string;
 }

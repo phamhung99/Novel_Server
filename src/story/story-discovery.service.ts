@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
-import { Brackets, DataSource, Repository } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
 import { DiscoverStoriesDto } from './dto/discover-stories.dto';
 import {
     LibraryType,
@@ -60,6 +60,7 @@ export class StoryDiscoveryService {
                 's.visibility AS "visibility"',
                 's.likes_count AS "likesCount"',
                 's.views_count AS "viewsCount"',
+                's.sourceType AS "sourceType"',
 
                 `json_agg(DISTINCT jsonb_build_object('id', cat.id, 'name', cat.name)) AS "categories"`,
 
@@ -609,13 +610,9 @@ export class StoryDiscoveryService {
 
         // === Keyword search
         if (keyword && keyword.trim()) {
-            const searchTerm = `%${keyword.trim()}%`;
-            qb.andWhere(
-                new Brackets((sqb) => {
-                    sqb.where('LOWER(s.title) LIKE LOWER(:searchTerm)');
-                }),
-                { searchTerm },
-            );
+            const searchTerm = `${keyword.trim().toLowerCase()}%`;
+
+            qb.andWhere('LOWER(s.title) LIKE :searchTerm', { searchTerm });
         }
 
         let chapterFilterValue: number | undefined = undefined;

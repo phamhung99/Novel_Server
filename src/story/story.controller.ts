@@ -13,6 +13,7 @@ import {
     UseInterceptors,
     UploadedFile,
     ParseFilePipe,
+    UseGuards,
 } from '@nestjs/common';
 import { StoryService } from './story.service';
 import { CreateStoryDto } from './dto/create-story.dto';
@@ -20,7 +21,6 @@ import { UpdateStoryDto } from './dto/update-story.dto';
 import { CreateChapterDto } from './dto/create-chapter.dto';
 import { UpdateChapterDto } from './dto/update-chapter.dto';
 import { RequestPublicationDto } from './dto/request-publication.dto';
-import { ApproveStoryDto } from './dto/approve-story.dto';
 import { RejectStoryDto } from './dto/reject-story.dto';
 import {
     GenerateChapterDto,
@@ -30,7 +30,11 @@ import {
     InitializeStoryDto,
     InitializeStoryResponseDto,
 } from './dto/generate-story-outline.dto';
-import { AllowedImageMimeTypes, LibraryType } from 'src/common/enums/app.enum';
+import {
+    AllowedImageMimeTypes,
+    LibraryType,
+    UserRole,
+} from 'src/common/enums/app.enum';
 import {
     DEFAULT_COVER_IMAGE_URL,
     ERROR_MESSAGES,
@@ -46,6 +50,9 @@ import { extname, join } from 'path';
 import { CustomMaxFileSizeValidator } from 'src/common/validators/custom-max-file-size.validator';
 import { MimeTypeValidator } from 'src/common/validators/mime-type.validator';
 import { GenerateCoverImageDto } from './dto/generate-cover-image.dto';
+import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
+import { Roles } from 'src/common/decorators/roles.decorator';
+import { RolesGuard } from 'src/common/guards/roles.guard';
 
 @Controller('story')
 export class StoryController {
@@ -121,8 +128,9 @@ export class StoryController {
     async getUserLibrary(
         @Headers('x-user-id') userId: string,
         @Query('type') type: LibraryType,
+        @Query() paginationDto: PaginationDto,
     ) {
-        return this.storyService.getUserLibrary(userId, type);
+        return this.storyService.getUserLibrary(userId, type, paginationDto);
     }
 
     @Get('/top-trending')
@@ -248,6 +256,8 @@ export class StoryController {
     }
 
     @Get()
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles(UserRole.ADMIN, UserRole.EDITOR)
     async getAllStories(@Query() paginationDto: PaginationDto) {
         return this.storyService.findAllStories(paginationDto);
     }
@@ -258,6 +268,8 @@ export class StoryController {
     }
 
     @Get('pending')
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles(UserRole.ADMIN, UserRole.EDITOR)
     async getPendingStories(@Query() paginationDto: PaginationDto) {
         return this.storyService.findPendingStories(paginationDto);
     }
@@ -310,6 +322,8 @@ export class StoryController {
     }
 
     @Get('deleted/all')
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles(UserRole.ADMIN, UserRole.EDITOR)
     async getDeletedStories(@Query() paginationDto: PaginationDto) {
         return this.storyService.findDeletedStories(paginationDto);
     }
@@ -337,10 +351,11 @@ export class StoryController {
     }
 
     @Post(':id/approve')
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles(UserRole.ADMIN)
     async approveStory(
         @Headers('x-user-id') adminId: string,
         @Param('id') id: string,
-        @Body() approveDto: ApproveStoryDto,
     ) {
         if (!adminId) {
             throw new BadRequestException('Admin ID is required');
@@ -353,6 +368,8 @@ export class StoryController {
     }
 
     @Post(':id/reject')
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles(UserRole.ADMIN)
     async rejectStory(
         @Headers('x-user-id') adminId: string,
         @Param('id') id: string,
@@ -373,6 +390,8 @@ export class StoryController {
     }
 
     @Post(':id/unpublish')
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles(UserRole.ADMIN)
     async unpublishStory(@Param('id') id: string) {
         const story = await this.storyService.unpublishStory(id);
         return {

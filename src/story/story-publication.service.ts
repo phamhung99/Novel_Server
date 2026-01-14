@@ -33,8 +33,14 @@ export class StoryPublicationService {
     async approveStory(id: string, adminId: string): Promise<Story> {
         const story = await this.storyCrudService.findStoryById(id);
 
-        if (story.status !== StoryStatus.PENDING) {
-            throw new BadRequestException('Story is not pending approval');
+        const canApprove =
+            story.status === StoryStatus.PENDING ||
+            (story.status === StoryStatus.DRAFT && story.authorId === adminId);
+
+        if (!canApprove) {
+            throw new BadRequestException(
+                `Cannot approve story ${id} in status: ${story.status}`,
+            );
         }
 
         // Approve = Publish directly

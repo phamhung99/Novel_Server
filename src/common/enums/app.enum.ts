@@ -106,3 +106,9 @@ export enum PublishedWithin {
     DAYS_365 = '365',
     DAYS_400 = '400',
 }
+
+export enum UserRole {
+    USER = 'user',
+    ADMIN = 'admin',
+    EDITOR = 'editor',
+}

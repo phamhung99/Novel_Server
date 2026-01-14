@@ -16,6 +16,7 @@ export interface ChapterDto {
 export interface StoryDto {
     id: string;
     authorId: string;
+    authorUsername?: string;
     title: string;
     synopsis: string;
     genres: string[];
@@ -26,6 +27,7 @@ export interface StoryDto {
     rating: string;
     status: string;
     visibility: string;
+    sourceType: string;
     createdAt: string;
     updatedAt: string;
     deletedAt: string | null;
