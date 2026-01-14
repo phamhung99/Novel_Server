@@ -1,6 +1,6 @@
 import { IsEnum, IsOptional, IsPositive, IsString } from 'class-validator';
 import { Type } from 'class-transformer';
-import { StorySource } from 'app/dist/common/enums/app.enum';
+import { StorySource } from 'src/common/enums/app.enum';
 
 export class PaginationDto {
     @IsOptional()
