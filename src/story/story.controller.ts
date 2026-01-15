@@ -191,9 +191,11 @@ export class StoryController {
     @Post('generate/initialize')
     async initializeStory(
         @Headers('x-user-id') userId: string,
-        @Headers('x-request-id') requestId: string,
         @Body() initializeStoryDto: InitializeStoryDto,
+        @Headers('x-request-id') headerRequestId?: string,
+        @Query('requestId') queryRequestId?: string,
     ): Promise<InitializeStoryResponseDto> {
+        const requestId = queryRequestId ?? headerRequestId;
         if (!requestId) {
             throw new BadRequestException('requestId is required');
         }
@@ -206,9 +208,11 @@ export class StoryController {
 
     @Get('generate/initialize/result')
     async getInitializationResults(
-        @Headers('x-request-id') requestId: string,
+        @Headers('x-request-id') headerRequestId?: string,
+        @Query('requestId') queryRequestId?: string,
         @Headers('x-skip-image') skipImage: boolean = false,
     ): Promise<InitializeStoryResponseDto[]> {
+        const requestId = queryRequestId ?? headerRequestId;
         if (!requestId) {
             throw new BadRequestException('requestId is required');
         }
@@ -218,9 +222,11 @@ export class StoryController {
     @Post(':storyId/generate/chapter')
     async generateChapterWithContext(
         @Param('storyId') storyId: string,
-        @Headers('x-request-id') requestId: string,
         @Body() generateChapterDto: GenerateChapterDto,
+        @Headers('x-request-id') headerRequestId?: string,
+        @Query('requestId') queryRequestId?: string,
     ): Promise<GenerateChapterResponseDto> {
+        const requestId = queryRequestId ?? headerRequestId;
         if (!requestId) {
             throw new BadRequestException('requestId is required');
         }
@@ -234,8 +240,10 @@ export class StoryController {
 
     @Get('generate/chapter/result')
     async getGeneratedChapterResults(
-        @Headers('x-request-id') requestId: string,
+        @Headers('x-request-id') headerRequestId?: string,
+        @Query('requestId') queryRequestId?: string,
     ): Promise<GenerateChapterResponseDto> {
+        const requestId = queryRequestId ?? headerRequestId;
         if (!requestId) {
             throw new BadRequestException('requestId is required');
         }

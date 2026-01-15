@@ -572,7 +572,6 @@ export class UserService extends BaseCrudService<User> {
 
             await actionRepo.save(todayAction);
 
-            // 3. Cộng coin
             const coinsToGrant = this.AD_REWARD_COINS;
             await this.grantCoins({
                 manager,
