@@ -11,6 +11,7 @@ import {
 } from 'typeorm';
 import { UserCategoryPreference } from './user-category-preference.entity';
 import { DEFAULT_PROFILE_IMAGE_URL } from 'src/common/constants/app.constant';
+import { UserDailyAction } from './user-daily-action.entity';
 
 @Entity('users')
 export class User {
@@ -71,4 +72,7 @@ export class User {
         (userCategoryPreference) => userCategoryPreference.user,
     )
     userCategoryPreferences: UserCategoryPreference[];
+
+    @OneToMany(() => UserDailyAction, (action) => action.user)
+    dailyActions: UserDailyAction[];
 }

@@ -10,6 +10,7 @@ import { Chapter } from 'src/story/entities/chapter.entity';
 import { UserCoins } from './entities/user-coins.entity';
 import { MediaService } from 'src/media/media.service';
 import { DoSpacesService } from 'src/upload/do-spaces.service';
+import { UserDailyAction } from './entities/user-daily-action.entity';
 
 @Module({
     controllers: [UserController],
@@ -22,6 +23,7 @@ import { DoSpacesService } from 'src/upload/do-spaces.service';
             StoryGeneration,
             Chapter,
             UserCoins,
+            UserDailyAction,
         ]),
     ],
     exports: [UserService, TypeOrmModule],

@@ -1,23 +1,36 @@
 import {
     BadRequestException,
     Injectable,
+    Logger,
     NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, Repository } from 'typeorm';
+import { DataSource, EntityManager, Repository } from 'typeorm';
 import { User } from './entities/user.entity';
 import { BaseCrudService } from 'src/common/services/base-crud.service';
 import { UserCategoryPreference } from './entities/user-category-preference.entity';
-import { ERROR_MESSAGES } from 'src/common/constants/app.constant';
+import {
+    ERROR_MESSAGES,
+    MS_PER_DAY,
+    TEMPORARY_COIN_DAYS,
+} from 'src/common/constants/app.constant';
 import { ReadingHistory } from './entities/reading-history.entity';
 import { StoryStatus } from 'src/common/enums/story-status.enum';
 import { Chapter } from 'src/story/entities/chapter.entity';
 import { UserCoins } from './entities/user-coins.entity';
-import { CoinType } from 'src/common/enums/app.enum';
+import { ActionType, CoinType } from 'src/common/enums/app.enum';
 import { MediaService } from 'src/media/media.service';
+import { UserDailyAction } from './entities/user-daily-action.entity';
+import { addDays } from 'src/common/utils/date.utils';
 
 @Injectable()
 export class UserService extends BaseCrudService<User> {
+    private readonly logger = new Logger(UserService.name);
+
+    private readonly LOGIN_BONUS_SCHEDULE = [
+        10, 15, 30, 10, 15, 15, 40,
+    ] as const;
+
     constructor(
         @InjectRepository(User) userRepo: Repository<User>,
         @InjectRepository(UserCategoryPreference)
@@ -26,6 +39,8 @@ export class UserService extends BaseCrudService<User> {
         @InjectRepository(UserCoins)
         private readonly userCoinsRepository: Repository<UserCoins>,
         private mediaService: MediaService,
+        @InjectRepository(UserDailyAction)
+        private readonly userDailyActionRepo: Repository<UserDailyAction>,
     ) {
         super(userRepo);
     }
@@ -293,6 +308,145 @@ export class UserService extends BaseCrudService<User> {
         }
     }
 
+    async calculateLoginStreakAndBonus(userId: string): Promise<{
+        currentStreak: number;
+        todayBonus: number | null;
+    }> {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        const loginActions = await this.userDailyActionRepo.find({
+            where: { userId, actionType: ActionType.LOGIN },
+            order: { actionDate: 'DESC' },
+        });
+
+        if (loginActions.length === 0) {
+            return {
+                currentStreak: 0,
+                todayBonus: this.LOGIN_BONUS_SCHEDULE[0],
+            };
+        }
+
+        let streak = 0;
+        let previousDate = today;
+        let hasLoggedInToday = false;
+
+        for (const action of loginActions) {
+            const date = new Date(action.actionDate);
+            date.setHours(0, 0, 0, 0);
+
+            const diffDays = Math.floor(
+                (previousDate.getTime() - date.getTime()) / MS_PER_DAY,
+            );
+
+            if (diffDays === 0) {
+                hasLoggedInToday = true;
+            } else if (diffDays !== 1) {
+                break;
+            }
+
+            streak++;
+            previousDate = date;
+        }
+
+        const currentStreak = hasLoggedInToday ? streak : streak + 1;
+        const bonusIndex = streak % 7;
+
+        return {
+            currentStreak,
+            todayBonus: hasLoggedInToday
+                ? null
+                : this.LOGIN_BONUS_SCHEDULE[bonusIndex],
+        };
+    }
+
+    async recordDailyCheckInAndGrantBonus(user: User) {
+        const userId = user.id;
+        const todayStr = new Date().toISOString().split('T')[0];
+
+        return this.dataSource.transaction(async (manager) => {
+            const repo = manager.getRepository(UserDailyAction);
+
+            // 1. Tìm hoặc tạo record login hôm nay
+            let todayLogin = await repo.findOne({
+                where: {
+                    userId,
+                    actionType: ActionType.LOGIN,
+                    actionDate: todayStr,
+                },
+                lock: { mode: 'pessimistic_write' },
+            });
+
+            const isFirstLoginToday = !todayLogin;
+
+            if (isFirstLoginToday) {
+                todayLogin = repo.create({
+                    userId,
+                    actionType: ActionType.LOGIN,
+                    actionDate: todayStr,
+                    count: 1,
+                    lastActionAt: new Date(),
+                });
+            } else {
+                todayLogin.count += 1;
+                todayLogin.lastActionAt = new Date();
+            }
+
+            await repo.save(todayLogin);
+
+            if (isFirstLoginToday) {
+                const { todayBonus } =
+                    await this.calculateLoginStreakAndBonus(userId);
+
+                if (todayBonus !== null && todayBonus > 0) {
+                    this.logger.log(
+                        `Granting login bonus of ${todayBonus} coins to user ${userId} for login on ${todayStr}`,
+                    );
+
+                    await this.grantCoins({
+                        manager,
+                        userId,
+                        amount: todayBonus,
+                        type: CoinType.TEMPORARY,
+                        source: ActionType.LOGIN,
+                    });
+                }
+            }
+        });
+    }
+
+    private async grantCoins({
+        manager,
+        userId,
+        amount,
+        type,
+        source,
+    }: {
+        manager: EntityManager;
+        userId: string;
+        amount: number;
+        type: CoinType;
+        source?: string;
+    }): Promise<void> {
+        if (amount <= 0) return;
+
+        const coinRepo = manager.getRepository(UserCoins);
+
+        const newRecord = coinRepo.create({
+            userId,
+            type,
+            remaining: amount,
+            amount: amount,
+            expiresAt:
+                type === CoinType.TEMPORARY
+                    ? addDays(new Date(), TEMPORARY_COIN_DAYS)
+                    : null,
+            source: source,
+        });
+
+        await coinRepo.save(newRecord);
+    }
+
     async getUserInfo(user: User): Promise<any> {
         if (!user) {
             throw new NotFoundException('User not found');
@@ -348,6 +502,9 @@ export class UserService extends BaseCrudService<User> {
         );
 
         user.profileImage = undefined;
+        user.userCategoryPreferences = undefined;
+
+        await this.recordDailyCheckInAndGrantBonus(user);
 
         return {
             ...user,

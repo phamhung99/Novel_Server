@@ -112,3 +112,9 @@ export enum UserRole {
     ADMIN = 'admin',
     EDITOR = 'editor',
 }
+
+export enum ActionType {
+    LOGIN = 'login',
+    WATCH_AD = 'watch_ad',
+    SHARE_STORY = 'share_story',
+}
