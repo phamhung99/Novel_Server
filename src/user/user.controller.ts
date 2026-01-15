@@ -23,6 +23,16 @@ import { IapStore } from 'src/common/enums/app.enum';
 export class UserController {
     constructor(private readonly userService: UserService) {}
 
+    @Post('ads/watch')
+    async watchAds(@Headers('x-user-id') userId: string) {
+        if (!userId) {
+            throw new BadRequestException(ERROR_MESSAGES.USER_ID_REQUIRED);
+        }
+
+        const result = await this.userService.watchAdsAndGrantBonus(userId);
+        return result;
+    }
+
     @Get('recent-story')
     async getRecentStories(
         @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit: number,

@@ -27,9 +27,12 @@ import { addDays } from 'src/common/utils/date.utils';
 export class UserService extends BaseCrudService<User> {
     private readonly logger = new Logger(UserService.name);
 
-    private readonly LOGIN_BONUS_SCHEDULE = [
+    private readonly LOGIN_STREAK_BONUS_SCHEDULE = [
         10, 15, 30, 10, 15, 15, 40,
     ] as const;
+
+    private readonly AD_REWARD_COINS = 50;
+    private readonly MAX_AD_VIEWS_PER_DAY = 5;
 
     constructor(
         @InjectRepository(User) userRepo: Repository<User>,
@@ -323,7 +326,7 @@ export class UserService extends BaseCrudService<User> {
         if (loginActions.length === 0) {
             return {
                 currentStreak: 0,
-                todayBonus: this.LOGIN_BONUS_SCHEDULE[0],
+                todayBonus: this.LOGIN_STREAK_BONUS_SCHEDULE[0],
             };
         }
 
@@ -356,7 +359,7 @@ export class UserService extends BaseCrudService<User> {
             currentStreak,
             todayBonus: hasLoggedInToday
                 ? null
-                : this.LOGIN_BONUS_SCHEDULE[bonusIndex],
+                : this.LOGIN_STREAK_BONUS_SCHEDULE[bonusIndex],
         };
     }
 
@@ -520,5 +523,70 @@ export class UserService extends BaseCrudService<User> {
             },
             preferredCategories,
         };
+    }
+
+    async watchAdsAndGrantBonus(
+        userId: string,
+    ): Promise<{ success: boolean; message: string; coinsGranted: number }> {
+        const todayStr = new Date().toISOString().split('T')[0];
+
+        return this.dataSource.transaction(async (manager) => {
+            const actionRepo = manager.getRepository(UserDailyAction);
+
+            const todayAdsActions = await actionRepo.find({
+                where: {
+                    userId,
+                    actionType: ActionType.WATCH_AD,
+                    actionDate: todayStr,
+                },
+                lock: { mode: 'pessimistic_write' },
+            });
+
+            const todayCount = todayAdsActions.reduce(
+                (sum, action) => sum + action.count,
+                0,
+            );
+
+            if (todayCount >= this.MAX_AD_VIEWS_PER_DAY) {
+                return {
+                    success: false,
+                    message: `You've reached the daily limit of ${this.MAX_AD_VIEWS_PER_DAY} ads. Come back tomorrow!`,
+                    coinsGranted: 0,
+                };
+            }
+
+            let todayAction = todayAdsActions[0];
+
+            if (!todayAction) {
+                todayAction = actionRepo.create({
+                    userId,
+                    actionType: ActionType.WATCH_AD,
+                    actionDate: todayStr,
+                    count: 1,
+                    lastActionAt: new Date(),
+                });
+            } else {
+                todayAction.count += 1;
+                todayAction.lastActionAt = new Date();
+            }
+
+            await actionRepo.save(todayAction);
+
+            // 3. Cộng coin
+            const coinsToGrant = this.AD_REWARD_COINS;
+            await this.grantCoins({
+                manager,
+                userId,
+                amount: coinsToGrant,
+                type: CoinType.TEMPORARY,
+                source: ActionType.WATCH_AD,
+            });
+
+            return {
+                success: true,
+                message: `Ad watched successfully! You received ${coinsToGrant} coins.`,
+                coinsGranted: coinsToGrant,
+            };
+        });
     }
 }
