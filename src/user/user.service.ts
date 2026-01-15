@@ -455,39 +455,7 @@ export class UserService extends BaseCrudService<User> {
             throw new NotFoundException('User not found');
         }
 
-        const now = new Date();
-
-        // Get all coin records for this user
-        const coinRecords = await this.userCoinsRepository.find({
-            where: { userId: user.id },
-            order: { createdAt: 'ASC' },
-        });
-
-        // 1. Tính permanent (thường không expire)
-        const permanentCoins = coinRecords
-            .filter((c) => c.type === CoinType.PERMANENT)
-            .reduce((sum, c) => sum + c.remaining, 0);
-
-        // 2. Tính temporary còn hiệu lực
-        const activeTemporary = coinRecords.filter(
-            (c) =>
-                c.type === CoinType.TEMPORARY &&
-                c.expiresAt &&
-                c.expiresAt > now,
-        );
-
-        const temporaryCoinsForDisplay = activeTemporary.map((c) => ({
-            amount: c.remaining,
-            expiresAt: c.expiresAt!.toISOString(),
-        }));
-
-        const activeTemporaryAmount = activeTemporary.reduce(
-            (sum, c) => sum + c.remaining,
-            0,
-        );
-
-        // 3. Total = permanent + temporary còn hạn
-        const totalCoins = permanentCoins + activeTemporaryAmount;
+        const coinsData = await this.calculateUserCoins(user.id);
 
         // Preferred categories (sorted by some order — you may want to add order column later)
         const preferredCategories =
@@ -507,8 +475,6 @@ export class UserService extends BaseCrudService<User> {
         user.profileImage = undefined;
         user.userCategoryPreferences = undefined;
 
-        await this.recordDailyCheckInAndGrantBonus(user);
-
         return {
             ...user,
             profileImageUrl,
@@ -517,23 +483,21 @@ export class UserService extends BaseCrudService<User> {
                 basePlanId: null,
             },
             wallet: {
-                totalCoins,
-                permanentCoins,
-                temporaryCoins: temporaryCoinsForDisplay,
+                totalCoins: coinsData.totalCoins,
+                permanentCoins: coinsData.permanentCoins,
+                temporaryCoins: coinsData.temporaryCoins,
             },
             preferredCategories,
         };
     }
 
-    async watchAdsAndGrantBonus(
-        userId: string,
-    ): Promise<{ success: boolean; message: string; coinsGranted: number }> {
+    async watchAdsAndGrantBonus(userId: string) {
         const todayStr = new Date().toISOString().split('T')[0];
 
         return this.dataSource.transaction(async (manager) => {
             const actionRepo = manager.getRepository(UserDailyAction);
 
-            const todayAdsActions = await actionRepo.find({
+            let todayAction = await actionRepo.findOne({
                 where: {
                     userId,
                     actionType: ActionType.WATCH_AD,
@@ -542,20 +506,24 @@ export class UserService extends BaseCrudService<User> {
                 lock: { mode: 'pessimistic_write' },
             });
 
-            const todayCount = todayAdsActions.reduce(
-                (sum, action) => sum + action.count,
-                0,
-            );
+            if (todayAction && todayAction.count >= this.MAX_AD_VIEWS_PER_DAY) {
+                const updatedCoins = await this.calculateUserCoins(userId, {
+                    manager,
+                });
 
-            if (todayCount >= this.MAX_AD_VIEWS_PER_DAY) {
                 return {
                     success: false,
                     message: `You've reached the daily limit of ${this.MAX_AD_VIEWS_PER_DAY} ads. Come back tomorrow!`,
                     coinsGranted: 0,
+                    currentViews: todayAction.count,
+                    maxViews: this.MAX_AD_VIEWS_PER_DAY,
+                    wallet: {
+                        totalCoins: updatedCoins.totalCoins,
+                        permanentCoins: updatedCoins.permanentCoins,
+                        temporaryCoins: updatedCoins.temporaryCoins,
+                    },
                 };
             }
-
-            let todayAction = todayAdsActions[0];
 
             if (!todayAction) {
                 todayAction = actionRepo.create({
@@ -581,11 +549,76 @@ export class UserService extends BaseCrudService<User> {
                 source: ActionType.WATCH_AD,
             });
 
+            const updatedCoins = await this.calculateUserCoins(userId, {
+                manager,
+            });
+
             return {
                 success: true,
                 message: `Ad watched successfully! You received ${coinsToGrant} coins.`,
                 coinsGranted: coinsToGrant,
+                currentViews: todayAction.count,
+                maxViews: this.MAX_AD_VIEWS_PER_DAY,
+                wallet: {
+                    totalCoins: updatedCoins.totalCoins,
+                    permanentCoins: updatedCoins.permanentCoins,
+                    temporaryCoins: updatedCoins.temporaryCoins,
+                },
             };
         });
+    }
+
+    async calculateUserCoins(
+        userId: string,
+        options: { manager?: EntityManager } = {},
+    ): Promise<{
+        totalCoins: number;
+        permanentCoins: number;
+        temporaryCoins: Array<{ amount: number; expiresAt: string }>;
+    }> {
+        const now = new Date();
+
+        // Chọn repository phù hợp
+        const repo = options.manager
+            ? options.manager.getRepository(UserCoins)
+            : this.userCoinsRepository;
+
+        const coinRecords = await repo.find({
+            where: { userId },
+            order: { createdAt: 'ASC' },
+        });
+
+        // 1. Permanent coins (thường không expire)
+        const permanentCoins = coinRecords
+            .filter((c) => c.type === CoinType.PERMANENT)
+            .reduce((sum, c) => sum + c.remaining, 0);
+
+        // 2. Temporary coins còn hiệu lực
+        const activeTemporary = coinRecords.filter(
+            (c) =>
+                c.type === CoinType.TEMPORARY &&
+                c.expiresAt &&
+                c.expiresAt > now,
+        );
+
+        const temporaryCoinsForDisplay = activeTemporary.map((c) => ({
+            id: c.id,
+            amount: c.remaining,
+            expiresAt: c.expiresAt!.toISOString(),
+            createdAt: c.createdAt.toISOString(),
+        }));
+
+        const activeTemporaryAmount = activeTemporary.reduce(
+            (sum, c) => sum + c.remaining,
+            0,
+        );
+
+        const totalCoins = permanentCoins + activeTemporaryAmount;
+
+        return {
+            totalCoins,
+            permanentCoins,
+            temporaryCoins: temporaryCoinsForDisplay,
+        };
     }
 }
