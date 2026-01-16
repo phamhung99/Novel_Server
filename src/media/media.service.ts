@@ -8,6 +8,8 @@ import { v4 as uuidv4 } from 'uuid';
 export class MediaService {
     constructor(private readonly storage: DoSpacesService) {}
 
+    uploadFromStream = this.storage.uploadFromStream.bind(this.storage);
+
     async uploadStoryCover(
         file: Express.Multer.File,
     ): Promise<{ key: string; url: string }> {
@@ -58,7 +60,55 @@ export class MediaService {
         }
     }
 
-    uploadFromStream = this.storage.uploadFromStream.bind(this.storage);
+    async uploadUserProfileImage(
+        file: Express.Multer.File,
+    ): Promise<{ key: string; url: string }> {
+        if (!file) {
+            throw new BadRequestException('No file provided');
+        }
+
+        const ext = extname(file.originalname).toLowerCase() || '.jpg';
+        const key = `avatars/${uuidv4()}${ext}`;
+
+        let buffer: Buffer | undefined;
+        const tempFilePath: string | undefined = file.path;
+
+        try {
+            if (file.buffer) {
+                buffer = file.buffer;
+            } else if (file.path) {
+                buffer = await fs.readFile(file.path);
+            } else {
+                throw new BadRequestException(
+                    'File buffer or path not available',
+                );
+            }
+
+            const uploadedKey = await this.storage.uploadFromBuffer(
+                buffer,
+                key,
+                file.mimetype,
+            );
+
+            const url = await this.storage.getImageUrl(uploadedKey);
+
+            return { key: uploadedKey, url };
+        } catch (err) {
+            console.error('Upload user avatar failed:', err);
+            throw err;
+        } finally {
+            if (tempFilePath) {
+                try {
+                    await fs.unlink(tempFilePath);
+                } catch (cleanupErr) {
+                    console.warn(
+                        `Failed to cleanup temp file ${tempFilePath}:`,
+                        cleanupErr,
+                    );
+                }
+            }
+        }
+    }
 
     async delete(key: string): Promise<void> {
         await this.storage.deleteImage(key);

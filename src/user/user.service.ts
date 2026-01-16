@@ -22,6 +22,7 @@ import { ActionType, CoinType } from 'src/common/enums/app.enum';
 import { MediaService } from 'src/media/media.service';
 import { UserDailyAction } from './entities/user-daily-action.entity';
 import { addDays } from 'src/common/utils/date.utils';
+import { UpdateUserDto } from './dto/update-user.dto';
 
 @Injectable()
 export class UserService extends BaseCrudService<User> {
@@ -624,5 +625,61 @@ export class UserService extends BaseCrudService<User> {
             permanentCoins,
             temporaryCoins: temporaryCoinsForDisplay,
         };
+    }
+
+    async updateUser(
+        id: string,
+        updateDto: UpdateUserDto,
+        profileImageFile?: Express.Multer.File,
+    ) {
+        const user = await this.repository.findOne({
+            where: { id },
+            relations: [
+                'userCategoryPreferences',
+                'userCategoryPreferences.category',
+            ],
+        });
+
+        if (!user) {
+            throw new NotFoundException('User not found');
+        }
+
+        let newProfileImageKey: string | undefined;
+
+        if (profileImageFile) {
+            try {
+                const { key } =
+                    await this.mediaService.uploadUserProfileImage(
+                        profileImageFile,
+                    );
+                newProfileImageKey = key;
+            } catch (err) {
+                throw new BadRequestException('Failed to upload profile image');
+            }
+        }
+
+        const updateData: Partial<User> = { ...updateDto };
+        if (newProfileImageKey) {
+            updateData.profileImage = newProfileImageKey;
+        }
+
+        Object.assign(user, updateData);
+
+        const savedUser = await this.repository.save(user);
+
+        if (
+            newProfileImageKey &&
+            user.profileImage &&
+            user.profileImage !== newProfileImageKey
+        ) {
+            this.mediaService.delete(user.profileImage).catch((err) => {
+                this.logger.error(
+                    `Failed to delete old profile image ${user.profileImage}`,
+                    err.stack,
+                );
+            });
+        }
+
+        return this.getUserInfo(savedUser);
     }
 }
