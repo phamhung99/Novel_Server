@@ -594,8 +594,6 @@ Architecture Alignment: Verify events serve story's core objectives from origina
                 error,
             );
 
-            console.log('Parsed story outline in string: ', content);
-
             try {
                 return {
                     title:
@@ -648,8 +646,6 @@ Architecture Alignment: Verify events serve story's core objectives from origina
                 'Failed to parse JSON response, falling back to text parsing',
                 jsonError,
             );
-
-            console.log('Parsed story outline in string: ', content);
 
             try {
                 const extract = (label: string) =>

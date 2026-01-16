@@ -263,6 +263,8 @@ export class StoryGenerationService {
 
         const savedStoryGeneration =
             await this.storyGenerationRepository.save(storyGeneration);
+
+        let response: any = null;
         try {
             if (!userId) {
                 throw new Error('userId is required');
@@ -288,14 +290,7 @@ export class StoryGenerationService {
                     aiProvider: dto.aiProvider || DEFAULT_AI_PROVIDER,
                 });
 
-            await this.storyGenerationRepository.update(
-                { id: savedStoryGeneration.id },
-                {
-                    response: {
-                        outline: outlineResponse.outline,
-                    } as any,
-                },
-            );
+            response = outlineResponse.outline;
 
             const storyCategoryEntities = await this.buildStoryCategories(
                 outlineResponse.storyContext?.meta,
@@ -329,6 +324,7 @@ export class StoryGenerationService {
                         coverImage: outlineResponse.coverImage,
                         storyContext: outlineResponse.storyContext,
                     } as any,
+                    response,
                     status: GenerationStatus.COMPLETED,
                 },
             );
@@ -357,6 +353,7 @@ export class StoryGenerationService {
                 {
                     status: GenerationStatus.FAILED,
                     errorMessage: error.message || 'Failed to initialize story',
+                    response,
                 },
             );
 
@@ -377,6 +374,8 @@ export class StoryGenerationService {
         dto: GenerateChapterDto,
     ): Promise<GenerateChapterResponseDto | any> {
         let savedPreGen: any = null;
+
+        let response: any = null;
 
         try {
             this.logger.log(
@@ -477,6 +476,8 @@ export class StoryGenerationService {
                 );
             }
 
+            response = chapterStructureResponse.raw;
+
             // Generate chapter summary every 5 chapters
             if (chapterNumber % 5 === 0) {
                 chapterStructureResponse.structure.chapterSummary =
@@ -507,6 +508,7 @@ export class StoryGenerationService {
                     chapterId: savedChapter.id,
                     generatedContent: chapterStructureResponse.content,
                     structure: chapterStructureResponse.structure as any,
+                    response,
                     storyGenerationId: storyGeneration.id,
                     chapterNumber,
                     status: GenerationStatus.COMPLETED,
@@ -541,6 +543,7 @@ export class StoryGenerationService {
                                 ? error.message
                                 : 'Failed to generate chapter',
                         status: GenerationStatus.FAILED,
+                        response,
                     },
                 );
             }

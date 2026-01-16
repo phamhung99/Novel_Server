@@ -55,6 +55,9 @@ export class ChapterGeneration {
     @Column({ name: 'structure', type: 'jsonb', nullable: true })
     structure: Record<string, any>;
 
+    @Column({ type: 'text', nullable: true })
+    response: string | null;
+
     @Column({ name: 'tokens_used', type: 'int', nullable: true })
     tokensUsed: number;
 
