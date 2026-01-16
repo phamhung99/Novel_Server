@@ -28,7 +28,7 @@ export class UserService extends BaseCrudService<User> {
     private readonly logger = new Logger(UserService.name);
 
     private readonly LOGIN_STREAK_BONUS_SCHEDULE = [
-        10, 15, 30, 10, 15, 15, 40,
+        10, 15, 40, 10, 15, 15, 30,
     ] as const;
 
     private readonly AD_REWARD_COINS = 50;
