@@ -514,13 +514,15 @@ export class UserService extends BaseCrudService<User> {
                 return {
                     success: false,
                     message: `You've reached the daily limit of ${this.MAX_AD_VIEWS_PER_DAY} ads. Come back tomorrow!`,
-                    coinsGranted: 0,
-                    currentViews: todayAction.count,
-                    maxViews: this.MAX_AD_VIEWS_PER_DAY,
-                    wallet: {
-                        totalCoins: updatedCoins.totalCoins,
-                        permanentCoins: updatedCoins.permanentCoins,
-                        temporaryCoins: updatedCoins.temporaryCoins,
+                    data: {
+                        coinsGranted: 0,
+                        currentViews: todayAction.count,
+                        maxViews: this.MAX_AD_VIEWS_PER_DAY,
+                        wallet: {
+                            totalCoins: updatedCoins.totalCoins,
+                            permanentCoins: updatedCoins.permanentCoins,
+                            temporaryCoins: updatedCoins.temporaryCoins,
+                        },
                     },
                 };
             }
@@ -556,13 +558,15 @@ export class UserService extends BaseCrudService<User> {
             return {
                 success: true,
                 message: `Ad watched successfully! You received ${coinsToGrant} coins.`,
-                coinsGranted: coinsToGrant,
-                currentViews: todayAction.count,
-                maxViews: this.MAX_AD_VIEWS_PER_DAY,
-                wallet: {
-                    totalCoins: updatedCoins.totalCoins,
-                    permanentCoins: updatedCoins.permanentCoins,
-                    temporaryCoins: updatedCoins.temporaryCoins,
+                data: {
+                    coinsGranted: coinsToGrant,
+                    currentViews: todayAction.count,
+                    maxViews: this.MAX_AD_VIEWS_PER_DAY,
+                    wallet: {
+                        totalCoins: updatedCoins.totalCoins,
+                        permanentCoins: updatedCoins.permanentCoins,
+                        temporaryCoins: updatedCoins.temporaryCoins,
+                    },
                 },
             };
         });

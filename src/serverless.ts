@@ -3,7 +3,6 @@ import { NestFactory } from '@nestjs/core';
 import serverlessExpress from '@vendia/serverless-express';
 import { Callback, Context, Handler } from 'aws-lambda';
 import { AppModule } from './app.module';
-import { JSendInterceptor } from './common/interceptors/jsend.interceptor';
 import { CronService } from './cron/cron.service';
 
 let server: Handler;
@@ -20,7 +19,6 @@ async function bootstrap() {
             forbidNonWhitelisted: false,
         }),
     );
-    app.useGlobalInterceptors(new JSendInterceptor());
     app.setGlobalPrefix('api/v1');
     await app.init();
 

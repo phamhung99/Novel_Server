@@ -18,12 +18,14 @@ import { parseQueryOptions } from 'src/common/utils/parse-query-options.util';
 import { ERROR_MESSAGES } from 'src/common/constants/app.constant';
 import { UpdateUserGenresDto } from './dto/update-user-genres.dto';
 import { IapStore } from 'src/common/enums/app.enum';
+import { SkipTransform } from 'src/common/decorators/skip-transform.decorator';
 
 @Controller('users')
 export class UserController {
     constructor(private readonly userService: UserService) {}
 
     @Post('ads/watch')
+    @SkipTransform()
     async watchAds(@Headers('x-user-id') userId: string) {
         if (!userId) {
             throw new BadRequestException(ERROR_MESSAGES.USER_ID_REQUIRED);

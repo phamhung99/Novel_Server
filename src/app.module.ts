@@ -14,6 +14,8 @@ import { AuthModule } from './auth/auth.module';
 import { PaymentsModule } from './payments/payments.module';
 import { MasterDataModule } from './master-data/master-data.module';
 import { CronModule } from './cron/cron.module';
+import { TransformInterceptor } from './common/interceptors/transform.interceptor';
+import { APP_INTERCEPTOR } from '@nestjs/core';
 
 @Module({
     imports: [
@@ -57,6 +59,12 @@ import { CronModule } from './cron/cron.module';
         CronModule,
     ],
     controllers: [HealthController],
+    providers: [
+        {
+            provide: APP_INTERCEPTOR,
+            useClass: TransformInterceptor,
+        },
+    ],
 })
 export class AppModule {
     configure(consumer: MiddlewareConsumer) {
