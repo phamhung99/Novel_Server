@@ -379,6 +379,11 @@ export class StoryCrudService {
         updateStoryDto: UpdateStoryDto,
     ): Promise<Story> {
         const story = await this.findStoryById(id);
+
+        if (updateStoryDto.visibility === StoryVisibility.PUBLIC) {
+            story.status = StoryStatus.PENDING;
+        }
+
         Object.assign(story, updateStoryDto);
         return this.storyRepository.save(story);
     }
