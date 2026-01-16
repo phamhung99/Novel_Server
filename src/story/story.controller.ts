@@ -244,6 +244,7 @@ export class StoryController {
         @Query('requestId') queryRequestId?: string,
     ): Promise<GenerateChapterResponseDto> {
         const requestId = queryRequestId ?? headerRequestId;
+
         if (!requestId) {
             throw new BadRequestException('requestId is required');
         }

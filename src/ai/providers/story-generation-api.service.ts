@@ -423,130 +423,6 @@ Architecture Alignment: Verify events serve story's core objectives from origina
         }
     }
 
-    //     async generateChapter(
-    //         dto: GenerateChapterDto,
-    //     ): Promise<ChapterStructureResponseDto> {
-    //         // Fetch story attributes from DB if not provided in DTO
-    //         let storyAttributes = dto.storyAttributes;
-    //         if (!storyAttributes) {
-    //             // Try to fetch from the StoryGeneration record for this story
-    //             const generation = await this.storyGenerationRepository.findOne({
-    //                 where: { storyId: dto.storyId },
-    //             });
-
-    //             if (generation) {
-    //                 // Reconstruct attributes from direct columns
-    //                 storyAttributes = {
-    //                     title: generation.title,
-    //                     synopsis: generation.synopsis,
-    //                     genres: generation.genres || [],
-    //                     mainCharacter: generation.mainCharacter,
-    //                     subCharacters: generation.subCharacters,
-    //                     setting: generation.setting,
-    //                     plotTheme: generation.plotTheme,
-    //                     writingStyle: generation.writingStyle,
-    //                     additionalContext: generation.additionalContext,
-    //                 };
-    //             } else {
-    //                 throw new NotFoundException(
-    //                     `Story attributes not found for story ${dto.storyId}. Please provide storyAttributes in the request.`,
-    //                 );
-    //             }
-    //         }
-
-    //         // Create a temporary DTO with fetched attributes for prompt building
-    //         const dtoWithAttributes = { ...dto, storyAttributes };
-
-    //         const providerName = dto.aiProvider || 'gpt';
-    //         const aiProvider =
-    //             this.storyGenerationProviderFactory.getProvider(providerName);
-
-    //         const systemPrompt = `Bạn là một người viết truyện chuyên nghiệp.
-    // Nhiệm vụ của bạn là viết các chương truyện hấp dẫn, với cấu trúc rõ ràng và nội dung phong phú.`;
-
-    //         const userPrompt = this.buildChapterPrompt(dtoWithAttributes);
-
-    //         try {
-    //             const response = await aiProvider.generateContent(
-    //                 systemPrompt,
-    //                 userPrompt,
-    //             );
-
-    //             return this.parseChapterResponse(response, dto.chapterNumber);
-    //         } catch (error) {
-    //             this.logger.error('Error generating chapter:', error);
-    //             throw new BadRequestException(
-    //                 `Failed to generate chapter: ${error.message}`,
-    //             );
-    //         }
-    //     }
-
-    //     private buildChapterPrompt(dto: GenerateChapterDto): string {
-    //         const storyContext = `
-    // **Thông tin truyện:**
-    // - Tiêu đề: ${dto.storyAttributes.title}
-    // - Tóm tắt: ${dto.storyAttributes.synopsis}
-    // - Thể loại: ${dto.storyAttributes.genres.join(', ')}
-    // ${dto.storyAttributes.mainCharacter ? `- Nhân vật chính: ${dto.storyAttributes.mainCharacter}` : ''}
-    // ${dto.storyAttributes.setting ? `- Bối cảnh: ${dto.storyAttributes.setting}` : ''}
-    // ${dto.storyAttributes.plotTheme ? `- Chủ đề cốt truyện: ${dto.storyAttributes.plotTheme}` : ''}
-    // ${dto.storyAttributes.writingStyle ? `- Phong cách viết: ${dto.storyAttributes.writingStyle}` : ''}
-    // ${dto.storyAttributes.additionalContext ? `- Thêm thông tin: ${dto.storyAttributes.additionalContext}` : ''}
-    // `;
-
-    //         const previousChaptersContext =
-    //             dto.previousChaptersSummaries &&
-    //             dto.previousChaptersSummaries.length > 0
-    //                 ? `
-    // **Tóm tắt các chương trước:**
-    // ${dto.previousChaptersSummaries.map((summary, index) => `${index + 1}. ${summary}`).join('\n')}
-    // `
-    //                 : '';
-
-    //         return `${storyContext}${previousChaptersContext}
-    // Từ thông tin truyện và các chương trước, xây dựng cấu trúc chương ${dto.chapterNumber} theo cấu trúc cơ bản sau.
-    // Bạn có thể thêm vào cấu trúc các mục cần thiết để tăng tính hấp dẫn và phù hợp với nội dung.
-    // Đảm bảo chương ${dto.chapterNumber} kế tiếp một cách tự nhiên từ các chương trước.
-
-    // **Cấu trúc chương (${dto.wordCount || 300} từ)**:
-    // - **Mở đầu hấp dẫn**:
-    // - **Miêu tả bối cảnh**:
-    // - **Giới thiệu nhân vật**:
-    // - **Hướng phát triển cốt truyện**:`;
-    //     }
-
-    // private parseChapterResponse(
-    //     content: string,
-    //     chapterNumber: number,
-    // ): ChapterStructureResponseDto {
-    //     try {
-    //         return {
-    //             chapterNumber,
-    //             openingHook: this.extractSection(content, 'Mở đầu hấp dẫn'),
-    //             sceneSetting: this.extractSection(content, 'Miêu tả bối cảnh'),
-    //             characterIntroduction: this.extractSection(
-    //                 content,
-    //                 'Giới thiệu nhân vật',
-    //             ),
-    //             plotDevelopment: this.extractSection(
-    //                 content,
-    //                 'Hướng phát triển cốt truyện',
-    //             ),
-    //             content,
-    //         };
-    //     } catch (error) {
-    //         this.logger.error('Error parsing chapter response:', error);
-    //         return {
-    //             chapterNumber,
-    //             openingHook: '',
-    //             sceneSetting: '',
-    //             characterIntroduction: '',
-    //             plotDevelopment: '',
-    //             content,
-    //         };
-    //     }
-    // }
-
     private extractSection(content: string, sectionName: string): string {
         // Support multiple section names separated by |
         // E.g., "Tên truyện|Tiêu đề" will match either "Tên truyện" or "Tiêu đề"
@@ -654,14 +530,11 @@ Architecture Alignment: Verify events serve story's core objectives from origina
                 return {
                     chapterNumber,
 
-                    title: extract('Tiêu đề chương|Chapter Title'),
-                    content: extract('Nội dung|Content'),
-
+                    title: extract('chapterTitle'),
+                    content: extract('content'),
                     structure: {
-                        chapterNumber,
-                        rawContent: content,
+                        continuitySnapshot: extract('continuitySnapshot'),
                     },
-
                     raw: content,
                 };
             } catch (error) {
@@ -671,10 +544,7 @@ Architecture Alignment: Verify events serve story's core objectives from origina
                     chapterNumber,
                     title: '',
                     content: '',
-                    structure: {
-                        chapterNumber,
-                        rawContent: content,
-                    },
+                    structure: {},
                     raw: content,
                 };
             }

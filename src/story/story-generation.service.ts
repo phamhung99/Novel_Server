@@ -37,6 +37,7 @@ import { ILike } from 'typeorm';
 import { Category } from './entities/categories.entity';
 import { StoryCategory } from './entities/story-category.entity';
 import { MediaService } from 'src/media/media.service';
+import { isEmptyObject } from 'src/ai/utils/object.utils';
 
 @Injectable()
 export class StoryGenerationService {
@@ -477,6 +478,17 @@ export class StoryGenerationService {
             }
 
             response = chapterStructureResponse.raw;
+
+            if (
+                !chapterStructureResponse ||
+                !chapterStructureResponse.content ||
+                chapterStructureResponse.content.trim().length === 0 ||
+                isEmptyObject(chapterStructureResponse.structure)
+            ) {
+                throw new BadRequestException(
+                    'Generated chapter missing content or structure, please try again.',
+                );
+            }
 
             // Generate chapter summary every 5 chapters
             if (chapterNumber % 5 === 0) {
