@@ -62,5 +62,4 @@ export class InitializeStoryResponseDto {
     synopsis: string;
     metadata: any;
     outline: string;
-    message: string;
 }

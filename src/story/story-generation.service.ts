@@ -343,8 +343,6 @@ export class StoryGenerationService {
                     storyContext: outlineResponse.storyContext,
                 },
                 outline: outlineResponse.outline,
-                message:
-                    'Story outline generated successfully. Ready to generate chapters on-demand.',
             };
         } catch (error) {
             console.error('Error initializing story:', error);
@@ -541,7 +539,6 @@ export class StoryGenerationService {
                 content: chapterStructureResponse.content,
                 summary: chapterStructureResponse.structure.summary,
                 structure: chapterStructureResponse.structure,
-                message: `Chapter ${chapterNumber} generated successfully.`,
             };
         } catch (error) {
             console.error('Error generating chapter:', error);
@@ -733,7 +730,6 @@ export class StoryGenerationService {
             title: generation.chapter.title,
             content: generation.chapter.content,
             structure: generation.structure || ({} as any),
-            message: `Chapter ${generation.chapter.index} generated successfully.`,
         };
     }
 
@@ -823,7 +819,6 @@ export class StoryGenerationService {
 
         return {
             coverImageUrl: newCoverImageUrl,
-            message: 'Cover image regenerated successfully',
         };
     }
 }

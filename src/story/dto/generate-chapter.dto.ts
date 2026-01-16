@@ -51,5 +51,4 @@ export class GenerateChapterResponseDto {
     title: string;
     content: string;
     structure: ChapterStructure;
-    message: string;
 }

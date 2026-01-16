@@ -102,7 +102,6 @@ export class StoryController {
         );
 
         return {
-            message: 'Cover image uploaded successfully',
             coverImageUrl,
         };
     }
@@ -176,7 +175,6 @@ export class StoryController {
         if (skipImage) {
             return {
                 coverImageUrl: DEFAULT_COVER_IMAGE_URL,
-                message: 'Cover image regenerated successfully',
             };
         }
         return this.storyService.generateStoryCoverImage(
