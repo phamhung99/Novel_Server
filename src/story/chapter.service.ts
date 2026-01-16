@@ -108,14 +108,13 @@ export class ChapterService {
         }
 
         const generation = chapter.chapterGenerations?.[0];
-        const nextOptions = generation?.structure?.nextOptions ?? [];
 
         const { chapterGenerations: _chapterGenerations, ...chapterData } =
             chapter;
 
         return {
             ...chapterData,
-            nextOptions,
+            structure: generation?.structure || null,
         };
     }
 
