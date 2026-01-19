@@ -10,6 +10,7 @@ import { User } from './entities/user.entity';
 import { BaseCrudService } from 'src/common/services/base-crud.service';
 import { UserCategoryPreference } from './entities/user-category-preference.entity';
 import {
+    DEFAULT_PROFILE_IMAGE_URL,
     ERROR_MESSAGES,
     MS_PER_DAY,
     TEMPORARY_COIN_DAYS,
@@ -670,7 +671,8 @@ export class UserService extends BaseCrudService<User> {
         if (
             newProfileImageKey &&
             user.profileImage &&
-            user.profileImage !== newProfileImageKey
+            user.profileImage !== newProfileImageKey &&
+            user.profileImage !== DEFAULT_PROFILE_IMAGE_URL
         ) {
             this.mediaService.delete(user.profileImage).catch((err) => {
                 this.logger.error(
