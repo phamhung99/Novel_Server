@@ -4,6 +4,7 @@ import { Repository } from 'typeorm';
 import { Chapter } from './entities/chapter.entity';
 import { CreateChapterDto } from './dto/create-chapter.dto';
 import { UpdateChapterDto } from './dto/update-chapter.dto';
+import { GenerateChapterResponseDto } from './dto/generate-chapter.dto';
 
 @Injectable()
 export class ChapterService {
@@ -90,7 +91,10 @@ export class ChapterService {
         }
     }
 
-    async findChapterByIndex(storyId: string, index: number) {
+    async findChapterByIndex(
+        storyId: string,
+        index: number,
+    ): Promise<GenerateChapterResponseDto> {
         const chapter = await this.chapterRepository.findOne({
             where: { storyId, index },
             relations: ['chapterGenerations'],
@@ -109,11 +113,14 @@ export class ChapterService {
 
         const generation = chapter.chapterGenerations?.[0];
 
-        const { chapterGenerations: _chapterGenerations, ...chapterData } =
-            chapter;
-
         return {
-            ...chapterData,
+            id: chapter.id,
+            storyId: chapter.storyId,
+            index: chapter.index,
+            title: chapter.title,
+            content: chapter.content,
+            createdAt: chapter.createdAt,
+            updatedAt: chapter.updatedAt,
             structure: generation?.structure || null,
         };
     }

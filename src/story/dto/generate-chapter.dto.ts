@@ -23,20 +23,6 @@ export class GenerateChapterDto {
     direction: string; // Additional direction for chapter generation
 }
 
-export interface ChapterStructure {
-    summary: string;
-    directions: string[];
-    writingStyle: string;
-    tone: string;
-    plotLogic: string;
-    emotionalMotif: string;
-    mainCharacterArc: string;
-    subCharacterArc: string;
-    antagonistAction: string;
-    emotionChart: string;
-    philosophicalSubtheme: string;
-}
-
 export interface ChapterStructureResponse {
     chapterNumber: number;
     title: string;
@@ -47,8 +33,11 @@ export interface ChapterStructureResponse {
 
 export class GenerateChapterResponseDto {
     id: string;
+    storyId: string;
     index: number;
     title: string;
     content: string;
-    structure: ChapterStructure;
+    structure: any;
+    createdAt: Date;
+    updatedAt: Date;
 }

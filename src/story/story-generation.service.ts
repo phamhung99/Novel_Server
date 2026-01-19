@@ -22,7 +22,6 @@ import {
     InitializeStoryResponseDto,
 } from './dto/generate-story-outline.dto';
 import {
-    ChapterStructureResponse,
     GenerateChapterDto,
     GenerateChapterResponseDto,
 } from './dto/generate-chapter.dto';
@@ -229,7 +228,7 @@ export class StoryGenerationService {
         userId: string,
         requestId: string,
         dto: InitializeStoryDto,
-    ): Promise<InitializeStoryResponseDto> {
+    ) {
         const exists = await this.storyGenerationRepository.findOne({
             where: { requestId },
         });
@@ -335,14 +334,7 @@ export class StoryGenerationService {
             await this.storyRepository.save(savedStory);
 
             return {
-                id: savedStory.id,
-                title: story.title,
-                synopsis: story.synopsis,
-                metadata: {
-                    coverImage: outlineResponse.coverImage,
-                    storyContext: outlineResponse.storyContext,
-                },
-                outline: outlineResponse.outline,
+                message: 'Story initialized successfully',
             };
         } catch (error) {
             console.error('Error initializing story:', error);
@@ -440,7 +432,7 @@ export class StoryGenerationService {
             }
             const totalChapters = storyGeneration.prompt.numberOfChapters;
 
-            let chapterStructureResponse: ChapterStructureResponse;
+            let chapterStructureResponse: any = null;
 
             const storyMetadata = JSON.stringify(
                 storyGeneration.metadata?.storyContext ?? '',
@@ -533,12 +525,7 @@ export class StoryGenerationService {
             );
 
             return {
-                chapterId: savedChapter.id,
-                index: chapterNumber,
-                title: chapterStructureResponse.title,
-                content: chapterStructureResponse.content,
-                summary: chapterStructureResponse.structure.summary,
-                structure: chapterStructureResponse.structure,
+                message: 'Chapter generated successfully',
             };
         } catch (error) {
             console.error('Error generating chapter:', error);
@@ -603,7 +590,10 @@ export class StoryGenerationService {
         });
     }
 
-    async previewStory(id: string, skipImage: boolean = false): Promise<any> {
+    async previewStory(
+        id: string,
+        skipImage: boolean = false,
+    ): Promise<InitializeStoryResponseDto> {
         const story = await this.storyRepository.findOne({
             where: { id },
             relations: {
@@ -667,7 +657,7 @@ export class StoryGenerationService {
     async getInitializationResults(
         requestId: string,
         skipImage: boolean,
-    ): Promise<any> {
+    ): Promise<InitializeStoryResponseDto> {
         const generation = await this.storyGenerationRepository.findOne({
             where: { requestId },
         });
@@ -726,10 +716,13 @@ export class StoryGenerationService {
 
         return {
             id: generation.chapter.id,
+            storyId: generation.chapter.storyId,
             index: generation.chapter.index,
             title: generation.chapter.title,
             content: generation.chapter.content,
             structure: generation.structure || ({} as any),
+            createdAt: generation.chapter.createdAt,
+            updatedAt: generation.chapter.updatedAt,
         };
     }
 
