@@ -577,14 +577,6 @@ export class StoryDiscoveryService {
             publishedWithin = published_within;
         }
 
-        // Subquery đếm chính xác số chapter của từng story
-        const chapterCountSubQuery = this.dataSource
-            .getRepository(Chapter)
-            .createQueryBuilder('ch')
-            .select('ch.story_id', 'story_id')
-            .addSelect('COUNT(ch.id)', 'chapter_count')
-            .groupBy('ch.story_id');
-
         const qb = this.dataSource
             .getRepository(Story)
             .createQueryBuilder('s')
@@ -619,11 +611,6 @@ export class StoryDiscoveryService {
                         .groupBy('c.story_id'),
                 'ss',
                 'ss.story_id = s.id',
-            )
-            .leftJoin(
-                `(${chapterCountSubQuery.getQuery()})`,
-                'chapcnt',
-                'chapcnt.story_id = s.id',
             )
             .leftJoin(
                 (subQb) =>
@@ -667,11 +654,12 @@ export class StoryDiscoveryService {
                 's.likes_count AS "likesCount"',
                 's.views_count AS "viewsCount"',
 
-                // Số chapter thực tế
-                'COALESCE(chapcnt.chapter_count::integer, 0) AS "chapterCount"',
+                'ss.chapter_count AS "chapterCount"',
 
-                // isCompleted chính xác
-                '(COALESCE(chapcnt.chapter_count::integer, 0) = COALESCE((generation.prompt ->> \'numberOfChapters\')::int, 0)) AS "isCompleted"',
+                `(
+                    COALESCE(ss.chapter_count, 0) >= 
+                    COALESCE((generation.prompt ->> 'numberOfChapters')::int, 0)
+                ) AS "isCompleted"`,
             ])
             .where('s.visibility = :visibility', {
                 visibility: StoryVisibility.PUBLIC,
@@ -706,7 +694,7 @@ export class StoryDiscoveryService {
 
         if (chapterFilterValue !== undefined && chapterFilterOperator) {
             qb.andWhere(
-                `COALESCE(chapcnt.chapter_count::integer, 0) ${chapterFilterOperator} :chapterFilterValue`,
+                `COALESCE(ss.chapter_count, 0) ${chapterFilterOperator} :chapterFilterValue`,
                 { chapterFilterValue },
             );
         }
@@ -726,11 +714,11 @@ export class StoryDiscoveryService {
         // === Status filter: completed / ongoing ===
         if (status === StoryStatusFilter.COMPLETED) {
             qb.andWhere(
-                "COALESCE(chapcnt.chapter_count::integer, 0) = COALESCE((generation.prompt ->> 'numberOfChapters')::int, 0)",
+                `COALESCE(ss.chapter_count, 0) = COALESCE((generation.prompt ->> 'numberOfChapters')::int, 0)`,
             );
         } else if (status === StoryStatusFilter.ONGOING) {
             qb.andWhere(
-                "COALESCE(chapcnt.chapter_count::integer, 0) < COALESCE((generation.prompt ->> 'numberOfChapters')::int, 0)",
+                `COALESCE(ss.chapter_count, 0) < COALESCE((generation.prompt ->> 'numberOfChapters')::int, 0)`,
             );
         }
 
@@ -812,7 +800,7 @@ export class StoryDiscoveryService {
             .addGroupBy('ss.chapter_count')
             .addGroupBy('main_cat.id')
             .addGroupBy('main_cat.name')
-            .addGroupBy('chapcnt.chapter_count')
+            .addGroupBy('ss.chapter_count')
 
             .offset(offset)
             .limit(limit)
