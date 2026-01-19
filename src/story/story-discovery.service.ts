@@ -16,6 +16,7 @@ import { Chapter } from './entities/chapter.entity';
 import { ChapterViews } from './entities/chapter-views.entity';
 import { MediaService } from 'src/media/media.service';
 import { StoryPreviewDto } from './dto/story-preview.dto';
+import { PaginatedStoryPreviewResponse } from './dto/paginated-story-preview.response';
 
 @Injectable()
 export class StoryDiscoveryService {
@@ -76,7 +77,7 @@ export class StoryDiscoveryService {
         userId: string,
         type: LibraryType,
         { page = 1, limit = 20 }: { page?: number; limit?: number } = {},
-    ) {
+    ): Promise<PaginatedStoryPreviewResponse> {
         const offset = (page - 1) * limit;
 
         // ===== Query chính (story-level, giống getRecentStories) =====
@@ -229,7 +230,7 @@ export class StoryDiscoveryService {
     async getTopTrending(
         userId: string,
         { page = 1, limit = 20 }: { page?: number; limit?: number } = {},
-    ) {
+    ): Promise<PaginatedStoryPreviewResponse> {
         const offset = (page - 1) * limit;
 
         const qb = this.dataSource
@@ -381,7 +382,7 @@ export class StoryDiscoveryService {
         userId: string,
         categoryId: string,
         { page = 1, limit = 20 }: { page?: number; limit?: number } = {},
-    ) {
+    ): Promise<PaginatedStoryPreviewResponse> {
         const offset = (page - 1) * limit;
 
         const qb = this.dataSource
@@ -568,7 +569,7 @@ export class StoryDiscoveryService {
             page = 1,
             limit = 20,
         }: DiscoverStoriesDto,
-    ) {
+    ): Promise<PaginatedStoryPreviewResponse> {
         const offset = (page - 1) * limit;
 
         // Handle deprecated 'published_within' parameter

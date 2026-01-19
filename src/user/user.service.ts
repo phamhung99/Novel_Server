@@ -25,6 +25,7 @@ import { UserDailyAction } from './entities/user-daily-action.entity';
 import { addDays } from 'src/common/utils/date.utils';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { StoryPreviewDto } from 'src/story/dto/story-preview.dto';
+import { PaginatedStoryPreviewResponse } from 'src/story/dto/paginated-story-preview.response';
 
 @Injectable()
 export class UserService extends BaseCrudService<User> {
@@ -198,7 +199,7 @@ export class UserService extends BaseCrudService<User> {
     async getRecentStories(
         userId: string,
         { page = 1, limit = 20 }: { page?: number; limit?: number } = {},
-    ) {
+    ): Promise<PaginatedStoryPreviewResponse> {
         try {
             const offset = (page - 1) * limit;
 
