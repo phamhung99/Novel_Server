@@ -24,6 +24,7 @@ import { MediaService } from 'src/media/media.service';
 import { UserDailyAction } from './entities/user-daily-action.entity';
 import { addDays } from 'src/common/utils/date.utils';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { StoryPreviewDto } from 'src/story/dto/story-preview.dto';
 
 @Injectable()
 export class UserService extends BaseCrudService<User> {
@@ -294,18 +295,47 @@ export class UserService extends BaseCrudService<User> {
                 );
             }
 
-            const items = await Promise.all(
+            const items: StoryPreviewDto[] = await Promise.all(
                 stories.map(async (story) => ({
-                    ...story,
-                    coverImage: undefined,
+                    storyId: story.storyId,
+                    title: story.title,
+                    synopsis: story.synopsis,
+                    rating: story.rating,
+                    type: story.type,
+                    status: story.status,
+                    createdAt: story.createdAt,
+                    updatedAt: story.updatedAt,
+                    visibility: story.visibility,
+                    likesCount: story.likesCount,
+                    viewsCount: story.viewsCount,
+                    sourceType: story.sourceType,
+
+                    categories: story.categories || [],
+                    mainCategory: story.mainCategory || null,
+
+                    authorId: story.authorId,
+                    authorUsername: story.authorUsername,
+
+                    lastReadAt: story.lastReadAt ?? null,
+                    lastReadChapter: story.lastReadChapter ?? null,
+
+                    isLike: !!story.isLike,
+                    isCompleted: !!story.isCompleted,
+
+                    profileImageUrl: story.profileImage
+                        ? await this.mediaService.getMediaUrl(
+                              story.profileImage,
+                          )
+                        : null,
                     coverImageUrl: story.coverImage
                         ? await this.mediaService.getMediaUrl(story.coverImage)
                         : null,
+
                     chapters: chaptersMap[story.storyId] || [],
+
                     canEdit: story.authorId === userId,
                 })),
             );
-
             return { page, limit, total, items };
         } catch (error) {
             console.error('Failed to get recent stories:', error);
