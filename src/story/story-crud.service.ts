@@ -380,7 +380,10 @@ export class StoryCrudService {
     ): Promise<Story> {
         const story = await this.findStoryById(id);
 
-        if (updateStoryDto.visibility === StoryVisibility.PUBLIC) {
+        if (
+            updateStoryDto.visibility === StoryVisibility.PUBLIC &&
+            story.status !== StoryStatus.PUBLISHED
+        ) {
             story.status = StoryStatus.PENDING;
         }
 
