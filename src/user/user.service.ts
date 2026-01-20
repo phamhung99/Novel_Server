@@ -26,6 +26,8 @@ import { UpdateUserDto } from './dto/update-user.dto';
 import { PaginatedStoryPreviewResponse } from 'src/story/dto/paginated-story-preview.response';
 import { enrichStoriesToPreviewDto } from 'src/common/mappers/story-preview.mapper';
 import { Chapter } from 'src/story/entities/chapter.entity';
+import { WalletDto } from './dto/wallet.dto';
+import { RewardResponseDto } from './dto/weekly-checkin.dto';
 
 @Injectable()
 export class UserService extends BaseCrudService<User> {
@@ -459,11 +461,7 @@ export class UserService extends BaseCrudService<User> {
                 isSubUser: false,
                 basePlanId: null,
             },
-            wallet: {
-                totalCoins: coinsData.totalCoins,
-                permanentCoins: coinsData.permanentCoins,
-                temporaryCoins: coinsData.temporaryCoins,
-            },
+            wallet: coinsData,
             preferredCategories,
         };
     }
@@ -495,11 +493,7 @@ export class UserService extends BaseCrudService<User> {
                         coinsGranted: 0,
                         currentViews: todayAction.count,
                         maxViews: this.MAX_AD_VIEWS_PER_DAY,
-                        wallet: {
-                            totalCoins: updatedCoins.totalCoins,
-                            permanentCoins: updatedCoins.permanentCoins,
-                            temporaryCoins: updatedCoins.temporaryCoins,
-                        },
+                        wallet: updatedCoins,
                     },
                 };
             }
@@ -539,11 +533,7 @@ export class UserService extends BaseCrudService<User> {
                     coinsGranted: coinsToGrant,
                     currentViews: todayAction.count,
                     maxViews: this.MAX_AD_VIEWS_PER_DAY,
-                    wallet: {
-                        totalCoins: updatedCoins.totalCoins,
-                        permanentCoins: updatedCoins.permanentCoins,
-                        temporaryCoins: updatedCoins.temporaryCoins,
-                    },
+                    wallet: updatedCoins,
                 },
             };
         });
@@ -552,11 +542,7 @@ export class UserService extends BaseCrudService<User> {
     async calculateUserCoins(
         userId: string,
         options: { manager?: EntityManager } = {},
-    ): Promise<{
-        totalCoins: number;
-        permanentCoins: number;
-        temporaryCoins: Array<{ amount: number; expiresAt: string }>;
-    }> {
+    ): Promise<WalletDto> {
         const now = new Date();
 
         // Chọn repository phù hợp
@@ -585,6 +571,7 @@ export class UserService extends BaseCrudService<User> {
         const temporaryCoinsForDisplay = activeTemporary.map((c) => ({
             id: c.id,
             amount: c.remaining,
+            source: c.source,
             expiresAt: c.expiresAt!.toISOString(),
             createdAt: c.createdAt.toISOString(),
         }));
@@ -658,5 +645,62 @@ export class UserService extends BaseCrudService<User> {
         }
 
         return this.getUserInfo(savedUser);
+    }
+
+    async getReward(userId: string): Promise<RewardResponseDto> {
+        const user = await this.repository.findOne({ where: { id: userId } });
+        if (!user) {
+            throw new NotFoundException(ERROR_MESSAGES.USER_NOT_FOUND);
+        }
+
+        const streakInfo = await this.calculateLoginStreakAndBonus(userId);
+        const { currentStreak, todayBonus } = streakInfo;
+
+        let currentDay = 1;
+
+        if (currentStreak > 0) {
+            const remainder = currentStreak % 7;
+            currentDay = remainder === 0 ? 7 : remainder;
+        }
+
+        const hasCheckedToday = todayBonus === null;
+
+        const weekDays = this.LOGIN_STREAK_BONUS_SCHEDULE.map((coin, index) => {
+            const day = index + 1;
+            const isChecked =
+                day < currentDay || (day === currentDay && hasCheckedToday);
+
+            return {
+                day,
+                isChecked,
+                coin,
+            };
+        });
+
+        const todayStr = new Date().toISOString().split('T')[0];
+        const todayAdAction = await this.userDailyActionRepo.findOne({
+            where: {
+                userId,
+                actionType: ActionType.WATCH_AD,
+                actionDate: todayStr,
+            },
+        });
+
+        const currentViews = todayAdAction?.count || 0;
+
+        const wallet = await this.calculateUserCoins(userId);
+
+        return {
+            checkIn: {
+                currentDay,
+                weekDays,
+            },
+            adInfo: {
+                coinsGranted: this.AD_REWARD_COINS,
+                currentViews,
+                maxViews: this.MAX_AD_VIEWS_PER_DAY,
+            },
+            wallet,
+        };
     }
 }

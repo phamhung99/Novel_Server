@@ -36,6 +36,15 @@ import { UpdateUserDto } from './dto/update-user.dto';
 export class UserController {
     constructor(private readonly userService: UserService) {}
 
+    @Get('reward')
+    async getReward(@Headers('x-user-id') userId: string) {
+        if (!userId) {
+            throw new BadRequestException(ERROR_MESSAGES.USER_ID_REQUIRED);
+        }
+
+        return this.userService.getReward(userId);
+    }
+
     @Post('ads/watch')
     @SkipTransform()
     async watchAds(@Headers('x-user-id') userId: string) {
