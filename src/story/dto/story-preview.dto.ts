@@ -41,7 +41,5 @@ export class StoryPreviewDto {
     profileImageUrl: string | null;
     coverImageUrl: string | null;
 
-    chapters: StoryPreviewChapterDto[];
-
     canEdit: boolean;
 }

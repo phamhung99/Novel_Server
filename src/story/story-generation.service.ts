@@ -407,7 +407,7 @@ export class StoryGenerationService {
             }
 
             const existingChapters =
-                await this.chapterService.findChaptersByStory(storyId);
+                await this.chapterService.findDetailChaptersByStory(storyId);
 
             const chapterNumber = existingChapters.length + 1;
             const isFirstChapter = chapterNumber === 1;

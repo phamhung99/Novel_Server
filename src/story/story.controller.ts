@@ -491,7 +491,22 @@ export class StoryController {
             throw new BadRequestException(ERROR_MESSAGES.STORY_ID_REQUIRED);
         }
 
-        return this.chapterService.findChaptersByStory(storyId);
+        return this.chapterService.findDetailChaptersByStory(storyId);
+    }
+
+    @Get(':storyId/chapters')
+    async getChaptersWithLockForUser(
+        @Param('storyId') storyId: string,
+        @Headers('x-user-id') userId: string,
+    ) {
+        if (!storyId) {
+            throw new BadRequestException(ERROR_MESSAGES.STORY_ID_REQUIRED);
+        }
+
+        return this.chapterService.getChaptersWithLockForUser({
+            storyId,
+            userId,
+        });
     }
 
     @Get(':storyId/chapter/:index')
