@@ -56,11 +56,17 @@ export class InitializeStoryDto {
     aiProvider: 'grok' | 'gpt' | 'gemini' = 'gemini';
 }
 
+class CategoryDto {
+    id: string;
+    name: string;
+}
+
 export class InitializeStoryResponseDto {
     id: string;
     title: string;
     synopsis: string;
-    metadata: any;
-    outline: string;
-    message: string;
+    numberOfChapters: number;
+    mainCategory: CategoryDto;
+    categories: CategoryDto[];
+    coverImageUrl: string;
 }

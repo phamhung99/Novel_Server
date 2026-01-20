@@ -43,8 +43,8 @@ export class StoryGeneration {
     @Column({ type: 'jsonb' })
     prompt: Record<string, any>;
 
-    @Column({ type: 'jsonb', nullable: true })
-    response: Record<string, any>;
+    @Column({ type: 'text', nullable: true })
+    response: string | null;
 
     @Column({ name: 'tokens_used', type: 'int', nullable: true })
     tokensUsed: number;

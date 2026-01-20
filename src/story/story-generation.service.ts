@@ -22,7 +22,6 @@ import {
     InitializeStoryResponseDto,
 } from './dto/generate-story-outline.dto';
 import {
-    ChapterStructureResponse,
     GenerateChapterDto,
     GenerateChapterResponseDto,
 } from './dto/generate-chapter.dto';
@@ -37,6 +36,8 @@ import { ILike } from 'typeorm';
 import { Category } from './entities/categories.entity';
 import { StoryCategory } from './entities/story-category.entity';
 import { MediaService } from 'src/media/media.service';
+import { isEmptyObject } from 'src/ai/utils/object.utils';
+import { cleanNextOptions } from 'src/common/utils/chapter.utils';
 
 @Injectable()
 export class StoryGenerationService {
@@ -228,7 +229,7 @@ export class StoryGenerationService {
         userId: string,
         requestId: string,
         dto: InitializeStoryDto,
-    ): Promise<InitializeStoryResponseDto> {
+    ) {
         const exists = await this.storyGenerationRepository.findOne({
             where: { requestId },
         });
@@ -263,6 +264,8 @@ export class StoryGenerationService {
 
         const savedStoryGeneration =
             await this.storyGenerationRepository.save(storyGeneration);
+
+        let response: any = null;
         try {
             if (!userId) {
                 throw new Error('userId is required');
@@ -288,14 +291,7 @@ export class StoryGenerationService {
                     aiProvider: dto.aiProvider || DEFAULT_AI_PROVIDER,
                 });
 
-            await this.storyGenerationRepository.update(
-                { id: savedStoryGeneration.id },
-                {
-                    response: {
-                        outline: outlineResponse.outline,
-                    } as any,
-                },
-            );
+            response = outlineResponse.outline;
 
             const storyCategoryEntities = await this.buildStoryCategories(
                 outlineResponse.storyContext?.meta,
@@ -329,6 +325,7 @@ export class StoryGenerationService {
                         coverImage: outlineResponse.coverImage,
                         storyContext: outlineResponse.storyContext,
                     } as any,
+                    response,
                     status: GenerationStatus.COMPLETED,
                 },
             );
@@ -338,16 +335,7 @@ export class StoryGenerationService {
             await this.storyRepository.save(savedStory);
 
             return {
-                id: savedStory.id,
-                title: story.title,
-                synopsis: story.synopsis,
-                metadata: {
-                    coverImage: outlineResponse.coverImage,
-                    storyContext: outlineResponse.storyContext,
-                },
-                outline: outlineResponse.outline,
-                message:
-                    'Story outline generated successfully. Ready to generate chapters on-demand.',
+                message: 'Story initialized successfully',
             };
         } catch (error) {
             console.error('Error initializing story:', error);
@@ -357,6 +345,7 @@ export class StoryGenerationService {
                 {
                     status: GenerationStatus.FAILED,
                     errorMessage: error.message || 'Failed to initialize story',
+                    response,
                 },
             );
 
@@ -377,6 +366,8 @@ export class StoryGenerationService {
         dto: GenerateChapterDto,
     ): Promise<GenerateChapterResponseDto | any> {
         let savedPreGen: any = null;
+
+        let response: any = null;
 
         try {
             this.logger.log(
@@ -416,7 +407,7 @@ export class StoryGenerationService {
             }
 
             const existingChapters =
-                await this.chapterService.findChaptersByStory(storyId);
+                await this.chapterService.findDetailChaptersByStory(storyId);
 
             const chapterNumber = existingChapters.length + 1;
             const isFirstChapter = chapterNumber === 1;
@@ -442,7 +433,7 @@ export class StoryGenerationService {
             }
             const totalChapters = storyGeneration.prompt.numberOfChapters;
 
-            let chapterStructureResponse: ChapterStructureResponse;
+            let chapterStructureResponse: any = null;
 
             const storyMetadata = JSON.stringify(
                 storyGeneration.metadata?.storyContext ?? '',
@@ -477,6 +468,19 @@ export class StoryGenerationService {
                 );
             }
 
+            response = chapterStructureResponse.raw;
+
+            if (
+                !chapterStructureResponse ||
+                !chapterStructureResponse.content ||
+                chapterStructureResponse.content.trim().length === 0 ||
+                isEmptyObject(chapterStructureResponse.structure)
+            ) {
+                throw new BadRequestException(
+                    'Generated chapter missing content or structure, please try again.',
+                );
+            }
+
             // Generate chapter summary every 5 chapters
             if (chapterNumber % 5 === 0) {
                 chapterStructureResponse.structure.chapterSummary =
@@ -507,6 +511,7 @@ export class StoryGenerationService {
                     chapterId: savedChapter.id,
                     generatedContent: chapterStructureResponse.content,
                     structure: chapterStructureResponse.structure as any,
+                    response,
                     storyGenerationId: storyGeneration.id,
                     chapterNumber,
                     status: GenerationStatus.COMPLETED,
@@ -521,13 +526,7 @@ export class StoryGenerationService {
             );
 
             return {
-                chapterId: savedChapter.id,
-                index: chapterNumber,
-                title: chapterStructureResponse.title,
-                content: chapterStructureResponse.content,
-                summary: chapterStructureResponse.structure.summary,
-                structure: chapterStructureResponse.structure,
-                message: `Chapter ${chapterNumber} generated successfully.`,
+                message: 'Chapter generated successfully',
             };
         } catch (error) {
             console.error('Error generating chapter:', error);
@@ -541,6 +540,7 @@ export class StoryGenerationService {
                                 ? error.message
                                 : 'Failed to generate chapter',
                         status: GenerationStatus.FAILED,
+                        response,
                     },
                 );
             }
@@ -591,7 +591,10 @@ export class StoryGenerationService {
         });
     }
 
-    async previewStory(id: string, skipImage: boolean = false): Promise<any> {
+    async previewStory(
+        id: string,
+        skipImage: boolean = false,
+    ): Promise<InitializeStoryResponseDto> {
         const story = await this.storyRepository.findOne({
             where: { id },
             relations: {
@@ -608,7 +611,6 @@ export class StoryGenerationService {
                 coverImage: true,
                 generation: {
                     prompt: true,
-                    metadata: true,
                 },
             },
         });
@@ -645,7 +647,6 @@ export class StoryGenerationService {
             numberOfChapters: story.generation?.prompt?.numberOfChapters || 0,
             mainCategory,
             categories,
-            metadata: story.generation?.metadata.storyContext || {},
             coverImageUrl: skipImage
                 ? DEFAULT_COVER_IMAGE_URL
                 : await this.mediaService.getMediaUrl(story.coverImage),
@@ -655,7 +656,7 @@ export class StoryGenerationService {
     async getInitializationResults(
         requestId: string,
         skipImage: boolean,
-    ): Promise<any> {
+    ): Promise<InitializeStoryResponseDto> {
         const generation = await this.storyGenerationRepository.findOne({
             where: { requestId },
         });
@@ -712,13 +713,21 @@ export class StoryGenerationService {
             );
         }
 
+        const cleanedNextOptions = cleanNextOptions(
+            generation.structure?.nextOptions,
+        );
+
         return {
             id: generation.chapter.id,
+            storyId: generation.chapter.storyId,
             index: generation.chapter.index,
             title: generation.chapter.title,
             content: generation.chapter.content,
-            structure: generation.structure || ({} as any),
-            message: `Chapter ${generation.chapter.index} generated successfully.`,
+            structure: {
+                nextOptions: cleanedNextOptions,
+            },
+            createdAt: generation.chapter.createdAt,
+            updatedAt: generation.chapter.updatedAt,
         };
     }
 
@@ -808,7 +817,6 @@ export class StoryGenerationService {
 
         return {
             coverImageUrl: newCoverImageUrl,
-            message: 'Cover image regenerated successfully',
         };
     }
 }

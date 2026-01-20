@@ -15,6 +15,8 @@ import { Story } from './entities/story.entity';
 import { Chapter } from './entities/chapter.entity';
 import { ChapterViews } from './entities/chapter-views.entity';
 import { MediaService } from 'src/media/media.service';
+import { PaginatedStoryPreviewResponse } from './dto/paginated-story-preview.response';
+import { enrichStoriesToPreviewDto } from 'src/common/mappers/story-preview.mapper';
 
 @Injectable()
 export class StoryDiscoveryService {
@@ -29,7 +31,7 @@ export class StoryDiscoveryService {
         userId: string,
         type: LibraryType,
         { page = 1, limit = 20 }: { page?: number; limit?: number } = {},
-    ) {
+    ): Promise<PaginatedStoryPreviewResponse> {
         const offset = (page - 1) * limit;
 
         // ===== Query chính (story-level, giống getRecentStories) =====
@@ -46,6 +48,16 @@ export class StoryDiscoveryService {
                 'rh',
                 'rh.story_id = s.id AND rh.user_id = :userId',
                 { userId },
+            )
+            .leftJoin(
+                (qb) =>
+                    qb
+                        .select('c.story_id')
+                        .addSelect('COUNT(c.id)', 'chapter_count')
+                        .from(Chapter, 'c')
+                        .groupBy('c.story_id'),
+                'ss',
+                'ss.story_id = s.id',
             )
             .select([
                 's.id AS "storyId"',
@@ -76,7 +88,12 @@ export class StoryDiscoveryService {
 
                 'CASE WHEN likes.id IS NULL THEN false ELSE true END AS "isLike"',
 
-                `(COUNT(*) OVER() = COALESCE((generation.prompt ->> 'numberOfChapters')::int, 0)) AS "isCompleted"`,
+                'ss.chapter_count AS "chapterCount"',
+
+                `(
+                    COALESCE(ss.chapter_count, 0) >= 
+                    COALESCE((generation.prompt ->> 'numberOfChapters')::int, 0)
+                ) AS "isCompleted"`,
             ])
             .groupBy('s.id')
             .addGroupBy('a.id')
@@ -85,7 +102,8 @@ export class StoryDiscoveryService {
             .addGroupBy('s.views_count')
             .addGroupBy('generation.prompt')
             .addGroupBy('rh.lastReadAt')
-            .addGroupBy('rh.lastReadChapter');
+            .addGroupBy('rh.lastReadChapter')
+            .addGroupBy('ss.chapter_count');
 
         // ===== Filter theo type =====
         if (type === LibraryType.CREATED) {
@@ -111,65 +129,10 @@ export class StoryDiscoveryService {
         const stories = await qb.getRawMany();
         const total = await qb.getCount();
 
-        // ===== Query chapters riêng (giống hệt getRecentStories) =====
-        const storyIds = stories.map((s) => s.storyId);
-
-        let chaptersMap: Record<string, any[]> = {};
-
-        if (storyIds.length > 0) {
-            const chapters = await this.dataSource
-                .getRepository(Chapter)
-                .createQueryBuilder('c')
-                .innerJoin('c.story', 's')
-                .leftJoin(
-                    'chapter_states',
-                    'cs',
-                    'cs.chapter_id = c.id AND cs.user_id = :userId',
-                    { userId },
-                )
-                .select([
-                    'c.story_id AS "storyId"',
-                    `json_agg(
-                jsonb_build_object(
-                    'id', c.id,
-                    'title', c.title,
-                    'index', c.index,
-                    'createdAt', c.created_at,
-                    'updatedAt', c.updated_at,
-                    'isLock', (
-                        cs.chapter_id IS NULL               
-                        AND s.author_id != :userId             
-                        )
-                    )
-                    ORDER BY c.index ASC
-                ) AS chapters`,
-                ])
-                .where('c.story_id IN (:...storyIds)', { storyIds })
-                .setParameters({ userId })
-                .groupBy('c.story_id')
-                .getRawMany();
-
-            chaptersMap = Object.fromEntries(
-                chapters.map((row) => [row.storyId, row.chapters]),
-            );
-        }
-
-        const items = await Promise.all(
-            stories.map(async (story) => ({
-                ...story,
-                coverImage: undefined,
-                profileImage: undefined,
-                profileImageUrl: story.profileImage
-                    ? await this.mediaService.getMediaUrl(story.profileImage)
-                    : null,
-                coverImageUrl: story.coverImage
-                    ? await this.mediaService.getMediaUrl(story.coverImage)
-                    : null,
-                chapters: chaptersMap[story.storyId] || [],
-                lastReadAt: story.lastReadAt || null,
-                lastReadChapter: story.lastReadChapter || null,
-                canEdit: story.authorId === userId,
-            })),
+        const items = await enrichStoriesToPreviewDto(
+            stories,
+            this.mediaService,
+            userId,
         );
 
         return { page, limit, total, items };
@@ -178,7 +141,7 @@ export class StoryDiscoveryService {
     async getTopTrending(
         userId: string,
         { page = 1, limit = 20 }: { page?: number; limit?: number } = {},
-    ) {
+    ): Promise<PaginatedStoryPreviewResponse> {
         const offset = (page - 1) * limit;
 
         const qb = this.dataSource
@@ -194,6 +157,16 @@ export class StoryDiscoveryService {
                 'rh',
                 'rh.story_id = s.id AND rh.user_id = :userId',
                 { userId },
+            )
+            .leftJoin(
+                (qb) =>
+                    qb
+                        .select('c.story_id')
+                        .addSelect('COUNT(c.id)', 'chapter_count')
+                        .from(Chapter, 'c')
+                        .groupBy('c.story_id'),
+                'ss',
+                'ss.story_id = s.id',
             )
             .leftJoin(
                 (qb) =>
@@ -234,7 +207,12 @@ export class StoryDiscoveryService {
 
                 'CASE WHEN likes.id IS NULL THEN false ELSE true END AS "isLike"',
 
-                `(COUNT(*) OVER() = COALESCE((generation.prompt ->> 'numberOfChapters')::int, 0)) AS "isCompleted"`,
+                'ss.chapter_count AS "chapterCount"',
+
+                `(
+                    COALESCE(ss.chapter_count, 0) >= 
+                    COALESCE((generation.prompt ->> 'numberOfChapters')::int, 0)
+                ) AS "isCompleted"`,
             ])
 
             .where('s.visibility = :visibility', {
@@ -249,6 +227,7 @@ export class StoryDiscoveryService {
             .addGroupBy('generation.prompt')
             .addGroupBy('rh.lastReadAt')
             .addGroupBy('rh.lastReadChapter')
+            .addGroupBy('ss.chapter_count')
             .addGroupBy('recent_views.views_count')
             .addOrderBy('recent_views.views_count', 'DESC', 'NULLS LAST')
             .addOrderBy('s.likes_count', 'DESC', 'NULLS LAST')
@@ -260,63 +239,11 @@ export class StoryDiscoveryService {
         const total = await qb.offset(0).limit(undefined).getCount();
 
         // Lấy chapters giống như trong getUserLibrary
-        const storyIds = stories.map((s) => s.storyId);
-        let chaptersMap: Record<string, any[]> = {};
 
-        if (storyIds.length > 0) {
-            const chapters = await this.dataSource
-                .getRepository(Chapter)
-                .createQueryBuilder('c')
-                .innerJoin('c.story', 's')
-                .leftJoin(
-                    'chapter_states',
-                    'cs',
-                    'cs.chapter_id = c.id AND cs.user_id = :userId',
-                    { userId },
-                )
-                .select([
-                    'c.story_id AS "storyId"',
-                    `json_agg(
-                jsonb_build_object(
-                    'id', c.id,
-                    'title', c.title,
-                    'index', c.index,
-                    'createdAt', c.created_at,
-                    'updatedAt', c.updated_at,
-                    'isLock', (
-                        cs.chapter_id IS NULL               
-                        AND s.author_id != :userId             
-                        )
-                    )
-                    ORDER BY c.index ASC
-                ) AS chapters`,
-                ])
-                .where('c.story_id IN (:...storyIds)', { storyIds })
-                .setParameters({ userId })
-                .groupBy('c.story_id')
-                .getRawMany();
-
-            chaptersMap = Object.fromEntries(
-                chapters.map((row) => [row.storyId, row.chapters]),
-            );
-        }
-
-        const items = await Promise.all(
-            stories.map(async (story) => ({
-                ...story,
-                coverImage: undefined,
-                profileImage: undefined,
-                profileImageUrl: story.profileImage
-                    ? await this.mediaService.getMediaUrl(story.profileImage)
-                    : null,
-                coverImageUrl: story.coverImage
-                    ? await this.mediaService.getMediaUrl(story.coverImage)
-                    : null,
-                chapters: chaptersMap[story.storyId] || [],
-                lastReadAt: story.lastReadAt || null,
-                lastReadChapter: story.lastReadChapter || null,
-                canEdit: story.authorId === userId,
-            })),
+        const items = await enrichStoriesToPreviewDto(
+            stories,
+            this.mediaService,
+            userId,
         );
 
         return { page, limit, total, items };
@@ -326,7 +253,7 @@ export class StoryDiscoveryService {
         userId: string,
         categoryId: string,
         { page = 1, limit = 20 }: { page?: number; limit?: number } = {},
-    ) {
+    ): Promise<PaginatedStoryPreviewResponse> {
         const offset = (page - 1) * limit;
 
         const qb = this.dataSource
@@ -354,6 +281,16 @@ export class StoryDiscoveryService {
             .leftJoin(
                 (qb) =>
                     qb
+                        .select('c.story_id')
+                        .addSelect('COUNT(c.id)', 'chapter_count')
+                        .from(Chapter, 'c')
+                        .groupBy('c.story_id'),
+                'ss',
+                'ss.story_id = s.id',
+            )
+            .leftJoin(
+                (qb) =>
+                    qb
                         .select('cv.story_id')
                         .addSelect('COUNT(cv.id)', 'views_count')
                         .from(ChapterViews, 'cv')
@@ -390,7 +327,12 @@ export class StoryDiscoveryService {
 
                 'CASE WHEN likes.id IS NULL THEN false ELSE true END AS "isLike"',
 
-                `(COUNT(*) OVER() = COALESCE((generation.prompt ->> 'numberOfChapters')::int, 0)) AS "isCompleted"`,
+                'ss.chapter_count AS "chapterCount"',
+
+                `(
+                    COALESCE(ss.chapter_count, 0) >= 
+                    COALESCE((generation.prompt ->> 'numberOfChapters')::int, 0)
+                ) AS "isCompleted"`,
             ])
             .where('s.visibility = :visibility', {
                 visibility: StoryVisibility.PUBLIC,
@@ -404,6 +346,7 @@ export class StoryDiscoveryService {
             .addGroupBy('generation.prompt')
             .addGroupBy('rh.lastReadAt')
             .addGroupBy('rh.lastReadChapter')
+            .addGroupBy('ss.chapter_count')
             .addGroupBy('recent_views.views_count')
             .addOrderBy('recent_views.views_count', 'DESC', 'NULLS LAST')
             .addOrderBy('s.likes_count', 'DESC', 'NULLS LAST')
@@ -416,63 +359,10 @@ export class StoryDiscoveryService {
 
         const total = await qb.offset(0).limit(undefined).getCount();
 
-        const storyIds = stories.map((s) => s.storyId);
-        let chaptersMap: Record<string, any[]> = {};
-
-        if (storyIds.length > 0) {
-            const chapters = await this.dataSource
-                .getRepository(Chapter)
-                .createQueryBuilder('c')
-                .innerJoin('c.story', 's')
-                .leftJoin(
-                    'chapter_states',
-                    'cs',
-                    'cs.chapter_id = c.id AND cs.user_id = :userId',
-                    { userId },
-                )
-                .select([
-                    'c.story_id AS "storyId"',
-                    `json_agg(
-                jsonb_build_object(
-                    'id', c.id,
-                    'title', c.title,
-                    'index', c.index,
-                    'createdAt', c.created_at,
-                    'updatedAt', c.updated_at,
-                    'isLock', (
-                        cs.chapter_id IS NULL               
-                        AND s.author_id != :userId             
-                        )
-                    )
-                    ORDER BY c.index ASC
-                ) AS chapters`,
-                ])
-                .where('c.story_id IN (:...storyIds)', { storyIds })
-                .setParameters({ userId })
-                .groupBy('c.story_id')
-                .getRawMany();
-
-            chaptersMap = Object.fromEntries(
-                chapters.map((row) => [row.storyId, row.chapters]),
-            );
-        }
-
-        const items = await Promise.all(
-            stories.map(async (story) => ({
-                ...story,
-                coverImage: undefined,
-                profileImage: undefined,
-                profileImageUrl: story.profileImage
-                    ? await this.mediaService.getMediaUrl(story.profileImage)
-                    : null,
-                coverImageUrl: story.coverImage
-                    ? await this.mediaService.getMediaUrl(story.coverImage)
-                    : null,
-                chapters: chaptersMap[story.storyId] || [],
-                lastReadAt: story.lastReadAt || null,
-                lastReadChapter: story.lastReadChapter || null,
-                canEdit: story.authorId === userId,
-            })),
+        const items = await enrichStoriesToPreviewDto(
+            stories,
+            this.mediaService,
+            userId,
         );
 
         return { page, limit, total, items };
@@ -509,21 +399,13 @@ export class StoryDiscoveryService {
             page = 1,
             limit = 20,
         }: DiscoverStoriesDto,
-    ) {
+    ): Promise<PaginatedStoryPreviewResponse> {
         const offset = (page - 1) * limit;
 
         // Handle deprecated 'published_within' parameter
         if (published_within) {
             publishedWithin = published_within;
         }
-
-        // Subquery đếm chính xác số chapter của từng story
-        const chapterCountSubQuery = this.dataSource
-            .getRepository(Chapter)
-            .createQueryBuilder('ch')
-            .select('ch.story_id', 'story_id')
-            .addSelect('COUNT(ch.id)', 'chapter_count')
-            .groupBy('ch.story_id');
 
         const qb = this.dataSource
             .getRepository(Story)
@@ -551,9 +433,14 @@ export class StoryDiscoveryService {
                 { userId },
             )
             .leftJoin(
-                `(${chapterCountSubQuery.getQuery()})`,
-                'chapcnt',
-                'chapcnt.story_id = s.id',
+                (qb) =>
+                    qb
+                        .select('c.story_id')
+                        .addSelect('COUNT(c.id)', 'chapter_count')
+                        .from(Chapter, 'c')
+                        .groupBy('c.story_id'),
+                'ss',
+                'ss.story_id = s.id',
             )
             .leftJoin(
                 (subQb) =>
@@ -597,11 +484,12 @@ export class StoryDiscoveryService {
                 's.likes_count AS "likesCount"',
                 's.views_count AS "viewsCount"',
 
-                // Số chapter thực tế
-                'COALESCE(chapcnt.chapter_count::integer, 0) AS "chapterCount"',
+                'ss.chapter_count AS "chapterCount"',
 
-                // isCompleted chính xác
-                '(COALESCE(chapcnt.chapter_count::integer, 0) = COALESCE((generation.prompt ->> \'numberOfChapters\')::int, 0)) AS "isCompleted"',
+                `(
+                    COALESCE(ss.chapter_count, 0) >= 
+                    COALESCE((generation.prompt ->> 'numberOfChapters')::int, 0)
+                ) AS "isCompleted"`,
             ])
             .where('s.visibility = :visibility', {
                 visibility: StoryVisibility.PUBLIC,
@@ -636,7 +524,7 @@ export class StoryDiscoveryService {
 
         if (chapterFilterValue !== undefined && chapterFilterOperator) {
             qb.andWhere(
-                `COALESCE(chapcnt.chapter_count::integer, 0) ${chapterFilterOperator} :chapterFilterValue`,
+                `COALESCE(ss.chapter_count, 0) ${chapterFilterOperator} :chapterFilterValue`,
                 { chapterFilterValue },
             );
         }
@@ -656,11 +544,11 @@ export class StoryDiscoveryService {
         // === Status filter: completed / ongoing ===
         if (status === StoryStatusFilter.COMPLETED) {
             qb.andWhere(
-                "COALESCE(chapcnt.chapter_count::integer, 0) = COALESCE((generation.prompt ->> 'numberOfChapters')::int, 0)",
+                `COALESCE(ss.chapter_count, 0) = COALESCE((generation.prompt ->> 'numberOfChapters')::int, 0)`,
             );
         } else if (status === StoryStatusFilter.ONGOING) {
             qb.andWhere(
-                "COALESCE(chapcnt.chapter_count::integer, 0) < COALESCE((generation.prompt ->> 'numberOfChapters')::int, 0)",
+                `COALESCE(ss.chapter_count, 0) < COALESCE((generation.prompt ->> 'numberOfChapters')::int, 0)`,
             );
         }
 
@@ -739,9 +627,10 @@ export class StoryDiscoveryService {
             .addGroupBy('generation.prompt')
             .addGroupBy('rh.lastReadAt')
             .addGroupBy('rh.lastReadChapter')
+            .addGroupBy('ss.chapter_count')
             .addGroupBy('main_cat.id')
             .addGroupBy('main_cat.name')
-            .addGroupBy('chapcnt.chapter_count')
+            .addGroupBy('ss.chapter_count')
 
             .offset(offset)
             .limit(limit)
@@ -754,63 +643,10 @@ export class StoryDiscoveryService {
                 ? await qb.offset(0).limit(undefined).getCount()
                 : 0;
 
-        const storyIds = stories.map((s) => s.storyId);
-        let chaptersMap: Record<string, any[]> = {};
-
-        if (storyIds.length > 0) {
-            const chapters = await this.dataSource
-                .getRepository(Chapter)
-                .createQueryBuilder('c')
-                .innerJoin('c.story', 's')
-                .leftJoin(
-                    'chapter_states',
-                    'cs',
-                    'cs.chapter_id = c.id AND cs.user_id = :userId',
-                    { userId },
-                )
-                .select([
-                    'c.story_id AS "storyId"',
-                    `json_agg(
-                jsonb_build_object(
-                    'id', c.id,
-                    'title', c.title,
-                    'index', c.index,
-                    'createdAt', c.created_at,
-                    'updatedAt', c.updated_at,
-                    'isLock', (
-                        cs.chapter_id IS NULL               
-                        AND s.author_id != :userId             
-                        )
-                    )
-                    ORDER BY c.index ASC
-                ) AS chapters`,
-                ])
-                .where('c.story_id IN (:...storyIds)', { storyIds })
-                .setParameters({ userId })
-                .groupBy('c.story_id')
-                .getRawMany();
-
-            chaptersMap = Object.fromEntries(
-                chapters.map((row) => [row.storyId, row.chapters]),
-            );
-        }
-
-        const items = await Promise.all(
-            stories.map(async (story) => ({
-                ...story,
-                coverImage: undefined,
-                profileImage: undefined,
-                profileImageUrl: story.profileImage
-                    ? await this.mediaService.getMediaUrl(story.profileImage)
-                    : null,
-                coverImageUrl: story.coverImage
-                    ? await this.mediaService.getMediaUrl(story.coverImage)
-                    : null,
-                chapters: chaptersMap[story.storyId] || [],
-                lastReadAt: story.lastReadAt || null,
-                lastReadChapter: story.lastReadChapter || null,
-                canEdit: story.authorId === userId,
-            })),
+        const items = await enrichStoriesToPreviewDto(
+            stories,
+            this.mediaService,
+            userId,
         );
 
         return {

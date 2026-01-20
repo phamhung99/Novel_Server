@@ -38,6 +38,8 @@ const ManageStories = () => {
 
     const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
     const [selectedStoryId, setSelectedStoryId] = useState<string | null>(null);
+
+    const [bulkActionLoading, setBulkActionLoading] = useState(false);
     const openMenu = Boolean(anchorEl);
 
     const [confirmDialog, setConfirmDialog] = useState({
@@ -57,8 +59,17 @@ const ManageStories = () => {
 
     const [aiFilter, setAiFilter] = useState<StorySource>(STORY_SOURCE.ALL);
     const [searchKeyword, setSearchKeyword] = useState('');
+    const [sort, setSort] = useState<string>('createdAt');
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+    const [bulkRequestResult, setBulkRequestResult] = useState<{
+        open: boolean;
+        message: string;
+        requestedCount: number;
+        failedCount: number;
+        failedDetails?: Record<string, string>;
+    } | null>(null);
 
     const navigate = useNavigate();
 
@@ -79,9 +90,13 @@ const ManageStories = () => {
         rowsPerPage,
         debouncedKeyword,
         aiFilter === STORY_SOURCE.ALL ? undefined : aiFilter,
+        sort,
     );
 
-    console.log(stories);
+    const selectedStory = useMemo(
+        () => stories?.find((s) => s.id === selectedStoryId) ?? null,
+        [stories, selectedStoryId],
+    );
 
     const {
         deleteStory,
@@ -90,7 +105,66 @@ const ManageStories = () => {
         rejectStory,
         unpublishStory,
         bulkDeleteStories,
+        bulkApproveStories,
+        bulkRequestPublication,
     } = useStoryActions(user.id, fetchStories);
+
+    const handleBulkRequestPublication = () => {
+        if (!selectedIds.length) return;
+
+        setConfirmDialog({
+            open: true,
+            title: `Request publication for ${selectedIds.length} stories?`,
+            content:
+                'This will send a publication request to admins/moderators.',
+            onConfirm: async () => {
+                setBulkActionLoading(true);
+
+                try {
+                    const result = await bulkRequestPublication(selectedIds);
+
+                    setBulkRequestResult({
+                        open: true,
+                        message: result.message,
+                        requestedCount: result.requestedCount,
+                        failedCount: result.failedCount,
+                        failedDetails: result.failedDetails,
+                    });
+
+                    setSelectedIds([]);
+                } catch (err: any) {
+                    setErrorMessage(
+                        err?.message || 'Bulk request publication failed',
+                    );
+                } finally {
+                    setBulkActionLoading(false);
+                    setConfirmDialog((prev) => ({ ...prev, open: false }));
+                }
+            },
+        });
+    };
+
+    const handleBulkApprove = () => {
+        if (!selectedIds.length) return;
+
+        setConfirmDialog({
+            open: true,
+            title: `Approve ${selectedIds.length} stories?`,
+            content: 'This action will make them publicly visible.',
+            onConfirm: async () => {
+                setBulkActionLoading(true);
+                try {
+                    await bulkApproveStories(selectedIds);
+                    setSelectedIds([]);
+                    setConfirmDialog((p) => ({ ...p, open: false }));
+                } catch (err: any) {
+                    setErrorMessage(err?.message || 'Bulk approve failed');
+                } finally {
+                    setBulkActionLoading(false);
+                }
+            },
+        });
+    };
 
     const handleMenuOpen = (
         e: React.MouseEvent<HTMLButtonElement>,
@@ -104,10 +178,6 @@ const ManageStories = () => {
         setAnchorEl(null);
         setSelectedStoryId(null);
     };
-
-    const selectedStory = Array.isArray(stories)
-        ? stories.find((s) => s.id === selectedStoryId) || null
-        : null;
 
     const withErrorHandling = async (action: () => Promise<void>) => {
         try {
@@ -166,7 +236,6 @@ const ManageStories = () => {
                         </Select>
                     </FormControl>
 
-                    {/* AI / Manual filter */}
                     <FormControl
                         sx={{ minWidth: 180 }}
                         disabled={statusFilter !== 'all'}
@@ -187,7 +256,6 @@ const ManageStories = () => {
                         </Select>
                     </FormControl>
 
-                    {/* Search */}
                     <TextField
                         placeholder="Search by story title..."
                         value={searchKeyword}
@@ -203,7 +271,6 @@ const ManageStories = () => {
                         }}
                     />
 
-                    {/* Bulk actions */}
                     {selectedIds.length > 0 && (
                         <Box
                             ml="auto"
@@ -214,13 +281,44 @@ const ManageStories = () => {
                             <Typography variant="body2" color="text.secondary">
                                 Selected: {selectedIds.length}
                             </Typography>
+
+                            {(statusFilter === 'pending' ||
+                                statusFilter === 'me') &&
+                                user.role === USER_ROLES.ADMIN && (
+                                    <Button
+                                        variant="contained"
+                                        color="success"
+                                        size="small"
+                                        onClick={handleBulkApprove}
+                                        disabled={bulkActionLoading}
+                                    >
+                                        Approve Selected
+                                    </Button>
+                                )}
+
+                            {statusFilter === 'me' &&
+                                user.role === USER_ROLES.EDITOR && (
+                                    <Button
+                                        variant="contained"
+                                        color="primary"
+                                        size="small"
+                                        onClick={handleBulkRequestPublication}
+                                        disabled={bulkActionLoading}
+                                    >
+                                        Request Publication
+                                    </Button>
+                                )}
+
                             {statusFilter !== 'deleted' && (
                                 <Button
                                     variant="outlined"
                                     color="error"
                                     size="small"
                                     onClick={handleBulkDelete}
-                                    disabled={statusFilter === 'deleted'}
+                                    disabled={
+                                        bulkActionLoading ||
+                                        statusFilter === 'deleted'
+                                    }
                                 >
                                     Delete
                                 </Button>
@@ -246,6 +344,8 @@ const ManageStories = () => {
                             selectedIds={selectedIds}
                             onSelectChange={setSelectedIds}
                             showAiColumn={true}
+                            sort={sort}
+                            onSortChange={setSort}
                         />
                         <TablePagination
                             component="div"
@@ -262,7 +362,6 @@ const ManageStories = () => {
                     </Paper>
                 )}
             </Box>
-
             <StoryMenu
                 anchorEl={anchorEl}
                 open={openMenu}
@@ -330,7 +429,6 @@ const ManageStories = () => {
                     },
                 }}
             />
-
             <ConfirmDialog
                 open={confirmDialog.open}
                 title={confirmDialog.title}
@@ -340,7 +438,6 @@ const ManageStories = () => {
                     setConfirmDialog((prev) => ({ ...prev, open: false }))
                 }
             />
-
             <ConfirmDialogWithInput
                 open={inputDialog.open}
                 title={inputDialog.title}
@@ -351,7 +448,6 @@ const ManageStories = () => {
                     setInputDialog((prev) => ({ ...prev, open: false }))
                 }
             />
-
             <Snackbar
                 open={!!errorMessage}
                 autoHideDuration={6000}
@@ -365,6 +461,45 @@ const ManageStories = () => {
                     variant="filled"
                 >
                     {errorMessage}
+                </Alert>
+            </Snackbar>
+
+            <Snackbar
+                open={bulkRequestResult?.open ?? false}
+                autoHideDuration={8000}
+                onClose={() => setBulkRequestResult(null)}
+                anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+            >
+                <Alert
+                    onClose={() => setBulkRequestResult(null)}
+                    severity={
+                        bulkRequestResult?.failedCount ? 'warning' : 'success'
+                    }
+                    sx={{ width: '100%' }}
+                    variant="filled"
+                    action={
+                        bulkRequestResult?.failedCount ? (
+                            <Button
+                                color="inherit"
+                                size="small"
+                                onClick={() => {
+                                    console.log(
+                                        bulkRequestResult.failedDetails,
+                                    );
+                                }}
+                            >
+                                Details
+                            </Button>
+                        ) : undefined
+                    }
+                >
+                    {bulkRequestResult && (
+                        <>
+                            {bulkRequestResult.message}
+                            {bulkRequestResult.failedCount > 0 &&
+                                ` (${bulkRequestResult.failedCount} failed)`}
+                        </>
+                    )}
                 </Alert>
             </Snackbar>
         </Container>

@@ -12,6 +12,7 @@ import { ERROR_MESSAGES } from 'src/common/constants/app.constant';
 import { MediaService } from 'src/media/media.service';
 import { StorySource } from 'src/common/enums/app.enum';
 import { StoryCategory } from './entities/story-category.entity';
+import { parseSort } from 'src/common/utils/query-parser';
 
 @Injectable()
 export class StoryCrudService {
@@ -81,6 +82,7 @@ export class StoryCrudService {
             keyword,
             source,
             authorId,
+            sort,
         } = paginationDto;
         const skip = (page - 1) * limit;
 
@@ -93,6 +95,9 @@ export class StoryCrudService {
             .skip(skip)
             .take(limit);
 
+        const order = parseSort(sort);
+        qb.orderBy(order);
+
         if (keyword && keyword.trim()) {
             const searchTerm = `${keyword.trim().toLowerCase()}%`;
 
@@ -102,8 +107,6 @@ export class StoryCrudService {
         if (source) {
             qb.andWhere('story.sourceType = :source', { source });
         }
-
-        console.log(authorId);
 
         if (authorId) {
             qb.andWhere('author.id = :authorId', { authorId });
@@ -376,6 +379,14 @@ export class StoryCrudService {
         updateStoryDto: UpdateStoryDto,
     ): Promise<Story> {
         const story = await this.findStoryById(id);
+
+        if (
+            updateStoryDto.visibility === StoryVisibility.PUBLIC &&
+            story.status !== StoryStatus.PUBLISHED
+        ) {
+            story.status = StoryStatus.PENDING;
+        }
+
         Object.assign(story, updateStoryDto);
         return this.storyRepository.save(story);
     }

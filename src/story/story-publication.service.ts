@@ -3,7 +3,7 @@ import { StoryCrudService } from './story-crud.service';
 import { StoryStatus } from 'src/common/enums/story-status.enum';
 import { StoryVisibility } from 'src/common/enums/story-visibility.enum';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { Story } from './entities/story.entity';
 
 @Injectable()
@@ -30,6 +30,77 @@ export class StoryPublicationService {
         return this.storyRepository.save(story);
     }
 
+    async bulkRequestPublication(
+        storyIds: string[],
+        authorId: string,
+    ): Promise<{
+        requested: number;
+        requestedIds: string[];
+        invalidIds: string[];
+        invalidReasons: Record<string, string>;
+    }> {
+        if (!storyIds?.length) {
+            return {
+                requested: 0,
+                requestedIds: [],
+                invalidIds: [],
+                invalidReasons: {},
+            };
+        }
+
+        const stories = await this.storyRepository.find({
+            where: {
+                id: In(storyIds),
+                authorId,
+            },
+            select: ['id', 'status'],
+        });
+
+        if (!stories.length) {
+            throw new BadRequestException(
+                'No stories found or you are not the author',
+            );
+        }
+
+        const validIds: string[] = [];
+        const invalid: Record<string, string> = {};
+
+        for (const story of stories) {
+            if (story.status === StoryStatus.PENDING) {
+                invalid[story.id] = 'Already pending approval';
+                continue;
+            }
+            if (story.status === StoryStatus.PUBLISHED) {
+                invalid[story.id] = 'Already published';
+                continue;
+            }
+            validIds.push(story.id);
+        }
+
+        if (validIds.length === 0) {
+            throw new BadRequestException({
+                message: 'No stories are eligible for publication request',
+                invalid,
+            });
+        }
+
+        const updateResult = await this.storyRepository
+            .createQueryBuilder()
+            .update(Story)
+            .set({
+                status: StoryStatus.PENDING,
+            })
+            .whereInIds(validIds)
+            .execute();
+
+        return {
+            requested: updateResult.affected || 0,
+            requestedIds: validIds,
+            invalidIds: Object.keys(invalid),
+            invalidReasons: invalid,
+        };
+    }
+
     async approveStory(id: string, adminId: string): Promise<Story> {
         const story = await this.storyCrudService.findStoryById(id);
 
@@ -51,6 +122,87 @@ export class StoryPublicationService {
         story.rejectionReason = null;
 
         return this.storyRepository.save(story);
+    }
+
+    async bulkApproveStories(
+        storyIds: string[],
+        adminId: string,
+    ): Promise<{
+        affected: number;
+        approvedIds: string[];
+        invalid?: { id: string; status: StoryStatus; reason?: string }[];
+    }> {
+        if (!storyIds.length) {
+            return { affected: 0, approvedIds: [] };
+        }
+
+        const stories = await this.storyRepository.find({
+            where: { id: In(storyIds) },
+            select: ['id', 'status', 'authorId'],
+        });
+
+        if (!stories.length) {
+            throw new BadRequestException(
+                'No stories found with the provided IDs',
+            );
+        }
+
+        // Phân loại story hợp lệ & không hợp lệ
+        const validStoryIds: string[] = [];
+        const invalidStories: {
+            id: string;
+            status: StoryStatus;
+            reason?: string;
+        }[] = [];
+
+        for (const story of stories) {
+            const canApprove =
+                story.status === StoryStatus.PENDING ||
+                (story.status === StoryStatus.DRAFT &&
+                    story.authorId === adminId);
+
+            if (canApprove) {
+                validStoryIds.push(story.id);
+            } else {
+                invalidStories.push({
+                    id: story.id,
+                    status: story.status,
+                    reason:
+                        story.authorId !== adminId
+                            ? 'Not author (for DRAFT)'
+                            : undefined,
+                });
+            }
+        }
+
+        if (validStoryIds.length === 0) {
+            throw new BadRequestException({
+                message: 'No stories can be approved',
+                invalid: invalidStories,
+            });
+        }
+
+        // Thực hiện update hàng loạt – rất nhanh
+        const now = new Date();
+
+        const updateResult = await this.storyRepository
+            .createQueryBuilder()
+            .update(Story)
+            .set({
+                status: StoryStatus.PUBLISHED,
+                visibility: StoryVisibility.PUBLIC,
+                approvedBy: adminId,
+                approvedAt: now,
+                rejectionReason: null,
+            })
+            .whereInIds(validStoryIds)
+            .execute();
+
+        return {
+            affected: updateResult.affected || 0,
+            approvedIds: validStoryIds,
+            invalid: invalidStories,
+        };
     }
 
     async rejectStory(

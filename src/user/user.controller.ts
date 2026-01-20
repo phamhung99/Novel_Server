@@ -11,17 +11,90 @@ import {
     Headers,
     BadRequestException,
     Post,
+    UseInterceptors,
+    UploadedFile,
+    ParseFilePipe,
 } from '@nestjs/common';
 import { UserService } from './user.service';
 import { User } from './entities/user.entity';
 import { parseQueryOptions } from 'src/common/utils/parse-query-options.util';
-import { ERROR_MESSAGES } from 'src/common/constants/app.constant';
+import {
+    ERROR_MESSAGES,
+    MAX_FILE_SIZE_UPLOAD,
+} from 'src/common/constants/app.constant';
 import { UpdateUserGenresDto } from './dto/update-user-genres.dto';
-import { IapStore } from 'src/common/enums/app.enum';
+import { AllowedImageMimeTypes, IapStore } from 'src/common/enums/app.enum';
+import { SkipTransform } from 'src/common/decorators/skip-transform.decorator';
+import { extname, join } from 'path';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { diskStorage } from 'multer';
+import { CustomMaxFileSizeValidator } from 'src/common/validators/custom-max-file-size.validator';
+import { MimeTypeValidator } from 'src/common/validators/mime-type.validator';
+import { UpdateUserDto } from './dto/update-user.dto';
 
 @Controller('users')
 export class UserController {
     constructor(private readonly userService: UserService) {}
+
+    @Get('reward')
+    async getReward(@Headers('x-user-id') userId: string) {
+        if (!userId) {
+            throw new BadRequestException(ERROR_MESSAGES.USER_ID_REQUIRED);
+        }
+
+        return this.userService.getReward(userId);
+    }
+
+    @Post('ads/watch')
+    @SkipTransform()
+    async watchAds(@Headers('x-user-id') userId: string) {
+        if (!userId) {
+            throw new BadRequestException(ERROR_MESSAGES.USER_ID_REQUIRED);
+        }
+
+        const result = await this.userService.watchAdsAndGrantBonus(userId);
+        return result;
+    }
+
+    @Patch('me')
+    @UseInterceptors(
+        FileInterceptor('profileImage', {
+            storage: diskStorage({
+                destination:
+                    process.env.NODE_ENV === 'production'
+                        ? '/tmp'
+                        : join(process.cwd(), 'tmp'),
+                filename: (req, file, cb) => {
+                    const unique = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
+                    cb(
+                        null,
+                        `${file.fieldname}-${unique}${extname(file.originalname)}`,
+                    );
+                },
+            }),
+            limits: { fileSize: MAX_FILE_SIZE_UPLOAD.IMAGE },
+        }),
+    )
+    async updateMe(
+        @Headers('x-user-id') userId: string,
+        @Body() updateDto: UpdateUserDto,
+        @UploadedFile(
+            new ParseFilePipe({
+                validators: [
+                    new CustomMaxFileSizeValidator(MAX_FILE_SIZE_UPLOAD),
+                    new MimeTypeValidator(AllowedImageMimeTypes),
+                ],
+                fileIsRequired: false,
+            }),
+        )
+        file?: Express.Multer.File,
+    ) {
+        if (!userId) {
+            throw new BadRequestException(ERROR_MESSAGES.USER_ID_REQUIRED);
+        }
+
+        return this.userService.updateUser(userId, updateDto, file);
+    }
 
     @Get('recent-story')
     async getRecentStories(

@@ -1,6 +1,6 @@
 import { FileValidator } from '@nestjs/common';
 import { ERROR_MESSAGES } from '../constants/app.constant';
-import { AllowedFileMimeTypes, AllowedImageMimeTypes } from '../enums/app.enum';
+import { AllowedImageMimeTypes } from '../enums/app.enum';
 
 export class CustomMaxFileSizeValidator extends FileValidator {
     constructor(private readonly maxSizeMap: Record<string, number>) {

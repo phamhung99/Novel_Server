@@ -1,15 +1,19 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
 import { Chapter } from './entities/chapter.entity';
 import { CreateChapterDto } from './dto/create-chapter.dto';
 import { UpdateChapterDto } from './dto/update-chapter.dto';
+import { GenerateChapterResponseDto } from './dto/generate-chapter.dto';
+import { cleanNextOptions } from 'src/common/utils/chapter.utils';
+import { StoryPreviewChapterDto } from './dto/story-preview.dto';
 
 @Injectable()
 export class ChapterService {
     constructor(
         @InjectRepository(Chapter)
         private chapterRepository: Repository<Chapter>,
+        private dataSource: DataSource,
     ) {}
 
     async createChapter(
@@ -36,7 +40,7 @@ export class ChapterService {
         return this.chapterRepository.save(chapters);
     }
 
-    async findChaptersByStory(storyId: string) {
+    async findDetailChaptersByStory(storyId: string) {
         const chapters = await this.chapterRepository.find({
             select: {
                 id: true,
@@ -60,6 +64,48 @@ export class ChapterService {
             content: chapter.content,
             structure: chapter.chapterGenerations?.[0]?.structure || null,
         }));
+    }
+
+    async getChaptersWithLockForUser({
+        storyId,
+        userId,
+    }: {
+        storyId: string;
+        userId: string | null;
+    }): Promise<StoryPreviewChapterDto[]> {
+        const result = await this.dataSource
+            .getRepository(Chapter)
+            .createQueryBuilder('c')
+            .innerJoin('c.story', 's')
+            .leftJoin(
+                'chapter_states',
+                'cs',
+                'cs.chapter_id = c.id AND cs.user_id = :userId',
+                { userId },
+            )
+            .select([
+                'c.story_id AS "storyId"',
+                `json_agg(
+                jsonb_build_object(
+                    'id',        c.id,
+                    'index',     c.index,
+                    'title',     c.title,
+                    'isLock',    (
+                        cs.chapter_id IS NULL 
+                        AND s.author_id != :userId
+                    ),
+                    'createdAt', c.created_at::text,    -- ép về text để thành ISO string
+                    'updatedAt', c.updated_at::text
+                )
+                ORDER BY c.index ASC
+            ) AS chapters`,
+            ])
+            .where('c.story_id = :storyId', { storyId })
+            .groupBy('c.story_id')
+            .setParameters({ userId })
+            .getRawOne();
+
+        return result?.chapters || [];
     }
 
     async findChapterById(id: string): Promise<Chapter> {
@@ -90,7 +136,10 @@ export class ChapterService {
         }
     }
 
-    async findChapterByIndex(storyId: string, index: number) {
+    async findChapterByIndex(
+        storyId: string,
+        index: number,
+    ): Promise<GenerateChapterResponseDto> {
         const chapter = await this.chapterRepository.findOne({
             where: { storyId, index },
             relations: ['chapterGenerations'],
@@ -108,14 +157,22 @@ export class ChapterService {
         }
 
         const generation = chapter.chapterGenerations?.[0];
-        const nextOptions = generation?.structure?.nextOptions ?? [];
 
-        const { chapterGenerations: _chapterGenerations, ...chapterData } =
-            chapter;
+        const cleanedNextOptions = cleanNextOptions(
+            generation.structure?.nextOptions,
+        );
 
         return {
-            ...chapterData,
-            nextOptions,
+            id: chapter.id,
+            storyId: chapter.storyId,
+            index: chapter.index,
+            title: chapter.title,
+            content: chapter.content,
+            createdAt: chapter.createdAt,
+            updatedAt: chapter.updatedAt,
+            structure: {
+                nextOptions: cleanedNextOptions,
+            },
         };
     }
 

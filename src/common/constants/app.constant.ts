@@ -1,6 +1,3 @@
-export const MAX_MSG_COUNT_PER_DAY = 3;
-export const COMIC_COOLDOWN_MS = 20 * 1000; // 20 seconds
-
 export const MAX_FILE_SIZE_UPLOAD = {
     TXT: 100 * 1024, // 100 KB
     DOCX: 2 * 1024 * 1024, // 2 MB
@@ -9,6 +6,9 @@ export const MAX_FILE_SIZE_UPLOAD = {
 
 export const DEFAULT_COVER_IMAGE_URL =
     'https://myapp-assets.sfo3.cdn.digitaloceanspaces.com/covers/cbba6c8b-744e-47fc-b5ad-a3ec8d7ccfe3.jpg';
+
+export const TEMPORARY_COIN_DAYS = 7;
+export const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
 export const DEFAULT_PROFILE_IMAGE_URL = 'avatars/default_avatar.png';
 

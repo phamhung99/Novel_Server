@@ -20,7 +20,6 @@ import { CreateStoryDto } from './dto/create-story.dto';
 import { UpdateStoryDto } from './dto/update-story.dto';
 import { CreateChapterDto } from './dto/create-chapter.dto';
 import { UpdateChapterDto } from './dto/update-chapter.dto';
-import { RequestPublicationDto } from './dto/request-publication.dto';
 import { RejectStoryDto } from './dto/reject-story.dto';
 import {
     GenerateChapterDto,
@@ -53,6 +52,7 @@ import { GenerateCoverImageDto } from './dto/generate-cover-image.dto';
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
 import { Roles } from 'src/common/decorators/roles.decorator';
 import { RolesGuard } from 'src/common/guards/roles.guard';
+import { SkipTransform } from 'src/common/decorators/skip-transform.decorator';
 
 @Controller('story')
 export class StoryController {
@@ -103,7 +103,6 @@ export class StoryController {
         );
 
         return {
-            message: 'Cover image uploaded successfully',
             coverImageUrl,
         };
     }
@@ -177,7 +176,6 @@ export class StoryController {
         if (skipImage) {
             return {
                 coverImageUrl: DEFAULT_COVER_IMAGE_URL,
-                message: 'Cover image regenerated successfully',
             };
         }
         return this.storyService.generateStoryCoverImage(
@@ -190,11 +188,14 @@ export class StoryController {
 
     // REQUEST 1: Initialize story with outline
     @Post('generate/initialize')
+    @SkipTransform()
     async initializeStory(
         @Headers('x-user-id') userId: string,
-        @Headers('x-request-id') requestId: string,
         @Body() initializeStoryDto: InitializeStoryDto,
+        @Headers('x-request-id') headerRequestId?: string,
+        @Query('requestId') queryRequestId?: string,
     ): Promise<InitializeStoryResponseDto> {
+        const requestId = queryRequestId ?? headerRequestId;
         if (!requestId) {
             throw new BadRequestException('requestId is required');
         }
@@ -207,9 +208,11 @@ export class StoryController {
 
     @Get('generate/initialize/result')
     async getInitializationResults(
-        @Headers('x-request-id') requestId: string,
+        @Headers('x-request-id') headerRequestId?: string,
+        @Query('requestId') queryRequestId?: string,
         @Headers('x-skip-image') skipImage: boolean = false,
     ): Promise<InitializeStoryResponseDto[]> {
+        const requestId = queryRequestId ?? headerRequestId;
         if (!requestId) {
             throw new BadRequestException('requestId is required');
         }
@@ -217,11 +220,14 @@ export class StoryController {
     }
 
     @Post(':storyId/generate/chapter')
+    @SkipTransform()
     async generateChapterWithContext(
         @Param('storyId') storyId: string,
-        @Headers('x-request-id') requestId: string,
         @Body() generateChapterDto: GenerateChapterDto,
+        @Headers('x-request-id') headerRequestId?: string,
+        @Query('requestId') queryRequestId?: string,
     ): Promise<GenerateChapterResponseDto> {
+        const requestId = queryRequestId ?? headerRequestId;
         if (!requestId) {
             throw new BadRequestException('requestId is required');
         }
@@ -235,8 +241,11 @@ export class StoryController {
 
     @Get('generate/chapter/result')
     async getGeneratedChapterResults(
-        @Headers('x-request-id') requestId: string,
+        @Headers('x-request-id') headerRequestId?: string,
+        @Query('requestId') queryRequestId?: string,
     ): Promise<GenerateChapterResponseDto> {
+        const requestId = queryRequestId ?? headerRequestId;
+
         if (!requestId) {
             throw new BadRequestException('requestId is required');
         }
@@ -339,14 +348,39 @@ export class StoryController {
 
     // Publication workflow endpoints
     @Post(':id/request-publication')
-    async requestPublication(
-        @Param('id') id: string,
-        @Body() requestDto: RequestPublicationDto,
-    ) {
+    async requestPublication(@Param('id') id: string) {
         const story = await this.storyService.requestPublication(id);
         return {
             message: 'Publication request submitted successfully',
             story,
+        };
+    }
+
+    @Post('bulk-request-publication')
+    @UseGuards(JwtAuthGuard)
+    async bulkRequestPublication(
+        @Headers('x-user-id') userId: string,
+        @Body('storyIds') storyIds: string[],
+    ) {
+        if (!userId) {
+            throw new BadRequestException('User ID is required');
+        }
+
+        if (!Array.isArray(storyIds) || storyIds.length === 0) {
+            throw new BadRequestException('storyIds must be a non-empty array');
+        }
+
+        const result = await this.storyService.bulkRequestPublication(
+            storyIds,
+            userId,
+        );
+
+        return {
+            message: `Successfully requested publication for ${result.requested} stories`,
+            requestedCount: result.requested,
+            requestedIds: result.requestedIds,
+            failedCount: result.invalidIds.length,
+            failedDetails: result.invalidReasons,
         };
     }
 
@@ -364,6 +398,37 @@ export class StoryController {
         return {
             message: 'Story approved and published successfully',
             story,
+        };
+    }
+
+    @Post('bulk-approve')
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles(UserRole.ADMIN)
+    async bulkApproveStories(
+        @Headers('x-user-id') adminId: string,
+        @Body('storyIds') storyIds: string[],
+    ) {
+        if (!adminId) {
+            throw new BadRequestException('Admin ID is required');
+        }
+
+        if (!Array.isArray(storyIds) || storyIds.length === 0) {
+            throw new BadRequestException(
+                'storyIds must be a non-empty array of strings',
+            );
+        }
+
+        const result = await this.storyService.bulkApproveStories(
+            storyIds,
+            adminId,
+        );
+
+        return {
+            message: `Successfully approved and published ${result.affected} stories`,
+            approvedCount: result.affected,
+            approvedIds: result.approvedIds,
+            invalidIds: result.invalidIds,
+            failedCount: result.invalid?.length || 0,
         };
     }
 
@@ -426,7 +491,22 @@ export class StoryController {
             throw new BadRequestException(ERROR_MESSAGES.STORY_ID_REQUIRED);
         }
 
-        return this.chapterService.findChaptersByStory(storyId);
+        return this.chapterService.findDetailChaptersByStory(storyId);
+    }
+
+    @Get(':storyId/chapters')
+    async getChaptersWithLockForUser(
+        @Param('storyId') storyId: string,
+        @Headers('x-user-id') userId: string,
+    ) {
+        if (!storyId) {
+            throw new BadRequestException(ERROR_MESSAGES.STORY_ID_REQUIRED);
+        }
+
+        return this.chapterService.getChaptersWithLockForUser({
+            storyId,
+            userId,
+        });
     }
 
     @Get(':storyId/chapter/:index')
