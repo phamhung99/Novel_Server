@@ -25,6 +25,7 @@ import { addDays } from 'src/common/utils/date.utils';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { PaginatedStoryPreviewResponse } from 'src/story/dto/paginated-story-preview.response';
 import { enrichStoriesToPreviewDto } from 'src/common/mappers/story-preview.mapper';
+import { Chapter } from 'src/story/entities/chapter.entity';
 
 @Injectable()
 export class UserService extends BaseCrudService<User> {
@@ -214,6 +215,16 @@ export class UserService extends BaseCrudService<User> {
                 .leftJoin('s.generation', 'generation')
                 .leftJoin('s.storyCategories', 'sc')
                 .leftJoin('sc.category', 'cat')
+                .leftJoin(
+                    (qb) =>
+                        qb
+                            .select('c.story_id')
+                            .addSelect('COUNT(c.id)', 'chapter_count')
+                            .from(Chapter, 'c')
+                            .groupBy('c.story_id'),
+                    'ss',
+                    'ss.story_id = s.id',
+                )
                 .select([
                     's.id AS "storyId"',
                     's.title AS "title"',
@@ -223,6 +234,8 @@ export class UserService extends BaseCrudService<User> {
                     's.type AS "type"',
                     's.status AS "status"',
                     's.visibility AS "visibility"',
+                    's.likes_count AS "likesCount"',
+                    's.views_count AS "viewsCount"',
 
                     's.createdAt AS "createdAt"',
                     's.updatedAt AS "updatedAt"',
@@ -234,17 +247,27 @@ export class UserService extends BaseCrudService<User> {
                     'rh.lastReadAt AS "lastReadAt"',
                     'rh.lastReadChapter AS "lastReadChapter"',
                     'CASE WHEN likes.id IS NULL THEN false ELSE true END AS "isLike"',
-                    's.likes_count AS "likesCount"',
-                    's.views_count AS "viewsCount"',
-                    `(COUNT(*) OVER() = COALESCE((generation.prompt ->> 'numberOfChapters')::int, 0)) AS "isCompleted"`,
+
+                    'ss.chapter_count AS "chapterCount"',
+
+                    `(
+                        COALESCE(ss.chapter_count, 0) >= 
+                        COALESCE((generation.prompt ->> 'numberOfChapters')::int, 0)
+                    ) AS "isCompleted"`,
                 ])
                 .where('rh.user_id = :userId', { userId })
                 .andWhere('s.status = :status', {
                     status: StoryStatus.PUBLISHED,
                 })
-                .groupBy(
-                    's.id, a.id, rh.lastReadAt, rh.lastReadChapter, likes.id, s.likes_count, s.views_count, generation.prompt',
-                )
+                .groupBy('s.id')
+                .addGroupBy('a.id')
+                .addGroupBy('rh.lastReadAt')
+                .addGroupBy('rh.lastReadChapter')
+                .addGroupBy('likes.id')
+                .addGroupBy('s.likes_count')
+                .addGroupBy('s.views_count')
+                .addGroupBy('generation.prompt')
+                .addGroupBy('ss.chapter_count')
                 .orderBy('rh.lastReadAt', 'DESC')
                 .offset(offset)
                 .limit(limit);

@@ -20,6 +20,7 @@ export async function enrichStoriesToPreviewDto(
             likesCount: story.likesCount ?? 0,
             viewsCount: story.viewsCount ?? 0,
             sourceType: story.sourceType,
+            chapterCount: Number(story.chapterCount) ?? 0,
 
             categories: story.categories || [],
             mainCategory: story.mainCategory || null,
