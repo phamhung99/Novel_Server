@@ -66,7 +66,6 @@ export class InitializeStoryResponseDto {
     title: string;
     synopsis: string;
     numberOfChapters: number;
-    metadata: any;
     mainCategory: CategoryDto;
     categories: CategoryDto[];
     coverImageUrl: string;

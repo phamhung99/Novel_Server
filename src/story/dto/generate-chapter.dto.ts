@@ -31,13 +31,22 @@ export interface ChapterStructureResponse {
     raw: string;
 }
 
+export interface NextOption {
+    label: string;
+    description: string;
+}
+
+export interface ChapterStructure {
+    nextOptions: NextOption[];
+}
+
 export class GenerateChapterResponseDto {
     id: string;
     storyId: string;
     index: number;
     title: string;
     content: string;
-    structure: any;
+    structure: ChapterStructure;
     createdAt: Date;
     updatedAt: Date;
 }

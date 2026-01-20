@@ -52,6 +52,7 @@ import { GenerateCoverImageDto } from './dto/generate-cover-image.dto';
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
 import { Roles } from 'src/common/decorators/roles.decorator';
 import { RolesGuard } from 'src/common/guards/roles.guard';
+import { SkipTransform } from 'src/common/decorators/skip-transform.decorator';
 
 @Controller('story')
 export class StoryController {
@@ -187,6 +188,7 @@ export class StoryController {
 
     // REQUEST 1: Initialize story with outline
     @Post('generate/initialize')
+    @SkipTransform()
     async initializeStory(
         @Headers('x-user-id') userId: string,
         @Body() initializeStoryDto: InitializeStoryDto,
@@ -218,6 +220,7 @@ export class StoryController {
     }
 
     @Post(':storyId/generate/chapter')
+    @SkipTransform()
     async generateChapterWithContext(
         @Param('storyId') storyId: string,
         @Body() generateChapterDto: GenerateChapterDto,

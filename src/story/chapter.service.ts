@@ -5,6 +5,7 @@ import { Chapter } from './entities/chapter.entity';
 import { CreateChapterDto } from './dto/create-chapter.dto';
 import { UpdateChapterDto } from './dto/update-chapter.dto';
 import { GenerateChapterResponseDto } from './dto/generate-chapter.dto';
+import { cleanNextOptions } from 'src/common/utils/chapter.utils';
 
 @Injectable()
 export class ChapterService {
@@ -113,6 +114,10 @@ export class ChapterService {
 
         const generation = chapter.chapterGenerations?.[0];
 
+        const cleanedNextOptions = cleanNextOptions(
+            generation.structure?.nextOptions,
+        );
+
         return {
             id: chapter.id,
             storyId: chapter.storyId,
@@ -121,7 +126,9 @@ export class ChapterService {
             content: chapter.content,
             createdAt: chapter.createdAt,
             updatedAt: chapter.updatedAt,
-            structure: generation?.structure || null,
+            structure: {
+                nextOptions: cleanedNextOptions,
+            },
         };
     }
 

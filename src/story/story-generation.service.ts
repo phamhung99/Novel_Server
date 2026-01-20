@@ -37,6 +37,7 @@ import { Category } from './entities/categories.entity';
 import { StoryCategory } from './entities/story-category.entity';
 import { MediaService } from 'src/media/media.service';
 import { isEmptyObject } from 'src/ai/utils/object.utils';
+import { cleanNextOptions } from 'src/common/utils/chapter.utils';
 
 @Injectable()
 export class StoryGenerationService {
@@ -610,7 +611,6 @@ export class StoryGenerationService {
                 coverImage: true,
                 generation: {
                     prompt: true,
-                    metadata: true,
                 },
             },
         });
@@ -647,7 +647,6 @@ export class StoryGenerationService {
             numberOfChapters: story.generation?.prompt?.numberOfChapters || 0,
             mainCategory,
             categories,
-            metadata: story.generation?.metadata.storyContext || {},
             coverImageUrl: skipImage
                 ? DEFAULT_COVER_IMAGE_URL
                 : await this.mediaService.getMediaUrl(story.coverImage),
@@ -714,13 +713,19 @@ export class StoryGenerationService {
             );
         }
 
+        const cleanedNextOptions = cleanNextOptions(
+            generation.structure?.nextOptions,
+        );
+
         return {
             id: generation.chapter.id,
             storyId: generation.chapter.storyId,
             index: generation.chapter.index,
             title: generation.chapter.title,
             content: generation.chapter.content,
-            structure: generation.structure || ({} as any),
+            structure: {
+                nextOptions: cleanedNextOptions,
+            },
             createdAt: generation.chapter.createdAt,
             updatedAt: generation.chapter.updatedAt,
         };
