@@ -346,6 +346,9 @@ const ManageStories = () => {
                             showAiColumn={true}
                             sort={sort}
                             onSortChange={setSort}
+                            onRowDoubleClick={(storyId) => {
+                                navigate(`${ROUTES.STORY_OVERVIEW}/${storyId}`);
+                            }}
                         />
                         <TablePagination
                             component="div"

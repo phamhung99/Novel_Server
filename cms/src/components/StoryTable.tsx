@@ -24,6 +24,7 @@ interface StoryTableProps {
     showAiColumn?: boolean;
     sort: string;
     onSortChange: (newSort: string) => void;
+    onRowDoubleClick?: (storyId: string) => void;
 }
 
 export const StoryTable = ({
@@ -34,6 +35,7 @@ export const StoryTable = ({
     showAiColumn = true,
     sort,
     onSortChange,
+    onRowDoubleClick,
 }: StoryTableProps) => {
     const handleSelectAllClick = (
         event: React.ChangeEvent<HTMLInputElement>,
@@ -254,6 +256,7 @@ export const StoryTable = ({
                             selected={isItemSelected}
                             sx={{ cursor: 'pointer' }}
                             onClick={() => handleClick(story.id)}
+                            onDoubleClick={() => onRowDoubleClick?.(story.id)}
                         >
                             <TableCell padding="checkbox">
                                 <Checkbox
