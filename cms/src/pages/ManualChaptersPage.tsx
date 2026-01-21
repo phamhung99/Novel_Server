@@ -28,6 +28,8 @@ import { useNavigate, useParams } from 'react-router-dom';
 import axios from '../api/axios';
 import { ROUTES } from '../constants/app.constants';
 
+import { ChapterRichEditor } from '../components/ChapterRichEditor';
+
 type ChapterDraft = {
     index: number;
     title: string;
@@ -368,7 +370,10 @@ const ManualChaptersPage = () => {
         );
         for (const d of drafts) {
             if (!d.title.trim()) return 'Chapter title is required';
-            if (!d.content.trim()) return 'Chapter content is required';
+
+            const textContent = d.content.replace(/<[^>]+>/g, '').trim();
+            if (!textContent) return 'Chapter content is required';
+
             if (d.index < 1) return 'Chapter index must be ≥ 1';
             if (usedExisting.has(d.index))
                 return `Index ${d.index} is already used by an existing chapter`;
@@ -874,19 +879,12 @@ const ManualChaptersPage = () => {
                                         </IconButton>
                                     </Stack>
 
-                                    <TextField
-                                        fullWidth
-                                        required
-                                        label="Chapter Content"
-                                        value={d.content}
-                                        onChange={(e) =>
-                                            updateRow(i, {
-                                                content: e.target.value,
-                                            })
+                                    <ChapterRichEditor
+                                        content={d.content}
+                                        onUpdate={(html) =>
+                                            updateRow(i, { content: html })
                                         }
-                                        multiline
-                                        minRows={10}
-                                        maxRows={14}
+                                        placeholder="Edit chapter content..."
                                     />
                                 </Box>
                             ))}

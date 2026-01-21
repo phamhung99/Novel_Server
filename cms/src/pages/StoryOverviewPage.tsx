@@ -25,6 +25,7 @@ import {
     InputLabel,
     Select,
     MenuItem,
+    FormHelperText,
 } from '@mui/material';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import EditIcon from '@mui/icons-material/Edit';
@@ -224,6 +225,31 @@ const StoryOverviewPage = () => {
         setStory((prev) => prev && { ...prev, [field]: value });
     };
 
+    const handleUpdateStory = async () => {
+        try {
+            if (!story) {
+                throw new Error('No story to update');
+            }
+
+            await axios.put(
+                `/api/v1/story/${storyId}`,
+                {
+                    title: story.title,
+                    synopsis: story.synopsis,
+                    freeChaptersCount: story.freeChaptersCount,
+                    isFullyFree: story.isFullyFree,
+                },
+                {
+                    headers: { 'x-user-id': userId },
+                },
+            );
+
+            setEditMode(false);
+        } catch (err) {
+            console.error('Failed to update story:', err);
+        }
+    };
+
     if (loading)
         return (
             <CircularProgress sx={{ display: 'block', mx: 'auto', my: 8 }} />
@@ -341,27 +367,7 @@ const StoryOverviewPage = () => {
                             fullWidth
                             variant="contained"
                             color="success"
-                            onClick={async () => {
-                                try {
-                                    await axios.put(
-                                        `/api/v1/story/${storyId}`,
-                                        {
-                                            title: story.title,
-                                            synopsis: story.synopsis,
-                                        },
-                                        {
-                                            headers: { 'x-user-id': userId },
-                                        },
-                                    );
-
-                                    setEditMode(false);
-                                } catch (err) {
-                                    console.error(
-                                        'Failed to update story:',
-                                        err,
-                                    );
-                                }
-                            }}
+                            onClick={handleUpdateStory}
                             sx={{ mb: 2 }}
                         >
                             Save Story Info
@@ -407,6 +413,121 @@ const StoryOverviewPage = () => {
                                 <strong>Type:</strong> {story.type} |{' '}
                                 <strong>Status:</strong> {story.status}
                             </Typography>
+
+                            {/* ── NEW: Free chapters & fully free toggles ── */}
+                            {editMode ? (
+                                <Grid
+                                    container
+                                    spacing={3}
+                                    sx={{ mt: 2, mb: 3 }}
+                                >
+                                    <Grid size={{ xs: 12, sm: 6 }}>
+                                        <TextField
+                                            fullWidth
+                                            type="number"
+                                            label="Free Chapters Count"
+                                            value={
+                                                story.freeChaptersCount ?? ''
+                                            }
+                                            onChange={(e) => {
+                                                const val = e.target.value;
+                                                handleChange(
+                                                    'freeChaptersCount',
+                                                    val === ''
+                                                        ? undefined
+                                                        : Number(val),
+                                                );
+                                            }}
+                                            placeholder="e.g. 3 (first 3 chapters free)"
+                                            helperText="Leave empty or 0 = no free chapters"
+                                            InputProps={{
+                                                inputProps: {
+                                                    min: 0,
+                                                    max:
+                                                        story.chapters.length ||
+                                                        999,
+                                                },
+                                            }}
+                                            sx={{ mb: 1 }}
+                                        />
+                                    </Grid>
+
+                                    <Grid size={{ xs: 12, sm: 6 }}>
+                                        <FormControl fullWidth>
+                                            <InputLabel>
+                                                Access Model
+                                            </InputLabel>
+                                            <Select
+                                                value={
+                                                    story.isFullyFree
+                                                        ? 'fully-free'
+                                                        : 'freemium'
+                                                }
+                                                label="Access Model"
+                                                onChange={(e) => {
+                                                    handleChange(
+                                                        'isFullyFree',
+                                                        e.target.value ===
+                                                            'fully-free',
+                                                    );
+                                                    // Optional: reset freeChaptersCount when switching to fully free
+                                                    if (
+                                                        e.target.value ===
+                                                        'fully-free'
+                                                    ) {
+                                                        handleChange(
+                                                            'freeChaptersCount',
+                                                            undefined,
+                                                        );
+                                                    }
+                                                }}
+                                            >
+                                                <MenuItem value="freemium">
+                                                    Freemium (some chapters
+                                                    paid)
+                                                </MenuItem>
+                                                <MenuItem value="fully-free">
+                                                    Fully Free
+                                                </MenuItem>
+                                            </Select>
+                                            <FormHelperText>
+                                                {story.isFullyFree
+                                                    ? 'All chapters are accessible without payment'
+                                                    : 'Only first N chapters are free'}
+                                            </FormHelperText>
+                                        </FormControl>
+                                    </Grid>
+                                </Grid>
+                            ) : (
+                                // ── Display mode ─────────────────────────────────────────────
+                                <Box sx={{ mt: 2, mb: 3 }}>
+                                    {story.isFullyFree ? (
+                                        <Chip
+                                            label="Fully Free"
+                                            color="success"
+                                            variant="filled"
+                                            sx={{ fontWeight: 'medium' }}
+                                        />
+                                    ) : story.freeChaptersCount &&
+                                      story.freeChaptersCount > 0 ? (
+                                        <Chip
+                                            label={`First ${story.freeChaptersCount} chapter${
+                                                story.freeChaptersCount > 1
+                                                    ? 's'
+                                                    : ''
+                                            } free`}
+                                            color="primary"
+                                            variant="outlined"
+                                        />
+                                    ) : (
+                                        <Chip
+                                            label="All chapters paid"
+                                            color="default"
+                                            variant="outlined"
+                                        />
+                                    )}
+                                </Box>
+                            )}
 
                             {/* Categories (Main Category highlighted) */}
                             <Typography
