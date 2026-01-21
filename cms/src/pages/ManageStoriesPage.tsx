@@ -30,6 +30,7 @@ import SearchIcon from '@mui/icons-material/Search';
 import { useDebounce } from '../hooks/useDebounce';
 import Snackbar from '@mui/material/Snackbar';
 import Alert from '@mui/material/Alert';
+import { openInNewTab } from '../utils/openInNewTab';
 
 const ManageStories = () => {
     const [statusFilter, setStatusFilter] = useState('all');
@@ -347,7 +348,9 @@ const ManageStories = () => {
                             sort={sort}
                             onSortChange={setSort}
                             onRowDoubleClick={(storyId) => {
-                                navigate(`${ROUTES.STORY_OVERVIEW}/${storyId}`);
+                                openInNewTab(
+                                    `${ROUTES.STORY_OVERVIEW}/${storyId}`,
+                                );
                             }}
                         />
                         <TablePagination
