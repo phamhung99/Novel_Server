@@ -24,8 +24,6 @@ import Bold from '@tiptap/extension-bold';
 import Italic from '@tiptap/extension-italic';
 import Placeholder from '@tiptap/extension-placeholder';
 
-import type { Editor } from '@tiptap/react';
-
 interface ChapterRichEditorProps {
     content: string;
     onUpdate?: (html: string) => void;
@@ -104,7 +102,7 @@ export const ChapterRichEditor = ({
             }}
             extensions={extensions}
             editable={!readOnly}
-            renderControls={(editor: Editor | null) => (
+            renderControls={() => (
                 <MenuControlsContainer>
                     <MenuSelectHeading />
                     <MenuDivider />
