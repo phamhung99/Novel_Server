@@ -26,6 +26,8 @@ export class StoryPreviewDto {
     viewsCount: number;
     sourceType?: string;
 
+    chapterCount: number;
+
     categories: StoryPreviewCategoryDto[];
     mainCategory: StoryPreviewCategoryDto | null;
 

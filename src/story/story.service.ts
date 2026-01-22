@@ -39,6 +39,9 @@ export class StoryService {
         this.publication,
     );
 
+    findPreviewStoryById = this.crud.findPreviewStoryById.bind(this.crud);
+    findDetailStoryById = this.crud.findDetailStoryById.bind(this.crud);
+
     // ========================
     // Publication Workflow
     // ========================
