@@ -101,6 +101,27 @@ export class Story {
     @Column({ name: 'views_count', type: 'int', default: 0 })
     viewsCount: number;
 
+    @Column({
+        type: 'decimal',
+        precision: 8,
+        scale: 3,
+        default: 0,
+        name: 'trending_score',
+    })
+    trendingScore: number;
+
+    @Column({
+        type: 'decimal',
+        precision: 8,
+        scale: 3,
+        default: 0,
+        name: 'search_score',
+    })
+    searchScore: number;
+
+    @Column({ type: 'varchar', nullable: true })
+    keyword: string;
+
     @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
     createdAt: Date;
 
