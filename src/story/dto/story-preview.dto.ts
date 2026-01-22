@@ -3,8 +3,8 @@ export class StoryPreviewChapterDto {
     index: number;
     title: string;
     isLock: boolean;
-    createdAt: string;
-    updatedAt: string;
+    createdAt: Date;
+    updatedAt: Date;
 }
 
 export class StoryPreviewCategoryDto {

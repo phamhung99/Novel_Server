@@ -119,6 +119,19 @@ export class UserService extends BaseCrudService<User> {
             .getOne();
     }
 
+    async findUserRoleById(id: string): Promise<string> {
+        const user = await this.repository.findOne({
+            where: { id },
+            select: ['role'],
+        });
+
+        if (!user) {
+            throw new NotFoundException(ERROR_MESSAGES.USER_NOT_FOUND);
+        }
+
+        return user.role;
+    }
+
     async createOrUpdateUser({
         userId,
         language,

@@ -80,6 +80,12 @@ export class Story {
     })
     sourceType: StorySource;
 
+    @Column({ type: 'boolean', default: true, name: 'is_fully_free' })
+    isFullyFree: boolean;
+
+    @Column({ type: 'int', default: 0, name: 'free_chapters_count' })
+    freeChaptersCount: number;
+
     @Column({ name: 'approved_by', nullable: true })
     approvedBy: string;
 
