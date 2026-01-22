@@ -21,11 +21,9 @@ export class StoryPreviewDto {
     status: string;
     createdAt: string;
     updatedAt: string;
-    visibility?: string;
+    visibility: string;
     likesCount: number;
     viewsCount: number;
-    sourceType?: string;
-
     chapterCount: number;
 
     categories: StoryPreviewCategoryDto[];

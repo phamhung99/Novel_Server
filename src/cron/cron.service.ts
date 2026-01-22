@@ -29,7 +29,7 @@ export class CronService {
     ) {}
 
     async updateTrendingScores(): Promise<void> {
-        this.logger.log('Bắt đầu cập nhật trending_score cho tất cả truyện...');
+        this.logger.log('Starting trending_score update for all stories...');
 
         const thirtyDaysAgo = new Date();
         thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
