@@ -101,8 +101,6 @@ export class ChapterService {
             isAdmin = userRole === UserRole.ADMIN;
         }
 
-        console.log('isAdmin:', isAdmin);
-
         if (isAdmin) {
             const chapters = await this.chapterRepository.find({
                 where: { storyId },

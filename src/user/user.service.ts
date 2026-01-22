@@ -543,9 +543,11 @@ export class UserService extends BaseCrudService<User> {
                 success: true,
                 message: `Ad watched successfully! You received ${coinsToGrant} coins.`,
                 data: {
-                    coinsGranted: coinsToGrant,
-                    currentViews: todayAction.count,
-                    maxViews: this.MAX_AD_VIEWS_PER_DAY,
+                    adInfo: {
+                        coinsGranted: coinsToGrant,
+                        currentViews: todayAction.count,
+                        maxViews: this.MAX_AD_VIEWS_PER_DAY,
+                    },
                     wallet: updatedCoins,
                 },
             };
