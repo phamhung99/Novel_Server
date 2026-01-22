@@ -192,6 +192,7 @@ export class StoryDiscoveryService {
                 's.visibility AS "visibility"',
                 's.likes_count AS "likesCount"',
                 's.views_count AS "viewsCount"',
+                's.trendingScore AS "trendingScore"',
 
                 `json_agg(DISTINCT jsonb_build_object('id', cat.id, 'name', cat.name)) AS "categories"`,
 
@@ -229,16 +230,13 @@ export class StoryDiscoveryService {
             .addGroupBy('rh.lastReadChapter')
             .addGroupBy('ss.chapter_count')
             .addGroupBy('recent_views.views_count')
-            .addOrderBy('recent_views.views_count', 'DESC', 'NULLS LAST')
-            .addOrderBy('s.likes_count', 'DESC', 'NULLS LAST')
+            .addOrderBy('s.trendingScore', 'DESC', 'NULLS LAST')
             .addOrderBy('s.updatedAt', 'DESC')
             .offset(offset)
             .limit(limit);
 
         const stories = await qb.getRawMany();
         const total = await qb.offset(0).limit(undefined).getCount();
-
-        // Lấy chapters giống như trong getUserLibrary
 
         const items = await enrichStoriesToPreviewDto(
             stories,
@@ -312,6 +310,7 @@ export class StoryDiscoveryService {
                 's.visibility AS "visibility"',
                 's.likes_count AS "likesCount"',
                 's.views_count AS "viewsCount"',
+                's.trendingScore AS "trendingScore"',
 
                 `json_agg(DISTINCT jsonb_build_object('id', cat.id, 'name', cat.name)) AS "categories"`,
 
@@ -348,8 +347,7 @@ export class StoryDiscoveryService {
             .addGroupBy('rh.lastReadChapter')
             .addGroupBy('ss.chapter_count')
             .addGroupBy('recent_views.views_count')
-            .addOrderBy('recent_views.views_count', 'DESC', 'NULLS LAST')
-            .addOrderBy('s.likes_count', 'DESC', 'NULLS LAST')
+            .addOrderBy('s.trendingScore', 'DESC', 'NULLS LAST')
             .addOrderBy('s.updatedAt', 'DESC')
             .offset(offset)
             .limit(limit)
