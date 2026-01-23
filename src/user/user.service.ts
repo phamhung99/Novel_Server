@@ -567,7 +567,7 @@ export class UserService extends BaseCrudService<User> {
 
         const coinRecords = await repo.find({
             where: { userId },
-            order: { createdAt: 'ASC' },
+            order: { createdAt: 'DESC' },
         });
 
         // 1. Permanent coins (thường không expire)
