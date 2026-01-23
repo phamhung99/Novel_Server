@@ -145,7 +145,236 @@ export class CronService {
             throw error;
         }
     }
+
+    async updateSearchScores(): Promise<void> {
+        this.logger.log(
+            'Starting bulk search score calculation for all stories...',
+        );
+
+        const now = new Date();
+        const sevenDaysAgo = new Date(now);
+        sevenDaysAgo.setDate(now.getDate() - 7);
+
+        const fourteenDaysAgo = new Date(now);
+        fourteenDaysAgo.setDate(now.getDate() - 14);
+
+        const ninetyDaysAgo = new Date(now);
+        ninetyDaysAgo.setDate(now.getDate() - 90);
+
+        try {
+            // Lấy tất cả story đang active + chapter đầu tiên (tránh N+1 bằng left join)
+            const storiesWithFirstChapter = await this.storyRepo
+                .createQueryBuilder('s')
+                .leftJoinAndSelect('s.chapters', 'c', 'c.index = 1')
+                .where('s.deletedAt IS NULL')
+                .select(['s.id AS "storyId"', 'c.id AS "firstChapterId"'])
+                .getRawMany<{
+                    storyId: string;
+                    firstChapterId: string | null;
+                }>();
+
+            if (storiesWithFirstChapter.length === 0) {
+                this.logger.log('No active stories found.');
+                return;
+            }
+
+            const validStories = storiesWithFirstChapter.filter(
+                (s) => s.firstChapterId !== null,
+            );
+
+            if (validStories.length === 0) {
+                this.logger.log('No stories with chapter 1 found.');
+                return;
+            }
+
+            this.logger.log(
+                `Processing ${validStories.length} stories in bulk...`,
+            );
+
+            // Lấy TẤT CẢ chapter views cần thiết một lần (lọc từ 90 ngày trước để bao quát tất cả)
+            const allRelevantViews = await this.chapterViewRepo
+                .createQueryBuilder('cv')
+                .innerJoin('cv.chapter', 'ch')
+                .where('cv.story_id IN (:...storyIds)', {
+                    storyIds: validStories.map((s) => s.storyId),
+                })
+                .andWhere('cv.viewedAt >= :ninetyDaysAgo', { ninetyDaysAgo })
+                .select([
+                    'cv.story_id AS "storyId"',
+                    'cv.user_id AS "userId"',
+                    'cv.viewedAt AS "viewedAt"',
+                    'ch.index AS "chapterIndex"',
+                ])
+                .orderBy('cv.story_id', 'ASC')
+                .addOrderBy('cv.user_id', 'ASC')
+                .addOrderBy('cv.viewedAt', 'ASC')
+                .getRawMany<{
+                    storyId: string;
+                    userId: string;
+                    viewedAt: Date;
+                    chapterIndex: number;
+                }>();
+
+            console.log(validStories);
+
+            // Group theo story → user → list views (sorted by time)
+            const viewsByStoryAndUser = new Map<
+                string,
+                Map<string, { viewedAt: Date; chapterIndex: number }[]>
+            >();
+
+            for (const view of allRelevantViews) {
+                const storyKey = view.storyId;
+                if (!viewsByStoryAndUser.has(storyKey)) {
+                    viewsByStoryAndUser.set(storyKey, new Map());
+                }
+                const userMap = viewsByStoryAndUser.get(storyKey)!;
+                if (!userMap.has(view.userId)) {
+                    userMap.set(view.userId, []);
+                }
+                userMap.get(view.userId)!.push({
+                    viewedAt: view.viewedAt,
+                    chapterIndex: view.chapterIndex,
+                });
+            }
+
+            // Tính score cho từng story in-memory
+            const scoreUpdates: { id: string; searchScore: number }[] = [];
+
+            for (const { storyId } of validStories) {
+                const userViews = viewsByStoryAndUser.get(storyId) || new Map();
+
+                let earlyRetention14dCount = 0;
+                let deepRetention7dCount = 0;
+                let earlyRetention90dCount = 0;
+                let countRecentEarly = 0;
+                let countDeep = 0;
+                let countLongTermEarly = 0;
+
+                for (const [userId, views] of userViews) {
+                    // views đã sort theo thời gian
+                    const firstChapterViews = views.filter(
+                        (v) => v.chapterIndex === 1,
+                    );
+                    if (firstChapterViews.length === 0) continue;
+
+                    const firstChapter1Time = firstChapterViews[0].viewedAt;
+
+                    // Early retention 14 ngày
+                    if (
+                        firstChapter1Time >= fourteenDaysAgo &&
+                        firstChapter1Time <= now
+                    ) {
+                        countRecentEarly++;
+                        const continued = views.some(
+                            (v) =>
+                                v.chapterIndex > 1 &&
+                                v.viewedAt <=
+                                    new Date(
+                                        firstChapter1Time.getTime() +
+                                            7 * 24 * 60 * 60 * 1000,
+                                    ),
+                        );
+                        if (continued) earlyRetention14dCount++;
+                    }
+
+                    // Deep retention 7 ngày
+                    if (
+                        firstChapter1Time >= sevenDaysAgo &&
+                        firstChapter1Time <= now
+                    ) {
+                        countDeep++;
+                        const reachedCh5 = views.some(
+                            (v) => v.chapterIndex >= 5,
+                        );
+                        if (reachedCh5) deepRetention7dCount++;
+                    }
+
+                    // Long-term early 90 ngày
+                    if (
+                        firstChapter1Time >= ninetyDaysAgo &&
+                        firstChapter1Time <= now
+                    ) {
+                        countLongTermEarly++;
+                        const continued = views.some(
+                            (v) =>
+                                v.chapterIndex > 1 &&
+                                v.viewedAt <=
+                                    new Date(
+                                        firstChapter1Time.getTime() +
+                                            7 * 24 * 60 * 60 * 1000,
+                                    ),
+                        );
+                        if (continued) earlyRetention90dCount++;
+                    }
+                }
+
+                // Tính phần trăm
+                const er14 =
+                    countRecentEarly > 0
+                        ? (earlyRetention14dCount / countRecentEarly) * 100
+                        : null;
+                const dr7 =
+                    countDeep > 0
+                        ? (deepRetention7dCount / countDeep) * 100
+                        : null;
+                const er90 =
+                    countLongTermEarly > 0
+                        ? (earlyRetention90dCount / countLongTermEarly) * 100
+                        : null;
+
+                // Logic tính final score giống bản gốc
+                let finalScore = 0;
+
+                const hasRecentEarly = er14 !== null && er14 >= 0;
+                const hasDeep = dr7 !== null && dr7 >= 0;
+                const hasLongTerm = er90 !== null && er90 >= 0;
+
+                if (hasRecentEarly && hasDeep) {
+                    finalScore = ((er14! + dr7!) / 2) * 1.3;
+                } else if (hasRecentEarly) {
+                    finalScore = er14!;
+                } else if (hasDeep) {
+                    finalScore = dr7!;
+                } else if (hasLongTerm) {
+                    finalScore = er90!;
+                }
+
+                finalScore = Math.min(finalScore, 100);
+
+                scoreUpdates.push({
+                    id: storyId,
+                    searchScore: Number(finalScore.toFixed(3)),
+                });
+            }
+
+            // Bulk update bằng .save() với chunk để tránh N+1 và tối ưu memory/transaction
+            if (scoreUpdates.length > 0) {
+                const ids = scoreUpdates.map((u) => u.id);
+                const scores = scoreUpdates.map((u) => u.searchScore);
+
+                await this.storyRepo.manager.query(
+                    `
+                        UPDATE comic."story" AS s
+                        SET "search_score" = v.score
+                        FROM unnest($1::uuid[], $2::numeric[]) AS v(id, score)
+                        WHERE s.id = v.id
+                    `,
+                    [ids, scores],
+                );
+
+                this.logger.log(
+                    `Updated search scores for ${scoreUpdates.length} stories`,
+                );
+            }
+        } catch (error) {
+            this.logger.error('Bulk search score update failed', error);
+            throw error;
+        }
+    }
+
     async runAllScheduledTasks() {
-        await this.updateTrendingScores();
+        // await this.updateTrendingScores();
+        await this.updateSearchScores();
     }
 }
