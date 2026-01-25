@@ -13,6 +13,8 @@ import { MediaService } from 'src/media/media.service';
 import { StorySource } from 'src/common/enums/app.enum';
 import { StoryCategory } from './entities/story-category.entity';
 import { parseSort } from 'src/common/utils/query-parser';
+import { enrichStoryToPreviewDto } from 'src/common/mappers/story-preview.mapper';
+import { StoryPreviewDto } from './dto/story-preview.dto';
 
 @Injectable()
 export class StoryCrudService {
@@ -285,7 +287,19 @@ export class StoryCrudService {
         });
     }
 
-    async findStoryById(id: string) {
+    async findStoryById(id: string): Promise<Story> {
+        const story = await this.storyRepository.findOne({
+            where: { id },
+        });
+
+        if (!story) {
+            throw new NotFoundException(`Story with ID ${id} not found`);
+        }
+
+        return story;
+    }
+
+    async findDetailStoryById(id: string) {
         const story = await this.storyRepository.findOne({
             where: { id },
             relations: {
@@ -303,6 +317,11 @@ export class StoryCrudService {
                 authorId: true,
                 status: true,
                 visibility: true,
+                sourceType: true,
+                isFullyFree: true,
+                freeChaptersCount: true,
+                likesCount: true,
+                viewsCount: true,
                 rating: true,
                 createdAt: true,
                 updatedAt: true,
@@ -374,10 +393,86 @@ export class StoryCrudService {
         };
     }
 
+    async findPreviewStoryById(
+        id: string,
+        currentUserId?: string,
+    ): Promise<StoryPreviewDto> {
+        const story = await this.storyRepository.findOne({
+            where: { id },
+            relations: [
+                'author',
+                'chapters',
+                'generation',
+                'storyCategories',
+                'storyCategories.category',
+            ],
+            order: {
+                chapters: {
+                    index: 'ASC',
+                },
+            },
+        });
+
+        if (!story) {
+            throw new NotFoundException(`Story with ID ${id} not found`);
+        }
+
+        const previewInput = {
+            storyId: story.id,
+            title: story.title,
+            synopsis: story.synopsis,
+            rating: story.rating,
+            type: story.type,
+            status: story.status,
+            createdAt: story.createdAt,
+            updatedAt: story.updatedAt,
+            visibility: story.visibility,
+            likesCount: story.likesCount ?? 0,
+            viewsCount: story.viewsCount ?? 0,
+            sourceType: story.sourceType,
+            chapterCount: story.chapters?.length ?? 0,
+
+            authorId: story.author?.id,
+            authorUsername: story.author?.username,
+            profileImage: story.author?.profileImage,
+            coverImage: story.coverImage,
+
+            categories:
+                story.storyCategories
+                    ?.filter((sc) => sc.category)
+                    .map((sc) => ({
+                        id: sc.category.id,
+                        name: sc.category.name,
+                    })) ?? [],
+
+            mainCategory: story.storyCategories?.find((sc) => sc.isMainCategory)
+                ?.category
+                ? {
+                      id: story.storyCategories.find((sc) => sc.isMainCategory)!
+                          .category.id,
+                      name: story.storyCategories.find(
+                          (sc) => sc.isMainCategory,
+                      )!.category.name,
+                  }
+                : null,
+
+            lastReadAt: null,
+            lastReadChapter: null,
+            isLike: false,
+            isCompleted: false,
+        };
+
+        return enrichStoryToPreviewDto(
+            previewInput,
+            this.mediaService,
+            currentUserId,
+        );
+    }
+
     async updateStory(
         id: string,
         updateStoryDto: UpdateStoryDto,
-    ): Promise<Story> {
+    ): Promise<StoryPreviewDto> {
         const story = await this.findStoryById(id);
 
         if (
@@ -388,7 +483,9 @@ export class StoryCrudService {
         }
 
         Object.assign(story, updateStoryDto);
-        return this.storyRepository.save(story);
+        await this.storyRepository.save(story);
+
+        return this.findPreviewStoryById(id);
     }
 
     async deleteStory(id: string): Promise<void> {

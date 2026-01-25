@@ -7,6 +7,7 @@ import {
     Button,
     Divider,
     Stack,
+    Box,
 } from '@mui/material';
 
 import EditIcon from '@mui/icons-material/Edit';
@@ -15,6 +16,9 @@ import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import axios from '../api/axios';
 import { ROUTES } from '../constants/app.constants';
+
+import DOMPurify from 'dompurify';
+import { ChapterRichEditor } from '../components/ChapterRichEditor';
 
 interface FullChapterDto {
     id: string;
@@ -207,17 +211,20 @@ const ChapterReaderPage = () => {
 
             {editMode ? (
                 <>
-                    <TextField
-                        fullWidth
-                        multiline
-                        minRows={20}
-                        value={chapter.content}
-                        onChange={(e) =>
-                            handleChapterChange('content', e.target.value)
+                    <ChapterRichEditor
+                        content={chapter.content}
+                        onUpdate={(html) =>
+                            handleChapterChange('content', html)
                         }
-                        sx={{ mb: 4 }}
+                        minHeight="500px"
+                        placeholder="Edit chapter content..."
                     />
-                    <Stack direction="row" spacing={2} justifyContent="center">
+                    <Stack
+                        direction="row"
+                        spacing={2}
+                        justifyContent="center"
+                        sx={{ mt: 3 }}
+                    >
                         <Button
                             variant="contained"
                             color="secondary"
@@ -236,20 +243,36 @@ const ChapterReaderPage = () => {
                     </Stack>
                 </>
             ) : (
-                <Typography
-                    component="div"
-                    variant="body1"
-                    whiteSpace="pre-line"
+                <Box
                     sx={{
                         fontSize: '1.25rem',
                         lineHeight: 2.2,
                         maxWidth: '900px',
                         mx: 'auto',
                         textAlign: 'justify',
+                        '& p': { mb: '1.2em' },
+                        '& strong, & b': { fontWeight: 700 },
+                        '& em, & i': { fontStyle: 'italic' },
+                        '& u': { textDecoration: 'underline' },
+                        '& h1': { fontSize: '2.5rem', fontWeight: 800, mb: 2 },
+                        '& h2': { fontSize: '2rem', fontWeight: 700, mb: 1.5 },
+                        '& h3': { fontSize: '1.6rem', fontWeight: 700, mb: 1 },
+                        '& ul, & ol': { pl: 4, mb: 2 },
+                        '& li': { mb: 0.5 },
+                        '& img': {
+                            maxWidth: '100%',
+                            height: 'auto',
+                            borderRadius: 1,
+                            my: 2,
+                        },
                     }}
                 >
-                    {chapter.content}
-                </Typography>
+                    <div
+                        dangerouslySetInnerHTML={{
+                            __html: DOMPurify.sanitize(chapter.content || ''),
+                        }}
+                    />
+                </Box>
             )}
 
             {/* Navigation - ĐÃ SỬA HOÀN CHỈNH */}

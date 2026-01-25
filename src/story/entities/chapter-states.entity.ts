@@ -1,4 +1,10 @@
-import { Entity, PrimaryColumn, ManyToOne, JoinColumn } from 'typeorm';
+import {
+    Entity,
+    PrimaryColumn,
+    ManyToOne,
+    JoinColumn,
+    CreateDateColumn,
+} from 'typeorm';
 import { User } from 'src/user/entities/user.entity';
 import { Chapter } from './chapter.entity';
 
@@ -9,6 +15,9 @@ export class ChapterState {
 
     @PrimaryColumn({ name: 'chapter_id', type: 'uuid' })
     chapterId: string;
+
+    @CreateDateColumn({ name: 'unlocked_at', type: 'timestamptz' })
+    unlockedAt: Date;
 
     @ManyToOne(() => User, (user) => user.chapterStates, {
         onDelete: 'CASCADE',

@@ -28,6 +28,8 @@ export interface StoryDto {
     status: string;
     visibility: string;
     sourceType: string;
+    freeChaptersCount?: number;
+    isFullyFree?: boolean;
     createdAt: string;
     updatedAt: string;
     deletedAt: string | null;

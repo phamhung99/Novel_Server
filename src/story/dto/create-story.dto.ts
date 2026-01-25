@@ -3,8 +3,11 @@ import {
     IsOptional,
     IsEnum,
     IsArray,
-    IsUrl,
+    // IsUrl,
     IsUUID,
+    IsBoolean,
+    Min,
+    IsInt,
 } from 'class-validator';
 import { StoryType } from '../../common/enums/story-type.enum';
 import { StoryVisibility } from 'src/common/enums/story-visibility.enum';
@@ -32,9 +35,19 @@ export class CreateStoryDto {
     visibility: StoryVisibility;
 
     @IsOptional()
-    canEdit: boolean;
+    @IsBoolean()
+    canEdit?: boolean;
+
+    // @IsOptional()
+    // @IsUrl()
+    // coverImage?: string;
 
     @IsOptional()
-    @IsUrl()
-    coverImage?: string;
+    @IsInt()
+    @Min(0)
+    freeChaptersCount?: number;
+
+    @IsOptional()
+    @IsBoolean()
+    isFullyFree?: boolean;
 }

@@ -80,6 +80,12 @@ export class Story {
     })
     sourceType: StorySource;
 
+    @Column({ type: 'boolean', default: true, name: 'is_fully_free' })
+    isFullyFree: boolean;
+
+    @Column({ type: 'int', default: 0, name: 'free_chapters_count' })
+    freeChaptersCount: number;
+
     @Column({ name: 'approved_by', nullable: true })
     approvedBy: string;
 
@@ -94,6 +100,27 @@ export class Story {
 
     @Column({ name: 'views_count', type: 'int', default: 0 })
     viewsCount: number;
+
+    @Column({
+        type: 'decimal',
+        precision: 8,
+        scale: 3,
+        default: 0,
+        name: 'trending_score',
+    })
+    trendingScore: number;
+
+    @Column({
+        type: 'decimal',
+        precision: 8,
+        scale: 3,
+        default: 0,
+        name: 'search_score',
+    })
+    searchScore: number;
+
+    @Column({ type: 'varchar', nullable: true })
+    keyword: string;
 
     @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
     createdAt: Date;

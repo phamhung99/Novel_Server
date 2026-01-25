@@ -47,10 +47,14 @@ export class Chapter {
     @UpdateDateColumn({ name: 'updated_at', type: 'timestamptz' })
     updatedAt: Date;
 
-    @OneToMany(() => ChapterState, (chapterState) => chapterState.chapter)
+    @OneToMany(() => ChapterState, (chapterState) => chapterState.chapter, {
+        cascade: true,
+    })
     chapterStates: ChapterState[];
 
-    @OneToMany(() => ChapterAudio, (chapterAudio) => chapterAudio.chapter)
+    @OneToMany(() => ChapterAudio, (chapterAudio) => chapterAudio.chapter, {
+        cascade: true,
+    })
     chapterAudios: ChapterAudio[];
 
     @OneToMany(() => ChapterAudio, (chapterAudio) => chapterAudio.chapter)

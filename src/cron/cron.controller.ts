@@ -1,24 +1,24 @@
-// import { Controller, Get } from '@nestjs/common';
-// import { CronService } from './cron.service';
+import { Controller, Get } from '@nestjs/common';
+import { CronService } from './cron.service';
 
-// @Controller('cron')
-// export class CronController {
-//     constructor(private readonly cronService: CronService) {}
+@Controller('cron')
+export class CronController {
+    constructor(private readonly cronService: CronService) {}
 
-//     @Get('update-summaries')
-//     async updateAllSummaries() {
-//         try {
-//             await this.cronService.updateStorySummary();
-//             return {
-//                 success: true,
-//                 message: 'All story summaries updated successfully',
-//             };
-//         } catch (error) {
-//             return {
-//                 success: false,
-//                 message: 'Failed to update story summaries',
-//                 error: error.message,
-//             };
-//         }
-//     }
-// }
+    @Get('')
+    async runAllScheduledTasks() {
+        try {
+            await this.cronService.runAllScheduledTasks();
+            return {
+                success: true,
+                message: 'All scheduled tasks executed successfully',
+            };
+        } catch (error) {
+            return {
+                success: false,
+                message: 'Failed to execute all scheduled tasks',
+                error: error.message,
+            };
+        }
+    }
+}

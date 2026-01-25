@@ -31,6 +31,7 @@ import {
 } from './dto/generate-story-outline.dto';
 import {
     AllowedImageMimeTypes,
+    IapStore,
     LibraryType,
     UserRole,
 } from 'src/common/enums/app.enum';
@@ -292,6 +293,7 @@ export class StoryController {
     async getStoryById(
         @Param('id') id: string,
         @Headers('x-user-id') userId: string,
+        @Headers('x-platform') platform: IapStore,
     ) {
         if (!id) {
             throw new BadRequestException(ERROR_MESSAGES.STORY_ID_REQUIRED);
@@ -306,7 +308,17 @@ export class StoryController {
             throw new BadRequestException(ERROR_MESSAGES.USER_NOT_FOUND);
         }
 
-        const story = await this.storyService.findStoryById(id);
+        const isMobile =
+            platform === IapStore.IOS || platform === IapStore.ANDROID;
+
+        let story;
+
+        if (isMobile) {
+            story = await this.storyService.findPreviewStoryById(id, userId);
+        } else {
+            story = await this.storyService.findDetailStoryById(id, userId);
+        }
+
         return story;
     }
 

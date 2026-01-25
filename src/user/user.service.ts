@@ -119,6 +119,19 @@ export class UserService extends BaseCrudService<User> {
             .getOne();
     }
 
+    async findUserRoleById(id: string): Promise<string> {
+        const user = await this.repository.findOne({
+            where: { id },
+            select: ['role'],
+        });
+
+        if (!user) {
+            throw new NotFoundException(ERROR_MESSAGES.USER_NOT_FOUND);
+        }
+
+        return user.role;
+    }
+
     async createOrUpdateUser({
         userId,
         language,
@@ -530,9 +543,11 @@ export class UserService extends BaseCrudService<User> {
                 success: true,
                 message: `Ad watched successfully! You received ${coinsToGrant} coins.`,
                 data: {
-                    coinsGranted: coinsToGrant,
-                    currentViews: todayAction.count,
-                    maxViews: this.MAX_AD_VIEWS_PER_DAY,
+                    adInfo: {
+                        coinsGranted: coinsToGrant,
+                        currentViews: todayAction.count,
+                        maxViews: this.MAX_AD_VIEWS_PER_DAY,
+                    },
                     wallet: updatedCoins,
                 },
             };
@@ -552,7 +567,7 @@ export class UserService extends BaseCrudService<User> {
 
         const coinRecords = await repo.find({
             where: { userId },
-            order: { createdAt: 'ASC' },
+            order: { createdAt: 'DESC' },
         });
 
         // 1. Permanent coins (thường không expire)
