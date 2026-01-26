@@ -95,4 +95,7 @@ export class StoryService {
     );
     getDiscoverStories = this.discovery.getDiscoverStories.bind(this.discovery);
     getAllCategories = this.discovery.getAllCategories.bind(this.discovery);
+    getTopTrendingKeywords = this.discovery.getTopTrendingKeywords.bind(
+        this.discovery,
+    );
 }

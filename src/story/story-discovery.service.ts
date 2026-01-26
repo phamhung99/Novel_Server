@@ -25,6 +25,8 @@ export class StoryDiscoveryService {
         @InjectRepository(Category)
         private categoryRepository: Repository<Category>,
         private mediaService: MediaService,
+        @InjectRepository(Story)
+        private storyRepository: Repository<Story>,
     ) {}
 
     async getUserLibrary(
@@ -653,5 +655,26 @@ export class StoryDiscoveryService {
             total,
             items,
         };
+    }
+
+    async getTopTrendingKeywords(limit = 5): Promise<{ keyword: string }[]> {
+        const result = await this.storyRepository
+            .createQueryBuilder('s')
+            .select(['s.title AS keyword', 's.search_score AS score'])
+            .where('s.search_score IS NOT NULL')
+            .andWhere('s.visibility = :visibility', {
+                visibility: StoryVisibility.PUBLIC,
+            })
+            .andWhere('s.status = :status', {
+                status: StoryStatus.PUBLISHED,
+            })
+            .andWhere('s.search_score > 0')
+            .orderBy('s.search_score', 'DESC')
+            .limit(limit)
+            .getRawMany();
+
+        return result.map((row) => ({
+            keyword: row.keyword.trim(),
+        }));
     }
 }

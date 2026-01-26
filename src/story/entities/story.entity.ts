@@ -119,9 +119,6 @@ export class Story {
     })
     searchScore: number;
 
-    @Column({ type: 'varchar', nullable: true })
-    keyword: string;
-
     @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
     createdAt: Date;
 

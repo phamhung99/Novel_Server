@@ -63,6 +63,11 @@ export class StoryController {
         private readonly chapterService: ChapterService,
     ) {}
 
+    @Get('trending/keywords')
+    async getTrendingKeywords(): Promise<{ keyword: string; score: number }[]> {
+        return this.storyService.getTopTrendingKeywords();
+    }
+
     @Post(':storyId/upload-cover')
     @UseInterceptors(
         FileInterceptor('image', {
