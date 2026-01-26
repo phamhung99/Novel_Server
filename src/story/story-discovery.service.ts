@@ -658,23 +658,44 @@ export class StoryDiscoveryService {
     }
 
     async getTopTrendingKeywords(limit = 5): Promise<{ keyword: string }[]> {
-        const result = await this.storyRepository
+        const topTrendingStories = await this.storyRepository
             .createQueryBuilder('s')
-            .select(['s.title AS keyword', 's.search_score AS score'])
-            .where('s.search_score IS NOT NULL')
-            .andWhere('s.visibility = :visibility', {
+            .select(['s."id"'])
+            .where('s.visibility = :visibility', {
                 visibility: StoryVisibility.PUBLIC,
             })
             .andWhere('s.status = :status', {
                 status: StoryStatus.PUBLISHED,
             })
+            .orderBy('s.trending_score', 'DESC')
+            .limit(3)
+            .getRawMany();
+
+        const excludeIds = topTrendingStories.map((row) => row.id);
+
+        const qb = this.storyRepository
+            .createQueryBuilder('s')
+            .select(['s.title AS keyword', 's.search_score AS score'])
+            .where('s.search_score IS NOT NULL')
             .andWhere('s.search_score > 0')
+            .andWhere('s.visibility = :visibility', {
+                visibility: StoryVisibility.PUBLIC,
+            })
+            .andWhere('s.status = :status', {
+                status: StoryStatus.PUBLISHED,
+            });
+
+        if (excludeIds.length > 0) {
+            qb.andWhere('s.id NOT IN (:...excludeIds)', { excludeIds });
+        }
+
+        const result = await qb
             .orderBy('s.search_score', 'DESC')
             .limit(limit)
             .getRawMany();
 
         return result.map((row) => ({
-            keyword: row.keyword.trim(),
+            keyword: (row.keyword || '').trim(),
         }));
     }
 }
