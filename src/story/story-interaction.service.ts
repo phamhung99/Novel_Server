@@ -131,6 +131,7 @@ export class StoryInteractionService {
             const existingViewToday = await manager.findOne(ChapterViews, {
                 where: {
                     chapter: { id: chapterId },
+                    story: { id: storyId },
                     user: { id: userId },
                     viewedAt: MoreThan(startOfToday),
                 },
@@ -139,6 +140,7 @@ export class StoryInteractionService {
             if (!existingViewToday) {
                 await manager.insert(ChapterViews, {
                     chapter: { id: chapterId },
+                    story: { id: storyId },
                     user: { id: userId },
                     viewedAt: now,
                 });
