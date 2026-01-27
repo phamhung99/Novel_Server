@@ -240,7 +240,7 @@ export class StoryGenerationService {
         const storyGeneration = this.storyGenerationRepository.create({
             requestId,
             type: GenerationType.CHAPTER,
-            status: GenerationStatus.IN_PROGRESS,
+            status: GenerationStatus.PROCESSING,
             aiProvider: dto.aiProvider || DEFAULT_AI_PROVIDER,
             aiModel: (() => {
                 switch (dto.aiProvider || DEFAULT_AI_PROVIDER) {
@@ -387,7 +387,7 @@ export class StoryGenerationService {
                 chapterNumber: 0, // tạm thời
                 requestId,
                 prompt: dto.direction || '',
-                status: GenerationStatus.IN_PROGRESS,
+                status: GenerationStatus.PROCESSING,
             });
 
             savedPreGen =
