@@ -38,6 +38,7 @@ import { StoryCategory } from './entities/story-category.entity';
 import { MediaService } from 'src/media/media.service';
 import { isEmptyObject } from 'src/ai/utils/object.utils';
 import { cleanNextOptions } from 'src/common/utils/chapter.utils';
+import { stripHtml } from 'src/common/utils/html.utils';
 
 @Injectable()
 export class StoryGenerationService {
@@ -723,6 +724,7 @@ export class StoryGenerationService {
             index: generation.chapter.index,
             title: generation.chapter.title,
             content: generation.chapter.content,
+            plainContent: stripHtml(generation.chapter.content),
             structure: {
                 nextOptions: cleanedNextOptions,
             },
