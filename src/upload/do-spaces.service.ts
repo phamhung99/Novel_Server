@@ -33,6 +33,10 @@ export class DoSpacesService implements OnModuleInit {
         });
     }
 
+    getEndpoint(): string {
+        return this.endpoint;
+    }
+
     async setupLifecycleRules(): Promise<void> {
         try {
             const cmd = new PutBucketLifecycleConfigurationCommand({

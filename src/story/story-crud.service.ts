@@ -483,6 +483,15 @@ export class StoryCrudService {
             story.status = StoryStatus.PENDING;
         }
 
+        const endpoint = this.doSpacesService.getEndpoint();
+
+        if (updateStoryDto.coverImage?.startsWith(endpoint)) {
+            updateStoryDto.coverImage = updateStoryDto.coverImage.replace(
+                endpoint,
+                '',
+            );
+        }
+
         Object.assign(story, updateStoryDto);
         await this.storyRepository.save(story);
 
