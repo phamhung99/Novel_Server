@@ -215,8 +215,6 @@ export class CronService {
                     chapterIndex: number;
                 }>();
 
-            console.log(validStories);
-
             // Group theo story → user → list views (sorted by time)
             const viewsByStoryAndUser = new Map<
                 string,

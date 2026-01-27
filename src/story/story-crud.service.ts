@@ -322,6 +322,7 @@ export class StoryCrudService {
                 freeChaptersCount: true,
                 likesCount: true,
                 viewsCount: true,
+                tags: true,
                 rating: true,
                 createdAt: true,
                 updatedAt: true,

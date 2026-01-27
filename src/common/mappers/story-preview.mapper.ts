@@ -39,7 +39,7 @@ export async function enrichStoryToPreviewDto(
             ? await mediaService.getMediaUrl(story.coverImage)
             : null,
 
-        canEdit: userId ? story.authorId === userId : false,
+        canEdit: false,
     };
 }
 

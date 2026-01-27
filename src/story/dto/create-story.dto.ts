@@ -50,4 +50,9 @@ export class CreateStoryDto {
     @IsOptional()
     @IsBoolean()
     isFullyFree?: boolean;
+
+    @IsOptional()
+    @IsArray()
+    @IsString({ each: true })
+    tags?: string[];
 }

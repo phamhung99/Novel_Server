@@ -119,6 +119,14 @@ export class Story {
     })
     searchScore: number;
 
+    @Column({
+        type: 'text',
+        array: true,
+        default: '{}',
+        nullable: false,
+    })
+    tags: string[];
+
     @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
     createdAt: Date;
 
