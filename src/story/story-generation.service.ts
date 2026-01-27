@@ -29,6 +29,7 @@ import { StoryGenerationApiService } from '../ai/providers/story-generation-api.
 import {
     DEFAULT_AI_PROVIDER,
     DEFAULT_COVER_IMAGE_URL,
+    IMAGE_PREFIX,
 } from 'src/common/constants/app.constant';
 import { ChapterService } from './chapter.service';
 import { UserService } from 'src/user/user.service';
@@ -733,7 +734,7 @@ export class StoryGenerationService {
         };
     }
 
-    async generateStoryCoverImage(
+    async generateStoryCoverForWeb(
         userId: string,
         storyId: string,
         prompt?: string,
@@ -788,8 +789,10 @@ export class StoryGenerationService {
 
         let newCoverImageKey: string | null = null;
         try {
-            newCoverImageKey =
-                await this.mediaService.uploadFromStream(tempImageUrl);
+            newCoverImageKey = await this.mediaService.uploadFromSource(
+                tempImageUrl,
+                { prefix: IMAGE_PREFIX.COVERS },
+            );
         } catch (err) {
             throw new InternalServerErrorException(
                 `Failed to upload cover image: ${err.message}`,
@@ -816,6 +819,79 @@ export class StoryGenerationService {
                 );
             });
         }
+
+        return {
+            coverImageUrl: newCoverImageUrl,
+        };
+    }
+
+    async generateStoryCoverForMobile(
+        userId: string,
+        storyId: string,
+        prompt?: string,
+        model?: string,
+    ) {
+        const story = await this.storyRepository.findOne({
+            where: { id: storyId, authorId: userId },
+            relations: ['generation'],
+        });
+
+        if (!story) {
+            throw new NotFoundException(
+                'Story not found or you do not have permission',
+            );
+        }
+
+        if (!story.generation) {
+            throw new BadRequestException(
+                'This story has no generation record',
+            );
+        }
+
+        let finalPrompt = prompt?.trim();
+
+        if (!finalPrompt) {
+            const metadata = story.generation.metadata as any;
+            finalPrompt = metadata?.coverImage;
+
+            if (
+                !finalPrompt ||
+                typeof finalPrompt !== 'string' ||
+                finalPrompt.trim() === ''
+            ) {
+                throw new BadRequestException(
+                    'No cover image prompt provided and no default cover prompt found in generation metadata',
+                );
+            }
+        }
+
+        let tempImageUrl: string;
+        try {
+            tempImageUrl =
+                await this.storyGenerationApiService.generateCoverImage(
+                    finalPrompt,
+                    model,
+                );
+        } catch (err) {
+            throw new BadRequestException(
+                `Failed to generate image: ${err.message}`,
+            );
+        }
+
+        let newCoverImageKey: string | null = null;
+        try {
+            newCoverImageKey = await this.mediaService.uploadFromSource(
+                tempImageUrl,
+                { prefix: IMAGE_PREFIX.COVERS_TEMP },
+            );
+        } catch (err) {
+            throw new InternalServerErrorException(
+                `Failed to upload cover image: ${err.message}`,
+            );
+        }
+
+        const newCoverImageUrl =
+            await this.mediaService.getMediaUrl(newCoverImageKey);
 
         return {
             coverImageUrl: newCoverImageUrl,

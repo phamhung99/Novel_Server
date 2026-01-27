@@ -51,3 +51,9 @@ export const ERROR_MESSAGES = {
     GENERATED_ALL_RETRY_ATTEMPT_FAILED: 'All retry attempts failed.',
     GENERATED_DAILY_LIMIT_REACHED: 'Daily generation limit reached',
 } as const;
+
+export const IMAGE_PREFIX = {
+    COVERS: 'covers',
+    COVERS_TEMP: 'covers/temp/',
+    AVATARS: 'avatars',
+} as const;

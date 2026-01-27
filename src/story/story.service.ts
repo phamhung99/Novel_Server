@@ -81,9 +81,11 @@ export class StoryService {
     getGeneratedChapterResults =
         this.generation.getGeneratedChapterResults.bind(this.generation);
 
-    generateStoryCoverImage = this.generation.generateStoryCoverImage.bind(
+    generateStoryCoverForWeb = this.generation.generateStoryCoverForWeb.bind(
         this.generation,
     );
+    generateStoryCoverForMobile =
+        this.generation.generateStoryCoverForMobile.bind(this.generation);
 
     // ========================
     // Discovery & Library

@@ -68,6 +68,7 @@ export class StoryController {
         return this.storyService.getTopTrendingKeywords();
     }
 
+    // cms using this endpoint to upload cover image
     @Post(':storyId/upload-cover')
     @UseInterceptors(
         FileInterceptor('image', {
@@ -173,9 +174,10 @@ export class StoryController {
     }
 
     @Post(':storyId/generate/cover-image')
-    generateCoverImage(
+    async generateCoverImage(
         @Headers('x-user-id') userId: string,
         @Headers('x-skip-image') skipImage: boolean = false,
+        @Headers('x-platform') platform: IapStore,
         @Param('storyId') storyId: string,
         @Body() dto: GenerateCoverImageDto,
     ) {
@@ -184,7 +186,20 @@ export class StoryController {
                 coverImageUrl: DEFAULT_COVER_IMAGE_URL,
             };
         }
-        return this.storyService.generateStoryCoverImage(
+
+        const isMobile =
+            platform === IapStore.IOS || platform === IapStore.ANDROID;
+
+        if (isMobile) {
+            return this.storyService.generateStoryCoverForMobile(
+                userId,
+                storyId,
+                dto.prompt,
+                dto.model,
+            );
+        }
+
+        return this.storyService.generateStoryCoverForWeb(
             userId,
             storyId,
             dto.prompt,
