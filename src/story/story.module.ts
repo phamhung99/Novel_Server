@@ -19,6 +19,7 @@ import { StoryGenerationService } from './story-generation.service';
 import { StoryDiscoveryService } from './story-discovery.service';
 import { ChapterViews } from './entities/chapter-views.entity';
 import { MediaService } from 'src/media/media.service';
+import { ImageGeneration } from './entities/image-generation.entity';
 
 @Module({
     imports: [
@@ -30,6 +31,7 @@ import { MediaService } from 'src/media/media.service';
             ChapterViews,
             Category,
             StoryCategory,
+            ImageGeneration,
         ]),
         AiModule,
         forwardRef(() => UserModule),

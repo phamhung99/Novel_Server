@@ -179,6 +179,7 @@ export class StoryController {
         @Headers('x-skip-image') skipImage: boolean = false,
         @Headers('x-platform') platform: IapStore,
         @Param('storyId') storyId: string,
+        @Query('requestId') requestId: string,
         @Body() dto: GenerateCoverImageDto,
     ) {
         if (skipImage) {
@@ -192,6 +193,7 @@ export class StoryController {
 
         if (isMobile) {
             return this.storyService.generateStoryCoverForMobile(
+                requestId,
                 userId,
                 storyId,
                 dto.prompt,
@@ -204,6 +206,21 @@ export class StoryController {
             storyId,
             dto.prompt,
             dto.model,
+        );
+    }
+
+    @Get('generate/cover-image/result')
+    async getGeneratedCoverImageResult(
+        @Query('requestId') requestId: string,
+        @Headers('x-skip-image') skipImage: boolean = false,
+    ) {
+        if (!requestId) {
+            throw new BadRequestException('requestId is required');
+        }
+
+        return this.storyService.getGeneratedCoverImageResult(
+            requestId,
+            skipImage,
         );
     }
 
