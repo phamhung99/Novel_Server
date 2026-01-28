@@ -23,6 +23,8 @@ export async function enrichStoryToPreviewDto(
         categories: story.categories || [],
         mainCategory: story.mainCategory || null,
 
+        hashtags: story.hashtags || [],
+
         authorId: story.authorId,
         authorUsername: story.authorUsername,
 

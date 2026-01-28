@@ -432,6 +432,7 @@ export class StoryCrudService {
             viewsCount: story.viewsCount ?? 0,
             sourceType: story.sourceType,
             chapterCount: story.chapters?.length ?? 0,
+            hashtags: story.tags ?? [],
 
             authorId: story.author?.id,
             authorUsername: story.author?.username,
