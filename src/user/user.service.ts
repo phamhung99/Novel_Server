@@ -251,6 +251,7 @@ export class UserService extends BaseCrudService<User> {
                     's.visibility AS "visibility"',
                     's.likes_count AS "likesCount"',
                     's.views_count AS "viewsCount"',
+                    's.tags AS "hashtags"',
 
                     's.createdAt AS "createdAt"',
                     's.updatedAt AS "updatedAt"',

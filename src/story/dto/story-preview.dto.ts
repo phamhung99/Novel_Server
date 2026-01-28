@@ -29,6 +29,8 @@ export class StoryPreviewDto {
     categories: StoryPreviewCategoryDto[];
     mainCategory: StoryPreviewCategoryDto | null;
 
+    hashtags: string[];
+
     authorId: string;
     authorUsername: string;
 

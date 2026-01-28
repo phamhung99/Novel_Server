@@ -79,9 +79,11 @@ export enum LibraryType {
 
 export enum GenerationStatus {
     PENDING = 'pending',
-    IN_PROGRESS = 'in_progress',
+    PROCESSING = 'processing',
     COMPLETED = 'completed',
     FAILED = 'failed',
+    RETRYING = 'retrying',
+    REJECTED = 'rejected',
 }
 
 export enum StoryStatusFilter {

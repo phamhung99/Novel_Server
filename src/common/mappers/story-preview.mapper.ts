@@ -23,6 +23,8 @@ export async function enrichStoryToPreviewDto(
         categories: story.categories || [],
         mainCategory: story.mainCategory || null,
 
+        hashtags: story.hashtags || [],
+
         authorId: story.authorId,
         authorUsername: story.authorUsername,
 
@@ -39,7 +41,7 @@ export async function enrichStoryToPreviewDto(
             ? await mediaService.getMediaUrl(story.coverImage)
             : null,
 
-        canEdit: userId ? story.authorId === userId : false,
+        canEdit: false,
     };
 }
 

@@ -25,6 +25,8 @@ export class StoryDiscoveryService {
         @InjectRepository(Category)
         private categoryRepository: Repository<Category>,
         private mediaService: MediaService,
+        @InjectRepository(Story)
+        private storyRepository: Repository<Story>,
     ) {}
 
     async getUserLibrary(
@@ -73,6 +75,7 @@ export class StoryDiscoveryService {
                 's.likes_count AS "likesCount"',
                 's.views_count AS "viewsCount"',
                 's.sourceType AS "sourceType"',
+                's.tags AS "hashtags"',
 
                 `json_agg(DISTINCT jsonb_build_object('id', cat.id, 'name', cat.name)) AS "categories"`,
 
@@ -193,6 +196,7 @@ export class StoryDiscoveryService {
                 's.likes_count AS "likesCount"',
                 's.views_count AS "viewsCount"',
                 's.trendingScore AS "trendingScore"',
+                's.tags AS "hashtags"',
 
                 `json_agg(DISTINCT jsonb_build_object('id', cat.id, 'name', cat.name)) AS "categories"`,
 
@@ -311,6 +315,7 @@ export class StoryDiscoveryService {
                 's.likes_count AS "likesCount"',
                 's.views_count AS "viewsCount"',
                 's.trendingScore AS "trendingScore"',
+                's.tags AS "hashtags"',
 
                 `json_agg(DISTINCT jsonb_build_object('id', cat.id, 'name', cat.name)) AS "categories"`,
 
@@ -463,6 +468,7 @@ export class StoryDiscoveryService {
                 's.createdAt AS "createdAt"',
                 's.updatedAt AS "updatedAt"',
                 's.visibility AS "visibility"',
+                's.tags AS "hashtags"',
 
                 // All categories array
                 `json_agg(DISTINCT jsonb_build_object('id', cat.id, 'name', cat.name)) FILTER (WHERE cat.id IS NOT NULL) AS "categories"`,
@@ -653,5 +659,47 @@ export class StoryDiscoveryService {
             total,
             items,
         };
+    }
+
+    async getTopTrendingKeywords(limit = 5): Promise<{ keyword: string }[]> {
+        const topTrendingStories = await this.storyRepository
+            .createQueryBuilder('s')
+            .select(['s."id"'])
+            .where('s.visibility = :visibility', {
+                visibility: StoryVisibility.PUBLIC,
+            })
+            .andWhere('s.status = :status', {
+                status: StoryStatus.PUBLISHED,
+            })
+            .orderBy('s.trending_score', 'DESC')
+            .limit(3)
+            .getRawMany();
+
+        const excludeIds = topTrendingStories.map((row) => row.id);
+
+        const qb = this.storyRepository
+            .createQueryBuilder('s')
+            .select(['s.title AS keyword', 's.search_score AS score'])
+            .where('s.search_score IS NOT NULL')
+            .andWhere('s.search_score > 0')
+            .andWhere('s.visibility = :visibility', {
+                visibility: StoryVisibility.PUBLIC,
+            })
+            .andWhere('s.status = :status', {
+                status: StoryStatus.PUBLISHED,
+            });
+
+        if (excludeIds.length > 0) {
+            qb.andWhere('s.id NOT IN (:...excludeIds)', { excludeIds });
+        }
+
+        const result = await qb
+            .orderBy('s.search_score', 'DESC')
+            .limit(limit)
+            .getRawMany();
+
+        return result.map((row) => ({
+            keyword: (row.keyword || '').trim(),
+        }));
     }
 }

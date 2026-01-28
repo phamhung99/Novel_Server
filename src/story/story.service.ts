@@ -81,9 +81,14 @@ export class StoryService {
     getGeneratedChapterResults =
         this.generation.getGeneratedChapterResults.bind(this.generation);
 
-    generateStoryCoverImage = this.generation.generateStoryCoverImage.bind(
+    generateStoryCoverForWeb = this.generation.generateStoryCoverForWeb.bind(
         this.generation,
     );
+    generateStoryCoverForMobile =
+        this.generation.generateStoryCoverForMobile.bind(this.generation);
+
+    getGeneratedCoverImageResult =
+        this.generation.getGeneratedCoverImageResult.bind(this.generation);
 
     // ========================
     // Discovery & Library
@@ -95,4 +100,7 @@ export class StoryService {
     );
     getDiscoverStories = this.discovery.getDiscoverStories.bind(this.discovery);
     getAllCategories = this.discovery.getAllCategories.bind(this.discovery);
+    getTopTrendingKeywords = this.discovery.getTopTrendingKeywords.bind(
+        this.discovery,
+    );
 }

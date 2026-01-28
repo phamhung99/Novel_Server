@@ -215,8 +215,6 @@ export class CronService {
                     chapterIndex: number;
                 }>();
 
-            console.log(validStories);
-
             // Group theo story → user → list views (sorted by time)
             const viewsByStoryAndUser = new Map<
                 string,
@@ -251,7 +249,7 @@ export class CronService {
                 let countDeep = 0;
                 let countLongTermEarly = 0;
 
-                for (const [userId, views] of userViews) {
+                for (const [_userId, views] of userViews) {
                     // views đã sort theo thời gian
                     const firstChapterViews = views.filter(
                         (v) => v.chapterIndex === 1,
@@ -374,7 +372,7 @@ export class CronService {
     }
 
     async runAllScheduledTasks() {
-        // await this.updateTrendingScores();
+        await this.updateTrendingScores();
         await this.updateSearchScores();
     }
 }

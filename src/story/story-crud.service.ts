@@ -322,6 +322,7 @@ export class StoryCrudService {
                 freeChaptersCount: true,
                 likesCount: true,
                 viewsCount: true,
+                tags: true,
                 rating: true,
                 createdAt: true,
                 updatedAt: true,
@@ -431,6 +432,7 @@ export class StoryCrudService {
             viewsCount: story.viewsCount ?? 0,
             sourceType: story.sourceType,
             chapterCount: story.chapters?.length ?? 0,
+            hashtags: story.tags ?? [],
 
             authorId: story.author?.id,
             authorUsername: story.author?.username,
@@ -480,6 +482,15 @@ export class StoryCrudService {
             story.status !== StoryStatus.PUBLISHED
         ) {
             story.status = StoryStatus.PENDING;
+        }
+
+        const endpoint = this.doSpacesService.getEndpoint();
+
+        if (updateStoryDto.coverImage?.startsWith(endpoint)) {
+            updateStoryDto.coverImage = updateStoryDto.coverImage.replace(
+                endpoint,
+                '',
+            );
         }
 
         Object.assign(story, updateStoryDto);

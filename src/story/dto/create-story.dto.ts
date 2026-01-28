@@ -3,7 +3,7 @@ import {
     IsOptional,
     IsEnum,
     IsArray,
-    // IsUrl,
+    IsUrl,
     IsUUID,
     IsBoolean,
     Min,
@@ -38,9 +38,9 @@ export class CreateStoryDto {
     @IsBoolean()
     canEdit?: boolean;
 
-    // @IsOptional()
-    // @IsUrl()
-    // coverImage?: string;
+    @IsOptional()
+    @IsUrl()
+    coverImage?: string;
 
     @IsOptional()
     @IsInt()
@@ -50,4 +50,9 @@ export class CreateStoryDto {
     @IsOptional()
     @IsBoolean()
     isFullyFree?: boolean;
+
+    @IsOptional()
+    @IsArray()
+    @IsString({ each: true })
+    tags?: string[];
 }

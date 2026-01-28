@@ -1,14 +1,22 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
-import { extname } from 'path';
 import * as fs from 'fs/promises';
 import { DoSpacesService } from '../upload/do-spaces.service';
-import { v4 as uuidv4 } from 'uuid';
 
 @Injectable()
 export class MediaService {
     constructor(private readonly storage: DoSpacesService) {}
 
-    uploadFromStream = this.storage.uploadFromStream.bind(this.storage);
+    async uploadFromSource(
+        source: string,
+        options: {
+            prefix: string;
+            filename?: string;
+            mimeType?: string;
+            isPublic?: boolean;
+        },
+    ): Promise<string> {
+        return this.storage.uploadFromSource(source, options);
+    }
 
     async uploadStoryCover(
         file: Express.Multer.File,
@@ -16,9 +24,6 @@ export class MediaService {
         if (!file) {
             throw new BadRequestException('No file provided');
         }
-
-        const ext = extname(file.originalname).toLowerCase() || '.jpg';
-        const key = `covers/${uuidv4()}${ext}`;
 
         let buffer: Buffer | undefined;
         const tempFilePath: string | undefined = file.path;
@@ -34,11 +39,7 @@ export class MediaService {
                 );
             }
 
-            const uploadedKey = await this.storage.uploadFromBuffer(
-                buffer,
-                key,
-                file.mimetype,
-            );
+            const uploadedKey = await this.storage.uploadCover(buffer, false);
 
             const url = await this.storage.getImageUrl(uploadedKey);
 
@@ -67,9 +68,6 @@ export class MediaService {
             throw new BadRequestException('No file provided');
         }
 
-        const ext = extname(file.originalname).toLowerCase() || '.jpg';
-        const key = `avatars/${uuidv4()}${ext}`;
-
         let buffer: Buffer | undefined;
         const tempFilePath: string | undefined = file.path;
 
@@ -84,11 +82,7 @@ export class MediaService {
                 );
             }
 
-            const uploadedKey = await this.storage.uploadFromBuffer(
-                buffer,
-                key,
-                file.mimetype,
-            );
+            const uploadedKey = await this.storage.uploadAvatar(buffer);
 
             const url = await this.storage.getImageUrl(uploadedKey);
 

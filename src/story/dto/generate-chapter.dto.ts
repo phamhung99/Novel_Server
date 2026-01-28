@@ -46,6 +46,7 @@ export class GenerateChapterResponseDto {
     index: number;
     title: string;
     content: string;
+    plainContent: string;
     structure: ChapterStructure;
     createdAt: Date;
     updatedAt: Date;

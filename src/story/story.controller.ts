@@ -63,6 +63,12 @@ export class StoryController {
         private readonly chapterService: ChapterService,
     ) {}
 
+    @Get('trending/keywords')
+    async getTrendingKeywords(): Promise<{ keyword: string; score: number }[]> {
+        return this.storyService.getTopTrendingKeywords();
+    }
+
+    // cms using this endpoint to upload cover image
     @Post(':storyId/upload-cover')
     @UseInterceptors(
         FileInterceptor('image', {
@@ -168,10 +174,12 @@ export class StoryController {
     }
 
     @Post(':storyId/generate/cover-image')
-    generateCoverImage(
+    async generateCoverImage(
         @Headers('x-user-id') userId: string,
         @Headers('x-skip-image') skipImage: boolean = false,
+        @Headers('x-platform') platform: IapStore,
         @Param('storyId') storyId: string,
+        @Query('requestId') requestId: string,
         @Body() dto: GenerateCoverImageDto,
     ) {
         if (skipImage) {
@@ -179,11 +187,40 @@ export class StoryController {
                 coverImageUrl: DEFAULT_COVER_IMAGE_URL,
             };
         }
-        return this.storyService.generateStoryCoverImage(
+
+        const isMobile =
+            platform === IapStore.IOS || platform === IapStore.ANDROID;
+
+        if (isMobile) {
+            return this.storyService.generateStoryCoverForMobile(
+                requestId,
+                userId,
+                storyId,
+                dto.prompt,
+                dto.model,
+            );
+        }
+
+        return this.storyService.generateStoryCoverForWeb(
             userId,
             storyId,
             dto.prompt,
             dto.model,
+        );
+    }
+
+    @Get('generate/cover-image/result')
+    async getGeneratedCoverImageResult(
+        @Query('requestId') requestId: string,
+        @Headers('x-skip-image') skipImage: boolean = false,
+    ) {
+        if (!requestId) {
+            throw new BadRequestException('requestId is required');
+        }
+
+        return this.storyService.getGeneratedCoverImageResult(
+            requestId,
+            skipImage,
         );
     }
 

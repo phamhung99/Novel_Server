@@ -10,6 +10,7 @@ import { StoryPreviewChapterDto } from './dto/story-preview.dto';
 import { Story } from './entities/story.entity';
 import { UserService } from 'src/user/user.service';
 import { UserRole } from 'src/common/enums/app.enum';
+import { stripHtml } from 'src/common/utils/html.utils';
 
 interface ChaptersWithLockParams {
     storyId: string;
@@ -220,6 +221,7 @@ export class ChapterService {
             index: chapter.index,
             title: chapter.title,
             content: chapter.content,
+            plainContent: stripHtml(chapter.content),
             createdAt: chapter.createdAt,
             updatedAt: chapter.updatedAt,
             structure: {

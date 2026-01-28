@@ -57,6 +57,8 @@ const StoryOverviewPage = () => {
     const [openGenerateDialog, setOpenGenerateDialog] = useState(false);
     const [coverPrompt, setCoverPrompt] = useState<string>('');
     const [generatingCover, setGeneratingCover] = useState(false);
+    const [tempTags, setTempTags] = useState<string[]>([]);
+    const [newTagInput, setNewTagInput] = useState('');
 
     const availableModels = [
         'imagen-4.0-generate-001',
@@ -204,20 +206,21 @@ const StoryOverviewPage = () => {
         }
     }, [story, openGenerateDialog]);
 
+    const fetchStory = async () => {
+        setLoading(true);
+        try {
+            const res = await axios.get(`/api/v1/story/${storyId}`, {
+                headers: { 'x-user-id': userId },
+            });
+            setStory(res.data.data);
+        } catch (err) {
+            console.error(err);
+        } finally {
+            setLoading(false);
+        }
+    };
+
     useEffect(() => {
-        const fetchStory = async () => {
-            setLoading(true);
-            try {
-                const res = await axios.get(`/api/v1/story/${storyId}`, {
-                    headers: { 'x-user-id': userId },
-                });
-                setStory(res.data.data);
-            } catch (err) {
-                console.error(err);
-            } finally {
-                setLoading(false);
-            }
-        };
         fetchStory();
     }, [storyId]);
 
@@ -238,16 +241,40 @@ const StoryOverviewPage = () => {
                     synopsis: story.synopsis,
                     freeChaptersCount: story.freeChaptersCount,
                     isFullyFree: story.isFullyFree,
+                    tags: tempTags,
                 },
                 {
                     headers: { 'x-user-id': userId },
                 },
             );
 
+            await fetchStory();
+
             setEditMode(false);
         } catch (err) {
             console.error('Failed to update story:', err);
         }
+    };
+
+    useEffect(() => {
+        if (editMode && story) {
+            setTempTags(story.tags || []);
+        }
+    }, [editMode, story]);
+
+    // Add new tag
+    const handleAddTag = () => {
+        if (!newTagInput.trim()) return;
+        const tag = newTagInput.trim().toLowerCase();
+        if (tag && !tempTags.includes(tag)) {
+            setTempTags((prev) => [...prev, tag]);
+        }
+        setNewTagInput('');
+    };
+
+    // Remove tag
+    const handleRemoveTag = (tagToRemove: string) => {
+        setTempTags((prev) => prev.filter((t) => t !== tagToRemove));
     };
 
     if (loading)
@@ -666,6 +693,128 @@ const StoryOverviewPage = () => {
                                                     />
                                                 );
                                             })
+                                        ) : (
+                                            <Typography
+                                                component="span"
+                                                color="text.secondary"
+                                            >
+                                                None
+                                            </Typography>
+                                        )}
+                                    </Box>
+                                )}
+                            </Typography>
+
+                            <Typography
+                                variant="body1"
+                                gutterBottom
+                                sx={{ mt: 3 }}
+                            >
+                                <strong>Tags:</strong>
+                                {editMode ? (
+                                    <Box sx={{ mt: 1 }}>
+                                        {/* Edit mode: removable chips + add input */}
+                                        <Box
+                                            sx={{
+                                                display: 'flex',
+                                                flexWrap: 'wrap',
+                                                gap: 1,
+                                                mb: 2,
+                                            }}
+                                        >
+                                            {tempTags.length > 0 ? (
+                                                tempTags.map((tag) => (
+                                                    <Chip
+                                                        key={tag}
+                                                        label={tag}
+                                                        onDelete={() =>
+                                                            handleRemoveTag(tag)
+                                                        }
+                                                        color="primary"
+                                                        variant="outlined"
+                                                        size="small"
+                                                    />
+                                                ))
+                                            ) : (
+                                                <Typography
+                                                    variant="caption"
+                                                    color="text.secondary"
+                                                    sx={{ ml: 1 }}
+                                                >
+                                                    No tags yet
+                                                </Typography>
+                                            )}
+                                        </Box>
+
+                                        <Box
+                                            sx={{
+                                                display: 'flex',
+                                                gap: 1,
+                                                alignItems: 'center',
+                                            }}
+                                        >
+                                            <TextField
+                                                size="small"
+                                                label="Add tag (press Enter)"
+                                                value={newTagInput}
+                                                onChange={(e) =>
+                                                    setNewTagInput(
+                                                        e.target.value,
+                                                    )
+                                                }
+                                                onKeyDown={(e) => {
+                                                    if (e.key === 'Enter') {
+                                                        e.preventDefault();
+                                                        handleAddTag();
+                                                    }
+                                                }}
+                                                sx={{ flex: 1, maxWidth: 300 }}
+                                                placeholder="e.g. mystery, slow-burn, historical"
+                                            />
+                                            <Button
+                                                variant="outlined"
+                                                size="small"
+                                                onClick={handleAddTag}
+                                                disabled={!newTagInput.trim()}
+                                            >
+                                                Add
+                                            </Button>
+                                        </Box>
+
+                                        <FormHelperText sx={{ mt: 1 }}>
+                                            Tags help readers find your story.
+                                            Press Enter or click Add.
+                                        </FormHelperText>
+                                    </Box>
+                                ) : (
+                                    // ── View mode ── make it look exactly like Categories ───────────────────────
+                                    <Box
+                                        component="span"
+                                        sx={{
+                                            ml: 1,
+                                            display: 'inline-flex',
+                                            flexWrap: 'wrap',
+                                            gap: 0.8, // same as categories
+                                            alignItems: 'center',
+                                            mt: 0.5,
+                                        }}
+                                    >
+                                        {story.tags && story.tags.length > 0 ? (
+                                            story.tags.map((tag: string) => (
+                                                <Chip
+                                                    key={tag}
+                                                    label={tag}
+                                                    size="small"
+                                                    variant="outlined"
+                                                    // Optional: make tags look less prominent than main category
+                                                    color="default"
+                                                    sx={{
+                                                        fontWeight: 'normal',
+                                                        // If you want tags slightly smaller or lighter than categories
+                                                        // '& .MuiChip-label': { px: 1.2, py: 0.4 },
+                                                    }}
+                                                />
+                                            ))
                                         ) : (
                                             <Typography
                                                 component="span"
