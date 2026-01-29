@@ -23,8 +23,6 @@ export class StoryInteractionService {
             const story = await manager.findOne(Story, {
                 where: {
                     id: storyId,
-                    visibility: StoryVisibility.PUBLIC,
-                    status: StoryStatus.PUBLISHED,
                 },
             });
 
@@ -66,8 +64,6 @@ export class StoryInteractionService {
             const story = await manager.findOne(Story, {
                 where: {
                     id: storyId,
-                    visibility: StoryVisibility.PUBLIC,
-                    status: StoryStatus.PUBLISHED,
                 },
             });
 
