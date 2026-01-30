@@ -32,7 +32,23 @@ export const ERROR_MESSAGES = {
 
     STORY_NOT_FOUND: 'Story not found',
 
+    // Payment
+    MISSING_PURCHASE_TOKEN: 'Missing purchase token',
+    NO_SUBSCRIPTION_DATA_RETURNED: 'No subscription data returned',
+    VERIFY_SUBSCRIPTION_FAILED: 'Failed to verify subscription',
+    FAILED_TO_GET_GOOGLE_ACCESS_TOKEN:
+        'Failed to obtain Google access token for verification',
+    SUBSCRIPTION_NOT_ACTIVE: 'Subscription is not active',
+    SUBSCRIPTION_VERIFICATION_FAILED: 'Subscription verification failed',
+    IAP_PRODUCT_NOT_FOUND: 'In-app product not found',
+    SUBSCRIPTION_ALREADY_USED: 'Subscription has already been used',
+    PURCHASE_ALREADY_USED: 'Purchase has already been used',
+    ALREADY_ACTIVE_SUBSCRIPTION: 'User already has an active subscription',
+    INVALID_PURCHASE_TOKEN: 'Invalid purchase token',
+    PRODUCT_ID_MISMATCH: 'Product ID does not match the purchase token',
+
     // Common
+    ENTITY_MANAGER_REQUIRED: 'Entity manager is required for this operation',
     CONTENT_GENERATE_ERROR: 'An error occurred, please try again later.',
     USER_NOT_FOUND: 'User not found',
     USER_ID_REQUIRED: 'User ID is required',
@@ -57,3 +73,5 @@ export const IMAGE_PREFIX = {
     COVERS_TEMP: 'covers/temp/',
     AVATARS: 'avatars',
 } as const;
+
+export const PACKAGE_NAME_NOVEL = 'com.greatest.novel';

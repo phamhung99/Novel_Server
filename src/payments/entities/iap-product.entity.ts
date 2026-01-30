@@ -1,8 +1,5 @@
-import {
-    IapPeriodType,
-    IapProductType,
-    IapStore,
-} from 'src/common/enums/app.enum';
+import { IapPeriod, IapProductType, IapStore } from 'src/common/enums/app.enum';
+
 import {
     Entity,
     Column,
@@ -26,16 +23,8 @@ export class IapProduct {
     @Column({ name: 'store_product_id', nullable: false })
     storeProductId: string;
 
-    @Column({ name: 'base_plan_id', nullable: false })
+    @Column({ name: 'base_plan_id', nullable: true })
     basePlanId: string;
-
-    @Column({
-        name: 'period_type',
-        type: 'enum',
-        enum: IapPeriodType,
-        nullable: false,
-    })
-    periodType: IapPeriodType;
 
     @Column({
         type: 'enum',
@@ -50,40 +39,45 @@ export class IapProduct {
     @Column({ nullable: true })
     description: string;
 
-    @Column({ type: 'float', name: 'price', nullable: false })
+    @Column({ type: 'float', nullable: false })
     price: number;
 
     @Column({ type: 'float', name: 'original_price', nullable: true })
     originalPrice: number;
 
-    @Column({ name: 'discount_percentage', type: 'int', nullable: true })
+    @Column({ type: 'int', name: 'discount_percentage', nullable: true })
     discountPercentage: number;
 
-    @Column({ name: 'is_popular', type: 'boolean', default: false })
+    @Column({ type: 'boolean', name: 'is_popular', default: false })
     isPopular: boolean;
 
-    @Column({ name: 'period_number', type: 'int', nullable: true })
+    @Column({ type: 'int', name: 'period_number', nullable: true })
     periodNumber: number;
 
-    @Column({ name: 'generation_number', type: 'int', nullable: true })
-    generationNumber: number;
+    @Column({ type: 'int', name: 'base_coins', nullable: true })
+    baseCoins: number;
 
-    @Column({ nullable: true })
-    period: string;
+    @Column({ type: 'int', name: 'bonus_percentage', nullable: true })
+    bonusPercentage: number;
 
-    @Column({ nullable: true })
-    duration: string;
+    @Column({
+        name: 'period',
+        type: 'enum',
+        enum: IapPeriod,
+        nullable: true,
+    })
+    period: IapPeriod;
 
     @Column({ name: 'image_url', nullable: true })
     imageUrl: string;
 
-    @Column({ name: 'display_order', type: 'int', nullable: true })
+    @Column({ type: 'int', name: 'display_order', nullable: true })
     displayOrder: number;
 
     @Column({ type: 'jsonb', nullable: true })
     benefits: any;
 
-    @Column({ name: 'is_active', type: 'boolean', default: true })
+    @Column({ type: 'boolean', name: 'is_active', default: true })
     isActive: boolean;
 
     @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })

@@ -41,8 +41,9 @@ export enum IapProductType {
     ONETIME = 'onetime',
 }
 
-export enum IapPeriodType {
+export enum IapPeriod {
     DAY = 'day',
+    WEEK = 'week',
     MONTH = 'month',
     YEAR = 'year',
 }
@@ -119,4 +120,30 @@ export enum ActionType {
     LOGIN = 'login',
     WATCH_AD = 'watch_ad',
     SHARE_STORY = 'share_story',
+}
+
+export enum SUBSCRIPTION_STATUS {
+    SUBSCRIPTION_STATE_ACTIVE = 'SUBSCRIPTION_STATE_ACTIVE',
+    SUBSCRIPTION_STATE_CANCELED = 'SUBSCRIPTION_STATE_CANCELED',
+    SUBSCRIPTION_STATE_EXPIRED = 'SUBSCRIPTION_STATE_EXPIRED',
+    SUBSCRIPTION_STATE_ON_HOLD = 'SUBSCRIPTION_STATE_ON_HOLD',
+    SUBSCRIPTION_STATE_PAUSED = 'SUBSCRIPTION_STATE_PAUSED',
+    SUBSCRIPTION_STATE_IN_GRACE_PERIOD = 'SUBSCRIPTION_STATE_IN_GRACE_PERIOD',
+    SUBSCRIPTION_STATE_PENDING = 'SUBSCRIPTION_STATE_PENDING',
+    SUBSCRIPTION_STATE_REVOKED = 'SUBSCRIPTION_STATE_REVOKED',
+}
+
+export enum TransactionStatus {
+    ACTIVE = 'ACTIVE',
+    PAUSED = 'PAUSED',
+    CANCELED = 'CANCELED',
+    EXPIRED = 'EXPIRED',
+    // cho one-time
+    PURCHASED = 'PURCHASED',
+    CONSUMED = 'CONSUMED',
+    // lỗi hoặc pending
+    PENDING = 'PENDING',
+    FAILED = 'FAILED',
+
+    REFUNDED = 'REFUNDED',
 }

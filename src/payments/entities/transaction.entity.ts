@@ -19,6 +19,9 @@ export class Transaction {
     @JoinColumn({ name: 'user_id' })
     user: User;
 
+    @Column({ name: 'user_id' })
+    userId: string;
+
     @Column({ name: 'order_id', unique: true })
     orderId: string;
 
@@ -37,11 +40,22 @@ export class Transaction {
     @Column({ name: 'purchase_time', type: 'timestamptz' })
     purchaseTime: Date;
 
+    @Column({ default: false })
+    isOneTime: boolean;
+
     @Column({ name: 'expiry_time', type: 'timestamptz', nullable: true })
     expiryTime: Date | null;
 
     @Column({ default: 1 })
     quantity: number;
+
+    @Column({
+        name: 'granted_coins',
+        type: 'int',
+        nullable: true,
+        default: null,
+    })
+    grantedCoins: number | null;
 
     @Column({ name: 'amount_paid', type: 'float', nullable: true })
     amountPaid: number | null;

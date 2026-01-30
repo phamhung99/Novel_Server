@@ -411,7 +411,7 @@ export class UserService extends BaseCrudService<User> {
         });
     }
 
-    private async grantCoins({
+    async grantCoins({
         manager,
         userId,
         amount,
