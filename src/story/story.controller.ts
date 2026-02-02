@@ -41,7 +41,7 @@ import {
     MAX_FILE_SIZE_UPLOAD,
 } from 'src/common/constants/app.constant';
 import { UserService } from 'src/user/user.service';
-import { ChapterService } from './chapter.service';
+import { ChapterService } from './chapter/chapter.service';
 import { PaginationDto } from './dto/pagination.dto';
 import { DiscoverStoriesDto } from './dto/discover-stories.dto';
 import { FileInterceptor } from '@nestjs/platform-express';
@@ -54,6 +54,7 @@ import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
 import { Roles } from 'src/common/decorators/roles.decorator';
 import { RolesGuard } from 'src/common/guards/roles.guard';
 import { SkipTransform } from 'src/common/decorators/skip-transform.decorator';
+import { ChapterUnlockService } from './chapter/chapter-unlock.service';
 
 @Controller('story')
 export class StoryController {
@@ -61,6 +62,7 @@ export class StoryController {
         private readonly storyService: StoryService,
         private readonly userService: UserService,
         private readonly chapterService: ChapterService,
+        private readonly chapterUnlockService: ChapterUnlockService,
     ) {}
 
     @Get('trending/keywords')
@@ -552,7 +554,7 @@ export class StoryController {
             throw new BadRequestException(ERROR_MESSAGES.STORY_ID_REQUIRED);
         }
 
-        return this.chapterService.getChaptersWithLockForUser({
+        return this.chapterUnlockService.getChaptersWithLockForUser({
             storyId,
             userId,
         });

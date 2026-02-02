@@ -10,7 +10,7 @@ import { AiModule } from '../ai/ai.module';
 import { UserModule } from 'src/user/user.module';
 import { Category } from './entities/categories.entity';
 import { DoSpacesService } from 'src/upload/do-spaces.service';
-import { ChapterService } from './chapter.service';
+import { ChapterService } from './chapter/chapter.service';
 import { StoryCategory } from './entities/story-category.entity';
 import { StoryCrudService } from './story-crud.service';
 import { StoryPublicationService } from './story-publication.service';
@@ -20,6 +20,7 @@ import { StoryDiscoveryService } from './story-discovery.service';
 import { ChapterViews } from './entities/chapter-views.entity';
 import { MediaService } from 'src/media/media.service';
 import { ImageGeneration } from './entities/image-generation.entity';
+import { ChapterUnlockService } from './chapter/chapter-unlock.service';
 
 @Module({
     imports: [
@@ -41,12 +42,13 @@ import { ImageGeneration } from './entities/image-generation.entity';
         StoryService,
         DoSpacesService,
         MediaService,
-        ChapterService,
         StoryCrudService,
         StoryPublicationService,
         StoryInteractionService,
         StoryGenerationService,
         StoryDiscoveryService,
+        ChapterService,
+        ChapterUnlockService,
     ],
     exports: [StoryService, ChapterService],
 })

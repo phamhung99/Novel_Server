@@ -31,7 +31,7 @@ import {
     DEFAULT_COVER_IMAGE_URL,
     IMAGE_PREFIX,
 } from 'src/common/constants/app.constant';
-import { ChapterService } from './chapter.service';
+import { ChapterService } from './chapter/chapter.service';
 import { UserService } from 'src/user/user.service';
 import { ILike } from 'typeorm';
 import { Category } from './entities/categories.entity';
