@@ -40,14 +40,13 @@ export class IapProductService {
             throw new BadRequestException(ERROR_MESSAGES.IAP_PRODUCT_NOT_FOUND);
         }
 
-        const bonusMultiplier = 1 + (iapProduct.bonusPercentage ?? 0) / 100;
-        const fullCoins = iapProduct.baseCoins * bonusMultiplier;
+        const bonusPercentage = iapProduct.bonusPercentage ?? 0;
 
-        console.log(
-            iapProduct.baseCoins,
-            iapProduct.bonusPercentage,
-            fullCoins,
-        );
+        const multiplier = 1 + bonusPercentage / 100;
+
+        const fullCoinsFloat = iapProduct.baseCoins * multiplier;
+
+        const fullCoins = Math.ceil(fullCoinsFloat);
 
         const coinsToAdd = fullCoins;
 

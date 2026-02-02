@@ -1,7 +1,8 @@
 import { Controller, Get, Post, Headers, Body } from '@nestjs/common';
 import { PaymentsService } from './payments.service';
 import { SkipTransform } from 'src/common/decorators/skip-transform.decorator';
-import { VerifyGooglePlayPurchaseDto } from './dto/verify-google-play-purchase.dto';
+import { VerifyPurchaseDto } from './dto/verify-purchase.dto';
+import { IapStore } from 'src/common/enums/app.enum';
 
 @Controller('payments')
 export class PaymentsController {
@@ -9,11 +10,12 @@ export class PaymentsController {
 
     @Post('/purchase/verify')
     @SkipTransform()
-    async verifyGooglePlayPurchase(
+    async verifyPurchase(
         @Headers('x-user-id') userId: string,
-        @Body() dto: VerifyGooglePlayPurchaseDto,
+        @Headers('x-platform') platform: IapStore,
+        @Body() dto: VerifyPurchaseDto,
     ) {
-        return this.paymentsService.verifyGooglePlayPurchase({
+        return this.paymentsService.verifyPurchase({
             userId,
             purchaseToken: dto.purchaseToken,
             type: dto.type,
@@ -21,7 +23,7 @@ export class PaymentsController {
     }
 
     // @Post('/webhooks/google-play')
-    // async handleGooglePlayWebhook(@Body() body: any) {
+    // async handleWebhook(@Body() body: any) {
     //     return this.paymentsService.handleGooglePlayWebhook(body);
     // }
 

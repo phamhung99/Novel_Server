@@ -14,6 +14,8 @@ import {
 } from 'src/common/enums/app.enum';
 import { Transaction } from './entities/transaction.entity';
 import { IapProductService } from './iap-product.service';
+import { VerifyPurchaseResponseDto } from './dto/verify-purchase.response.dto';
+import { VerifyPurchaseParamsDto } from './dto/verify-purchase.dto';
 
 @Injectable()
 export class PaymentsService {
@@ -34,15 +36,11 @@ export class PaymentsService {
             this.configService.get<string[]>('testUserIds') || [];
     }
 
-    async verifyGooglePlayPurchase({
+    async verifyPurchase({
         userId,
         purchaseToken,
         type,
-    }: {
-        userId: string;
-        purchaseToken: string;
-        type: IapProductType;
-    }) {
+    }: VerifyPurchaseParamsDto): Promise<VerifyPurchaseResponseDto> {
         this.logger.log(
             `Verifying purchase - user: ${userId}, token: ${purchaseToken}`,
         );
@@ -126,10 +124,12 @@ export class PaymentsService {
                 await queryRunner.commitTransaction();
                 return {
                     success: true,
-                    coinsAdded: existingTx.grantedCoins,
-                    productId: existingTx.storeProductId,
-                    transactionId: existingTx.id,
                     message: 'Purchase verified and coins granted successfully',
+                    data: {
+                        coinsAdded: existingTx.grantedCoins,
+                        productId: existingTx.storeProductId,
+                        transactionId: existingTx.id,
+                    },
                 };
             }
 
@@ -185,10 +185,12 @@ export class PaymentsService {
 
             return {
                 success: true,
-                coinsAdded: coinsToAdd,
-                productId: storeProductId,
-                transactionId: transaction.id,
                 message: 'Purchase verified and coins granted successfully',
+                data: {
+                    coinsAdded: coinsToAdd,
+                    productId: storeProductId,
+                    transactionId: transaction.id,
+                },
             };
         } catch (err: any) {
             await queryRunner.rollbackTransaction();

@@ -45,7 +45,14 @@ export class IapProduct {
     @Column({ type: 'float', name: 'original_price', nullable: true })
     originalPrice: number;
 
-    @Column({ type: 'int', name: 'discount_percentage', nullable: true })
+    @Column({
+        type: 'decimal',
+        precision: 5,
+        scale: 2,
+        name: 'discount_percentage',
+        nullable: true,
+        default: 0,
+    })
     discountPercentage: number;
 
     @Column({ type: 'boolean', name: 'is_popular', default: false })
@@ -57,7 +64,13 @@ export class IapProduct {
     @Column({ type: 'int', name: 'base_coins', nullable: true })
     baseCoins: number;
 
-    @Column({ type: 'int', name: 'bonus_percentage', nullable: true })
+    @Column({
+        type: 'decimal',
+        precision: 5,
+        scale: 2,
+        name: 'bonus_percentage',
+        nullable: true,
+    })
     bonusPercentage: number;
 
     @Column({
