@@ -126,9 +126,15 @@ export class PaymentsService {
                 const updatedUser = await this.userService.getUserInfo(user);
 
                 await queryRunner.commitTransaction();
+
+                const isSub = type === IapProductType.SUBSCRIPTION;
+                const displayMessage = isSub
+                    ? `Subscription successful! You have been credited with ${existingTx.grantedCoins} coins.`
+                    : `Purchase successful! ${existingTx.grantedCoins} coins have been added to your account.`;
+
                 return {
                     success: true,
-                    message: 'Purchase verified and coins granted successfully',
+                    message: displayMessage,
                     data: {
                         coinsAdded: existingTx.grantedCoins,
                         productId: existingTx.storeProductId,
@@ -194,9 +200,14 @@ export class PaymentsService {
                 `Granted ${coinsToAdd} permanent coins to ${userId} via ${storeProductId}`,
             );
 
+            const isSub = type === IapProductType.SUBSCRIPTION;
+            const displayMessage = isSub
+                ? `Subscription successful! You have been credited with ${coinsToAdd} coins.`
+                : `Purchase successful! ${coinsToAdd} coins have been added to your account.`;
+
             return {
                 success: true,
-                message: 'Purchase verified and coins granted successfully',
+                message: displayMessage,
                 data: {
                     coinsAdded: coinsToAdd,
                     productId: storeProductId,
