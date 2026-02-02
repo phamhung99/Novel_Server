@@ -10,6 +10,7 @@ import {
     CoinType,
     IapProductType,
     IapStore,
+    SUBSCRIPTION_STATUS,
     TransactionStatus,
 } from 'src/common/enums/app.enum';
 import { Transaction } from './entities/transaction.entity';
@@ -53,7 +54,7 @@ export class PaymentsService {
             );
         }
 
-        await this.userService.findById(userId);
+        const user = await this.userService.findById(userId);
 
         // Xác thực Google Play
         let googleData: any = null;
@@ -121,6 +122,9 @@ export class PaymentsService {
                         ERROR_MESSAGES.SUBSCRIPTION_ALREADY_USED,
                     );
                 }
+
+                const updatedUser = await this.userService.getUserInfo(user);
+
                 await queryRunner.commitTransaction();
                 return {
                     success: true,
@@ -129,6 +133,7 @@ export class PaymentsService {
                         coinsAdded: existingTx.grantedCoins,
                         productId: existingTx.storeProductId,
                         transactionId: existingTx.id,
+                        user: updatedUser,
                     },
                 };
             }
@@ -153,6 +158,10 @@ export class PaymentsService {
                 orderId,
                 storeProductId,
                 basePlanId: basePlanId ?? null,
+                subscriptionState:
+                    type === IapProductType.SUBSCRIPTION
+                        ? SUBSCRIPTION_STATUS.SUBSCRIPTION_STATE_ACTIVE
+                        : null,
                 purchaseTime,
                 purchaseToken,
                 quantity: 1,
@@ -177,6 +186,8 @@ export class PaymentsService {
                 source: `iap:${storeProductId}${basePlanId ? `:${basePlanId}` : ''}`,
             });
 
+            const updatedUser = await this.userService.getUserInfo(user);
+
             await queryRunner.commitTransaction();
 
             this.logger.log(
@@ -190,6 +201,7 @@ export class PaymentsService {
                     coinsAdded: coinsToAdd,
                     productId: storeProductId,
                     transactionId: transaction.id,
+                    user: updatedUser,
                 },
             };
         } catch (err: any) {

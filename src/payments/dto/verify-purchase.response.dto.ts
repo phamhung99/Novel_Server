@@ -4,6 +4,8 @@ export class VerifyPurchaseDataDto {
     productId: string;
 
     transactionId: number;
+
+    user: any;
 }
 
 export class VerifyPurchaseResponseDto {

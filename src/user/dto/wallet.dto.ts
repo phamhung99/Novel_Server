@@ -9,5 +9,5 @@ export class TemporaryCoinDto {
 export class WalletDto {
     totalCoins: number;
     permanentCoins: number;
-    temporaryCoins: TemporaryCoinDto[];
+    temporaryCoins: number;
 }

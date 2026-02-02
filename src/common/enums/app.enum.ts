@@ -147,3 +147,11 @@ export enum TransactionStatus {
 
     REFUNDED = 'REFUNDED',
 }
+
+export enum CoinTransactionType {
+    ADD = 'add',
+    SPEND = 'spend',
+    EXPIRE = 'expire',
+    ADJUSTMENT = 'adjustment',
+    REFUND = 'refund',
+}

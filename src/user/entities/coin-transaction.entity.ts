@@ -8,14 +8,7 @@ import {
     JoinColumn,
 } from 'typeorm';
 import { User } from './user.entity';
-
-export enum CoinTransactionType {
-    ADD = 'add',
-    SPEND = 'spend',
-    EXPIRE = 'expire',
-    ADJUSTMENT = 'adjustment',
-    REFUND = 'refund',
-}
+import { CoinTransactionType } from 'src/common/enums/app.enum';
 
 @Entity('coin_transactions')
 @Index(['userId', 'createdAt'])

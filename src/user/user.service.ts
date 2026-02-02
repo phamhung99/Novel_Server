@@ -5,7 +5,7 @@ import {
     NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, EntityManager, Repository } from 'typeorm';
+import { DataSource, EntityManager, MoreThan, Repository } from 'typeorm';
 import { User } from './entities/user.entity';
 import { BaseCrudService } from 'src/common/services/base-crud.service';
 import { UserCategoryPreference } from './entities/user-category-preference.entity';
@@ -18,7 +18,12 @@ import {
 import { ReadingHistory } from './entities/reading-history.entity';
 import { StoryStatus } from 'src/common/enums/story-status.enum';
 import { UserCoins } from './entities/user-coins.entity';
-import { ActionType, CoinType } from 'src/common/enums/app.enum';
+import {
+    ActionType,
+    CoinTransactionType,
+    CoinType,
+    SUBSCRIPTION_STATUS,
+} from 'src/common/enums/app.enum';
 import { MediaService } from 'src/media/media.service';
 import { UserDailyAction } from './entities/user-daily-action.entity';
 import { addDays } from 'src/common/utils/date.utils';
@@ -28,6 +33,8 @@ import { enrichStoriesToPreviewDto } from 'src/common/mappers/story-preview.mapp
 import { Chapter } from 'src/story/entities/chapter.entity';
 import { WalletDto } from './dto/wallet.dto';
 import { RewardResponseDto } from './dto/weekly-checkin.dto';
+import { CoinTransaction } from './entities/coin-transaction.entity';
+import { Transaction } from 'src/payments/entities/transaction.entity';
 
 @Injectable()
 export class UserService extends BaseCrudService<User> {
@@ -50,6 +57,10 @@ export class UserService extends BaseCrudService<User> {
         private mediaService: MediaService,
         @InjectRepository(UserDailyAction)
         private readonly userDailyActionRepo: Repository<UserDailyAction>,
+        @InjectRepository(CoinTransaction)
+        private readonly coinTransactionRepo: Repository<CoinTransaction>,
+        @InjectRepository(Transaction)
+        private readonly transactionRepo: Repository<Transaction>,
     ) {
         super(userRepo);
     }
@@ -443,12 +454,46 @@ export class UserService extends BaseCrudService<User> {
         await coinRepo.save(newRecord);
     }
 
+    async getSubscriptionStatus(
+        userId: string,
+    ): Promise<{ isSubUser: boolean; basePlanId: string | null }> {
+        const now = new Date();
+
+        const activeSubscription = await this.transactionRepo.findOne({
+            where: {
+                userId: userId,
+                expiryTime: MoreThan(now),
+                subscriptionState:
+                    SUBSCRIPTION_STATUS.SUBSCRIPTION_STATE_ACTIVE,
+            },
+            order: {
+                expiryTime: 'DESC',
+            },
+            select: ['basePlanId'],
+        });
+
+        if (activeSubscription) {
+            return {
+                isSubUser: true,
+                basePlanId: activeSubscription.basePlanId,
+            };
+        }
+
+        return {
+            isSubUser: false,
+            basePlanId: null,
+        };
+    }
+
     async getUserInfo(user: User): Promise<any> {
         if (!user) {
             throw new NotFoundException('User not found');
         }
 
-        const coinsData = await this.calculateUserCoins(user.id);
+        const [coinsData, subscriptionData] = await Promise.all([
+            this.calculateUserCoins(user.id),
+            this.getSubscriptionStatus(user.id),
+        ]);
 
         // Preferred categories (sorted by some order — you may want to add order column later)
         const preferredCategories =
@@ -471,10 +516,7 @@ export class UserService extends BaseCrudService<User> {
         return {
             ...user,
             profileImageUrl,
-            subscription: {
-                isSubUser: false,
-                basePlanId: null,
-            },
+            subscription: subscriptionData,
             wallet: coinsData,
             preferredCategories,
         };
@@ -584,14 +626,6 @@ export class UserService extends BaseCrudService<User> {
                 c.expiresAt > now,
         );
 
-        const temporaryCoinsForDisplay = activeTemporary.map((c) => ({
-            id: c.id,
-            amount: c.remaining,
-            source: c.source,
-            expiresAt: c.expiresAt!.toISOString(),
-            createdAt: c.createdAt.toISOString(),
-        }));
-
         const activeTemporaryAmount = activeTemporary.reduce(
             (sum, c) => sum + c.remaining,
             0,
@@ -602,7 +636,7 @@ export class UserService extends BaseCrudService<User> {
         return {
             totalCoins,
             permanentCoins,
-            temporaryCoins: temporaryCoinsForDisplay,
+            temporaryCoins: activeTemporaryAmount,
         };
     }
 
@@ -718,5 +752,209 @@ export class UserService extends BaseCrudService<User> {
             },
             wallet,
         };
+    }
+
+    /**
+     * Cộng coin và ghi lịch sử giao dịch
+     */
+    async addCoins({
+        userId,
+        amount,
+        coinType = CoinType.PERMANENT, // hoặc TEMPORARY
+        source,
+        referenceType,
+        referenceId,
+        description,
+        manager, // optional - dùng trong transaction lớn
+    }: {
+        userId: string;
+        amount: number;
+        coinType?: CoinType;
+        source?: ActionType | string;
+        referenceType?: string;
+        referenceId?: string;
+        description?: string;
+        manager?: EntityManager;
+    }): Promise<{ success: boolean; newBalance: number }> {
+        if (amount <= 0) {
+            throw new BadRequestException('Amount must be positive');
+        }
+
+        const execute = async (tx: EntityManager) => {
+            // 1. Tạo bản ghi coin mới (theo logic hiện tại của bạn)
+            const coinRecord = tx.getRepository(UserCoins).create({
+                userId,
+                type: coinType,
+                amount,
+                remaining: amount,
+                expiresAt:
+                    coinType === CoinType.TEMPORARY
+                        ? addDays(new Date(), TEMPORARY_COIN_DAYS)
+                        : null,
+                source: source || 'system',
+            });
+
+            await tx.getRepository(UserCoins).save(coinRecord);
+
+            // 2. Tính tổng số dư hiện tại SAU khi cộng
+            const wallet = await this.calculateUserCoins(userId, {
+                manager: tx,
+            });
+            const newTotalBalance = wallet.totalCoins;
+
+            // 3. Ghi lịch sử giao dịch
+            const transaction = tx.getRepository(CoinTransaction).create({
+                userId,
+                type: CoinTransactionType.ADD,
+                amount,
+                balanceAfter: newTotalBalance,
+                referenceType,
+                referenceId,
+                description:
+                    description ||
+                    `Added ${amount} ${coinType} coins from ${source || 'system'}`,
+                createdAt: new Date(),
+            });
+
+            await tx.getRepository(CoinTransaction).save(transaction);
+
+            return { success: true, newBalance: newTotalBalance };
+        };
+
+        if (manager) {
+            // đang trong transaction lớn → dùng luôn
+            return execute(manager);
+        }
+
+        // transaction riêng
+        return this.dataSource.transaction(execute);
+    }
+
+    /**
+     * Trừ coin với ưu tiên: temporary (sắp hết hạn trước) → permanent
+     * @throws BadRequestException nếu không đủ coin hoặc amount <= 0
+     */
+    async spendCoins({
+        userId,
+        amount,
+        reason,
+        referenceType,
+        referenceId,
+        description,
+        manager,
+    }: {
+        userId: string;
+        amount: number;
+        reason: string; // ví dụ: "unlock-chapter", "premium-feature"
+        referenceType?: string;
+        referenceId?: string;
+        description?: string;
+        manager?: EntityManager;
+    }): Promise<{ success: boolean; newBalance: number; spentDetails: any[] }> {
+        if (amount <= 0) {
+            throw new BadRequestException('Amount must be positive');
+        }
+
+        const execute = async (tx: EntityManager): Promise<any> => {
+            const now = new Date();
+
+            const coinRecords = await tx.getRepository(UserCoins).find({
+                where: [
+                    {
+                        userId,
+                        type: CoinType.PERMANENT,
+                        remaining: MoreThan(0),
+                    },
+                    {
+                        userId,
+                        type: CoinType.TEMPORARY,
+                        remaining: MoreThan(0),
+                        expiresAt: MoreThan(now),
+                    },
+                ],
+                order: {
+                    expiresAt: 'ASC',
+                },
+                lock: { mode: 'pessimistic_write' },
+            });
+
+            if (!coinRecords.length) {
+                throw new BadRequestException('No available coins');
+            }
+
+            let remainingToSpend = amount;
+            const spentDetails: Array<{
+                id: string;
+                type: CoinType;
+                amountSpent: number;
+                expiresAt?: string;
+            }> = [];
+            const recordsToUpdate: UserCoins[] = [];
+
+            for (const record of coinRecords) {
+                if (remainingToSpend <= 0) break;
+
+                const canSpend = Math.min(remainingToSpend, record.remaining);
+                if (canSpend <= 0) continue;
+
+                // Chuẩn bị cập nhật (chưa save)
+                record.remaining -= canSpend;
+                recordsToUpdate.push(record);
+
+                spentDetails.push({
+                    id: record.id,
+                    type: record.type,
+                    amountSpent: canSpend,
+                    expiresAt: record.expiresAt?.toISOString(),
+                });
+
+                remainingToSpend -= canSpend;
+            }
+
+            if (remainingToSpend > 0) {
+                throw new BadRequestException(
+                    `Insufficient coins. Required: ${amount}, Available: ${amount - remainingToSpend}`,
+                );
+            }
+
+            // Bulk update – chỉ 1 query (hoặc rất ít query)
+            if (recordsToUpdate.length > 0) {
+                await tx
+                    .getRepository(UserCoins)
+                    .save(recordsToUpdate, { chunk: 100 });
+                // chunk = 100 là an toàn với hầu hết DB (tránh quá dài query)
+            }
+
+            // 3. Tính tổng số dư sau khi trừ
+            const walletAfter = await this.calculateUserCoins(userId, {
+                manager: tx,
+            });
+            const newTotalBalance = walletAfter.totalCoins;
+
+            // 4. Ghi lịch sử giao dịch (amount âm để biểu thị trừ)
+            const transaction = tx.getRepository(CoinTransaction).create({
+                userId,
+                type: CoinTransactionType.SPEND,
+                amount: -amount,
+                balanceAfter: newTotalBalance,
+                referenceType,
+                referenceId,
+                description:
+                    description || `Spent ${amount} coins for ${reason}`,
+                createdAt: new Date(),
+            });
+
+            await tx.getRepository(CoinTransaction).save(transaction);
+
+            return {
+                success: true,
+                newBalance: newTotalBalance,
+                spentDetails, // optional: để debug hoặc trả về chi tiết cho client nếu cần
+            };
+        };
+
+        return manager
+            ? execute(manager)
+            : this.dataSource.transaction(execute);
     }
 }

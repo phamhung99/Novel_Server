@@ -11,6 +11,8 @@ import { UserCoins } from './entities/user-coins.entity';
 import { MediaService } from 'src/media/media.service';
 import { DoSpacesService } from 'src/upload/do-spaces.service';
 import { UserDailyAction } from './entities/user-daily-action.entity';
+import { CoinTransaction } from './entities/coin-transaction.entity';
+import { Transaction } from 'src/payments/entities/transaction.entity';
 
 @Module({
     controllers: [UserController],
@@ -24,6 +26,8 @@ import { UserDailyAction } from './entities/user-daily-action.entity';
             Chapter,
             UserCoins,
             UserDailyAction,
+            CoinTransaction,
+            Transaction,
         ]),
     ],
     exports: [UserService, TypeOrmModule],
