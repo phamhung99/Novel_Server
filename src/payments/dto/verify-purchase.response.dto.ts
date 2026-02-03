@@ -3,7 +3,7 @@ export class VerifyPurchaseDataDto {
 
     productId: string;
 
-    transactionId: number;
+    transactionId: string;
 
     user: any;
 }

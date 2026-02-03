@@ -4,6 +4,7 @@ export class WeekDayDto {
     day: number;
     isChecked: boolean;
     coin: number;
+    coinPremium: number;
 }
 
 export class AdInfoDto {

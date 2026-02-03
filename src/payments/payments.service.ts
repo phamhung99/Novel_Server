@@ -7,6 +7,7 @@ import { ERROR_MESSAGES } from 'src/common/constants/app.constant';
 import { UserService } from 'src/user/user.service';
 import { GooglePlayService } from 'src/google-play/google-play.service';
 import {
+    CoinReferenceType,
     CoinType,
     IapProductType,
     IapStore,
@@ -184,12 +185,14 @@ export class PaymentsService {
             await queryRunner.manager.save(transaction);
 
             // 4. Cấp coin vĩnh viễn
-            await this.userService.grantCoins({
+            await this.userService.addCoins({
                 manager: queryRunner.manager,
                 userId,
                 amount: coinsToAdd,
-                type: CoinType.PERMANENT,
+                coinType: CoinType.PERMANENT,
                 source: `iap:${storeProductId}${basePlanId ? `:${basePlanId}` : ''}`,
+                referenceType: CoinReferenceType.IAP,
+                referenceId: transaction?.id,
             });
 
             const updatedUser = await this.userService.getUserInfo(user);

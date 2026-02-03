@@ -32,7 +32,7 @@ import { PaginatedStoryPreviewResponse } from 'src/story/dto/paginated-story-pre
 import { enrichStoriesToPreviewDto } from 'src/common/mappers/story-preview.mapper';
 import { Chapter } from 'src/story/entities/chapter.entity';
 import { WalletDto } from './dto/wallet.dto';
-import { RewardResponseDto } from './dto/weekly-checkin.dto';
+import { RewardResponseDto, WeekDayDto } from './dto/weekly-checkin.dto';
 import { CoinTransaction } from './entities/coin-transaction.entity';
 import { Transaction } from 'src/payments/entities/transaction.entity';
 
@@ -404,7 +404,7 @@ export class UserService extends BaseCrudService<User> {
             await repo.save(todayLogin);
 
             if (isFirstLoginToday) {
-                const { todayBonus } =
+                const { todayBonus, currentStreak } =
                     await this.calculateLoginStreakAndBonus(userId);
 
                 if (todayBonus !== null && todayBonus > 0) {
@@ -412,49 +412,50 @@ export class UserService extends BaseCrudService<User> {
                         `Granting login bonus of ${todayBonus} coins to user ${userId} for login on ${todayStr}`,
                     );
 
-                    await this.grantCoins({
+                    await this.addCoins({
                         manager,
                         userId,
                         amount: todayBonus,
-                        type: CoinType.TEMPORARY,
+                        coinType: CoinType.TEMPORARY,
                         source: ActionType.LOGIN,
+                        description: `Daily login streak bonus (day ${currentStreak})`,
                     });
                 }
             }
         });
     }
 
-    async grantCoins({
-        manager,
-        userId,
-        amount,
-        type,
-        source,
-    }: {
-        manager: EntityManager;
-        userId: string;
-        amount: number;
-        type: CoinType;
-        source?: string;
-    }): Promise<void> {
-        if (amount <= 0) return;
+    // async grantCoins({
+    //     manager,
+    //     userId,
+    //     amount,
+    //     type,
+    //     source,
+    // }: {
+    //     manager: EntityManager;
+    //     userId: string;
+    //     amount: number;
+    //     type: CoinType;
+    //     source?: string;
+    // }): Promise<void> {
+    //     if (amount <= 0) return;
 
-        const coinRepo = manager.getRepository(UserCoins);
+    //     const coinRepo = manager.getRepository(UserCoins);
 
-        const newRecord = coinRepo.create({
-            userId,
-            type,
-            remaining: amount,
-            amount: amount,
-            expiresAt:
-                type === CoinType.TEMPORARY
-                    ? addDays(new Date(), TEMPORARY_COIN_DAYS)
-                    : null,
-            source: source,
-        });
+    //     const newRecord = coinRepo.create({
+    //         userId,
+    //         type,
+    //         remaining: amount,
+    //         amount: amount,
+    //         expiresAt:
+    //             type === CoinType.TEMPORARY
+    //                 ? addDays(new Date(), TEMPORARY_COIN_DAYS)
+    //                 : null,
+    //         source: source,
+    //     });
 
-        await coinRepo.save(newRecord);
-    }
+    //     await coinRepo.save(newRecord);
+    // }
 
     async getSubscriptionStatus(
         userId: string,
@@ -572,12 +573,13 @@ export class UserService extends BaseCrudService<User> {
             await actionRepo.save(todayAction);
 
             const coinsToGrant = this.AD_REWARD_COINS;
-            await this.grantCoins({
+            await this.addCoins({
                 manager,
                 userId,
-                amount: coinsToGrant,
-                type: CoinType.TEMPORARY,
+                amount: this.AD_REWARD_COINS,
+                coinType: CoinType.TEMPORARY,
                 source: ActionType.WATCH_AD,
+                description: `Ad reward - view #${todayAction.count}`,
             });
 
             const updatedCoins = await this.calculateUserCoins(userId, {
@@ -717,18 +719,20 @@ export class UserService extends BaseCrudService<User> {
 
         const hasCheckedToday = todayBonus === null;
 
-        const weekDays = this.STREAK_REWARDS.map((coin, index) => {
-            const day = index + 1;
-            const isChecked =
-                day < currentDay || (day === currentDay && hasCheckedToday);
+        const weekDays: WeekDayDto[] = this.STREAK_REWARDS.map(
+            (coin, index) => {
+                const day = index + 1;
+                const isChecked =
+                    day < currentDay || (day === currentDay && hasCheckedToday);
 
-            return {
-                day,
-                isChecked,
-                coin,
-                coinPremium: this.PREMIUM_STREAK_REWARDS[index],
-            };
-        });
+                return {
+                    day,
+                    isChecked,
+                    coin,
+                    coinPremium: this.PREMIUM_STREAK_REWARDS[index],
+                };
+            },
+        );
 
         const todayStr = new Date().toISOString().split('T')[0];
         const todayAdAction = await this.userDailyActionRepo.findOne({

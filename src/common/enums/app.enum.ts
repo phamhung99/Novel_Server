@@ -155,3 +155,13 @@ export enum CoinTransactionType {
     ADJUSTMENT = 'adjustment',
     REFUND = 'refund',
 }
+
+export enum CoinReferenceType {
+    IAP = 'iap',
+    LOGIN_BONUS = 'login_bonus',
+    WATCH_AD = 'watch_ad',
+    CHAPTER_UNLOCK = 'chapter_unlock',
+    ADMIN_ADJUST = 'admin_adjust',
+    REFUND = 'refund',
+    GIFT_CODE = 'gift_code',
+}

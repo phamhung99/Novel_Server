@@ -12,8 +12,8 @@ import { IapStore } from 'src/common/enums/app.enum';
 
 @Entity('transactions')
 export class Transaction {
-    @PrimaryGeneratedColumn()
-    id: number;
+    @PrimaryGeneratedColumn('uuid')
+    id: string;
 
     @ManyToOne(() => User)
     @JoinColumn({ name: 'user_id' })
