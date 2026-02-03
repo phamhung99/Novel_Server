@@ -40,8 +40,10 @@ import { Transaction } from 'src/payments/entities/transaction.entity';
 export class UserService extends BaseCrudService<User> {
     private readonly logger = new Logger(UserService.name);
 
-    private readonly LOGIN_STREAK_BONUS_SCHEDULE = [
-        10, 15, 40, 10, 15, 15, 30,
+    private readonly STREAK_REWARDS = [10, 15, 40, 10, 15, 15, 30] as const;
+
+    private readonly PREMIUM_STREAK_REWARDS = [
+        100, 100, 100, 100, 100, 100, 100,
     ] as const;
 
     private readonly AD_REWARD_COINS = 50;
@@ -330,7 +332,7 @@ export class UserService extends BaseCrudService<User> {
         if (loginActions.length === 0) {
             return {
                 currentStreak: 0,
-                todayBonus: this.LOGIN_STREAK_BONUS_SCHEDULE[0],
+                todayBonus: this.STREAK_REWARDS[0],
             };
         }
 
@@ -363,7 +365,7 @@ export class UserService extends BaseCrudService<User> {
             currentStreak,
             todayBonus: hasLoggedInToday
                 ? null
-                : this.LOGIN_STREAK_BONUS_SCHEDULE[bonusIndex],
+                : this.STREAK_REWARDS[bonusIndex],
         };
     }
 
@@ -715,7 +717,7 @@ export class UserService extends BaseCrudService<User> {
 
         const hasCheckedToday = todayBonus === null;
 
-        const weekDays = this.LOGIN_STREAK_BONUS_SCHEDULE.map((coin, index) => {
+        const weekDays = this.STREAK_REWARDS.map((coin, index) => {
             const day = index + 1;
             const isChecked =
                 day < currentDay || (day === currentDay && hasCheckedToday);
@@ -724,6 +726,7 @@ export class UserService extends BaseCrudService<User> {
                 day,
                 isChecked,
                 coin,
+                coinPremium: this.PREMIUM_STREAK_REWARDS[index],
             };
         });
 
