@@ -195,9 +195,10 @@ export class PaymentsService {
                 referenceId: transaction?.id,
             });
 
-            const updatedUser = await this.userService.getUserInfo(user);
-
             await queryRunner.commitTransaction();
+
+            const freshUser = await this.userService.findById(userId);
+            const updatedUser = await this.userService.getUserInfo(freshUser);
 
             this.logger.log(
                 `Granted ${coinsToAdd} permanent coins to ${userId} via ${storeProductId}`,
