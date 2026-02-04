@@ -12,5 +12,6 @@ import { IapProductService } from './iap-product.service';
     controllers: [PaymentsController],
     imports: [TypeOrmModule.forFeature([Transaction, IapProduct]), UserModule],
     providers: [PaymentsService, GooglePlayService, IapProductService],
+    exports: [IapProductService],
 })
 export class PaymentsModule {}

@@ -45,16 +45,6 @@ export class IapProduct {
     @Column({ type: 'float', name: 'original_price', nullable: true })
     originalPrice: number;
 
-    @Column({
-        type: 'decimal',
-        precision: 5,
-        scale: 2,
-        name: 'discount_percentage',
-        nullable: true,
-        default: 0,
-    })
-    discountPercentage: number;
-
     @Column({ type: 'boolean', name: 'is_popular', default: false })
     isPopular: boolean;
 
@@ -70,6 +60,11 @@ export class IapProduct {
         scale: 2,
         name: 'bonus_percentage',
         nullable: true,
+        transformer: {
+            to: (value: number | null) => value?.toString() ?? null,
+            from: (value: string | null) =>
+                value === null ? null : Number(value),
+        },
     })
     bonusPercentage: number;
 

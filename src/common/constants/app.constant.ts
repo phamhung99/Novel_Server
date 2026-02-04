@@ -12,6 +12,8 @@ export const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
 export const CHAPTER_UNLOCK_FEE = 10;
 export const CHAPTER_CREATION_FEE = 30;
+export const STORY_CREATION_FEE = 10;
+export const IMAGE_CREATION_FEE = 5;
 
 export const DEFAULT_PROFILE_IMAGE_URL = 'avatars/default_avatar.png';
 
