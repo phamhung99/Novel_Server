@@ -379,6 +379,12 @@ export class StoryGenerationService {
                 `Initializing chapter generation for requestId: ${requestId}`,
             );
 
+            const exists = await this.chapterGenerationRepository.findOne({
+                where: { requestId },
+            });
+
+            if (exists) throw new BadRequestException('Duplicate request');
+
             // Tạo preGen trước, để luôn có record lưu lỗi
             savedPreGen = this.chapterGenerationRepository.create({
                 storyGenerationId: null, // tạm thời null, sẽ update sau nếu có storyGeneration
@@ -394,11 +400,6 @@ export class StoryGenerationService {
             if (!storyId) {
                 throw new BadRequestException('storyId is required');
             }
-
-            const exists = await this.chapterGenerationRepository.findOne({
-                where: { requestId },
-            });
-            if (exists) throw new BadRequestException('Duplicate request');
 
             const storyGeneration =
                 await this.storyGenerationRepository.findOne({
