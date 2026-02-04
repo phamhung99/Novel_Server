@@ -587,6 +587,32 @@ export class StoryController {
         return chapter;
     }
 
+    @Post(':storyId/chapter/:index/unlock')
+    @SkipTransform()
+    async unlockChapter(
+        @Headers('x-user-id') userId: string,
+        @Param('storyId') storyId: string,
+        @Param('index') index: string,
+    ) {
+        if (!storyId) {
+            throw new BadRequestException(ERROR_MESSAGES.STORY_ID_REQUIRED);
+        }
+
+        if (!userId) {
+            throw new BadRequestException(ERROR_MESSAGES.USER_ID_REQUIRED);
+        }
+
+        if (!index) {
+            throw new BadRequestException('Chapter index is required');
+        }
+
+        return this.chapterUnlockService.unlockChapter({
+            userId,
+            index,
+            storyId,
+        });
+    }
+
     @Put(':storyId/chapter/:index')
     async updateChapter(
         @Param('storyId') storyId: string,

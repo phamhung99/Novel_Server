@@ -10,6 +10,9 @@ export const DEFAULT_COVER_IMAGE_URL =
 export const TEMPORARY_COIN_DAYS = 7;
 export const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
+export const CHAPTER_UNLOCK_FEE = 10;
+export const CHAPTER_CREATION_FEE = 30;
+
 export const DEFAULT_PROFILE_IMAGE_URL = 'avatars/default_avatar.png';
 
 export const DEFAULT_AI_PROVIDER = 'gemini';

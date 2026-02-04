@@ -158,7 +158,7 @@ export enum CoinTransactionType {
 
 export enum CoinReferenceType {
     IAP = 'iap',
-    LOGIN_BONUS = 'login_bonus',
+    LOGIN = 'login',
     WATCH_AD = 'watch_ad',
     CHAPTER_UNLOCK = 'chapter_unlock',
     ADMIN_ADJUST = 'admin_adjust',

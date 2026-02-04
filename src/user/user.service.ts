@@ -20,6 +20,7 @@ import { StoryStatus } from 'src/common/enums/story-status.enum';
 import { UserCoins } from './entities/user-coins.entity';
 import {
     ActionType,
+    CoinReferenceType,
     CoinTransactionType,
     CoinType,
     SUBSCRIPTION_STATUS,
@@ -317,9 +318,13 @@ export class UserService extends BaseCrudService<User> {
         }
     }
 
-    async calculateLoginStreakAndBonus(userId: string): Promise<{
+    async calculateLoginStreakAndBonus(
+        userId: string,
+        isSubUser?: boolean,
+    ): Promise<{
         currentStreak: number;
         todayBonus: number | null;
+        todayPremiumBonus: number | null;
     }> {
         const today = new Date();
         today.setHours(0, 0, 0, 0);
@@ -333,6 +338,9 @@ export class UserService extends BaseCrudService<User> {
             return {
                 currentStreak: 0,
                 todayBonus: this.STREAK_REWARDS[0],
+                todayPremiumBonus: isSubUser
+                    ? this.PREMIUM_STREAK_REWARDS[0]
+                    : null,
             };
         }
 
@@ -366,6 +374,10 @@ export class UserService extends BaseCrudService<User> {
             todayBonus: hasLoggedInToday
                 ? null
                 : this.STREAK_REWARDS[bonusIndex],
+            todayPremiumBonus:
+                hasLoggedInToday || !isSubUser
+                    ? null
+                    : this.PREMIUM_STREAK_REWARDS[bonusIndex],
         };
     }
 
@@ -404,9 +416,12 @@ export class UserService extends BaseCrudService<User> {
             await repo.save(todayLogin);
 
             if (isFirstLoginToday) {
-                const { todayBonus, currentStreak } =
-                    await this.calculateLoginStreakAndBonus(userId);
+                const { isSubUser } = await this.getSubscriptionStatus(userId);
 
+                const { todayBonus, todayPremiumBonus, currentStreak } =
+                    await this.calculateLoginStreakAndBonus(userId, isSubUser);
+
+                // Grant normal bonus
                 if (todayBonus !== null && todayBonus > 0) {
                     this.logger.log(
                         `Granting login bonus of ${todayBonus} coins to user ${userId} for login on ${todayStr}`,
@@ -419,43 +434,29 @@ export class UserService extends BaseCrudService<User> {
                         coinType: CoinType.TEMPORARY,
                         source: ActionType.LOGIN,
                         description: `Daily login streak bonus (day ${currentStreak})`,
+                        referenceType: CoinReferenceType.LOGIN,
+                    });
+                }
+
+                // Grant premium bonus if applicable
+                if (todayPremiumBonus !== null && todayPremiumBonus > 0) {
+                    this.logger.log(
+                        `Granting premium login bonus of ${todayPremiumBonus} coins to user ${userId} for login on ${todayStr}`,
+                    );
+
+                    await this.addCoins({
+                        manager,
+                        userId,
+                        amount: todayPremiumBonus,
+                        coinType: CoinType.PERMANENT,
+                        source: ActionType.LOGIN,
+                        description: `Premium daily login streak bonus (day ${currentStreak})`,
+                        referenceType: CoinReferenceType.LOGIN,
                     });
                 }
             }
         });
     }
-
-    // async grantCoins({
-    //     manager,
-    //     userId,
-    //     amount,
-    //     type,
-    //     source,
-    // }: {
-    //     manager: EntityManager;
-    //     userId: string;
-    //     amount: number;
-    //     type: CoinType;
-    //     source?: string;
-    // }): Promise<void> {
-    //     if (amount <= 0) return;
-
-    //     const coinRepo = manager.getRepository(UserCoins);
-
-    //     const newRecord = coinRepo.create({
-    //         userId,
-    //         type,
-    //         remaining: amount,
-    //         amount: amount,
-    //         expiresAt:
-    //             type === CoinType.TEMPORARY
-    //                 ? addDays(new Date(), TEMPORARY_COIN_DAYS)
-    //                 : null,
-    //         source: source,
-    //     });
-
-    //     await coinRepo.save(newRecord);
-    // }
 
     async getSubscriptionStatus(
         userId: string,
@@ -474,6 +475,8 @@ export class UserService extends BaseCrudService<User> {
             },
             select: ['basePlanId'],
         });
+
+        console.log();
 
         if (activeSubscription) {
             return {
@@ -580,6 +583,7 @@ export class UserService extends BaseCrudService<User> {
                 coinType: CoinType.TEMPORARY,
                 source: ActionType.WATCH_AD,
                 description: `Ad reward - view #${todayAction.count}`,
+                referenceType: CoinReferenceType.WATCH_AD,
             });
 
             const updatedCoins = await this.calculateUserCoins(userId, {
@@ -778,11 +782,11 @@ export class UserService extends BaseCrudService<User> {
         amount: number;
         coinType?: CoinType;
         source?: ActionType | string;
-        referenceType?: string;
+        referenceType: string;
         referenceId?: string;
         description?: string;
         manager?: EntityManager;
-    }): Promise<{ success: boolean; newBalance: number }> {
+    }): Promise<number> {
         if (amount <= 0) {
             throw new BadRequestException('Amount must be positive');
         }
@@ -798,7 +802,6 @@ export class UserService extends BaseCrudService<User> {
                     coinType === CoinType.TEMPORARY
                         ? addDays(new Date(), TEMPORARY_COIN_DAYS)
                         : null,
-                source: source || 'system',
             });
 
             await tx.getRepository(UserCoins).save(coinRecord);
@@ -825,7 +828,7 @@ export class UserService extends BaseCrudService<User> {
 
             await tx.getRepository(CoinTransaction).save(transaction);
 
-            return { success: true, newBalance: newTotalBalance };
+            return newTotalBalance;
         };
 
         if (manager) {
@@ -844,7 +847,6 @@ export class UserService extends BaseCrudService<User> {
     async spendCoins({
         userId,
         amount,
-        reason,
         referenceType,
         referenceId,
         description,
@@ -852,12 +854,11 @@ export class UserService extends BaseCrudService<User> {
     }: {
         userId: string;
         amount: number;
-        reason: string; // ví dụ: "unlock-chapter", "premium-feature"
         referenceType?: string;
         referenceId?: string;
-        description?: string;
+        description: string;
         manager?: EntityManager;
-    }): Promise<{ success: boolean; newBalance: number; spentDetails: any[] }> {
+    }): Promise<{ newBalance: number; spentDetails: any[] }> {
         if (amount <= 0) {
             throw new BadRequestException('Amount must be positive');
         }
@@ -929,7 +930,6 @@ export class UserService extends BaseCrudService<User> {
                 await tx
                     .getRepository(UserCoins)
                     .save(recordsToUpdate, { chunk: 100 });
-                // chunk = 100 là an toàn với hầu hết DB (tránh quá dài query)
             }
 
             // 3. Tính tổng số dư sau khi trừ
@@ -946,17 +946,15 @@ export class UserService extends BaseCrudService<User> {
                 balanceAfter: newTotalBalance,
                 referenceType,
                 referenceId,
-                description:
-                    description || `Spent ${amount} coins for ${reason}`,
+                description: description,
                 createdAt: new Date(),
             });
 
             await tx.getRepository(CoinTransaction).save(transaction);
 
             return {
-                success: true,
                 newBalance: newTotalBalance,
-                spentDetails, // optional: để debug hoặc trả về chi tiết cho client nếu cần
+                spentDetails,
             };
         };
 
