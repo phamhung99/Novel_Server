@@ -36,6 +36,17 @@ import { WalletDto } from './dto/wallet.dto';
 import { RewardResponseDto, WeekDayDto } from './dto/weekly-checkin.dto';
 import { CoinTransaction } from './entities/coin-transaction.entity';
 import { Transaction } from 'src/payments/entities/transaction.entity';
+import { PaginationDto } from 'src/story/dto/pagination.dto';
+
+const coinTransactionTitles: Record<CoinReferenceType, string> = {
+    [CoinReferenceType.IAP]: 'In-App Purchase',
+    [CoinReferenceType.LOGIN]: 'Daily Login Bonus',
+    [CoinReferenceType.WATCH_AD]: 'Ad Watch Reward',
+    [CoinReferenceType.CHAPTER_UNLOCK]: 'Chapter Unlock',
+    [CoinReferenceType.ADMIN_ADJUST]: 'Admin Adjustment',
+    [CoinReferenceType.REFUND]: 'Refund',
+    [CoinReferenceType.GIFT_CODE]: 'Gift Code Reward',
+};
 
 @Injectable()
 export class UserService extends BaseCrudService<User> {
@@ -74,6 +85,10 @@ export class UserService extends BaseCrudService<User> {
 
     protected getUniqueField(): keyof User {
         return;
+    }
+
+    private getTransactionTitle(referenceType: CoinReferenceType): string {
+        return coinTransactionTitles[referenceType] ?? 'Coin Transaction';
     }
 
     private generateRandomUsername(): string {
@@ -448,7 +463,7 @@ export class UserService extends BaseCrudService<User> {
                         manager,
                         userId,
                         amount: todayPremiumBonus,
-                        coinType: CoinType.PERMANENT,
+                        coinType: CoinType.TEMPORARY,
                         source: ActionType.LOGIN,
                         description: `Premium daily login streak bonus (day ${currentStreak})`,
                         referenceType: CoinReferenceType.LOGIN,
@@ -475,8 +490,6 @@ export class UserService extends BaseCrudService<User> {
             },
             select: ['basePlanId'],
         });
-
-        console.log();
 
         if (activeSubscription) {
             return {
@@ -824,6 +837,7 @@ export class UserService extends BaseCrudService<User> {
                     description ||
                     `Added ${amount} ${coinType} coins from ${source || 'system'}`,
                 createdAt: new Date(),
+                expiresAt: coinRecord.expiresAt,
             });
 
             await tx.getRepository(CoinTransaction).save(transaction);
@@ -948,6 +962,7 @@ export class UserService extends BaseCrudService<User> {
                 referenceId,
                 description: description,
                 createdAt: new Date(),
+                expiresAt: null,
             });
 
             await tx.getRepository(CoinTransaction).save(transaction);
@@ -961,5 +976,40 @@ export class UserService extends BaseCrudService<User> {
         return manager
             ? execute(manager)
             : this.dataSource.transaction(execute);
+    }
+
+    async getCoinTransactions(userId: string, paginationDto: PaginationDto) {
+        const { page = 1, limit = 20 } = paginationDto;
+        const skip = (page - 1) * limit;
+
+        const [transactions, total] =
+            await this.coinTransactionRepo.findAndCount({
+                where: { userId },
+                order: { createdAt: 'DESC' },
+                skip,
+                take: limit,
+            });
+
+        const items = transactions.map((transaction) => {
+            const title = this.getTransactionTitle(
+                transaction.referenceType as CoinReferenceType,
+            );
+
+            return {
+                amount: transaction.amount,
+                title: title,
+                description: transaction.description,
+                type: transaction.type,
+                createdAt: transaction.createdAt,
+                expiresAt: transaction.expiresAt,
+            };
+        });
+
+        return {
+            page,
+            limit,
+            total,
+            items,
+        };
     }
 }

@@ -31,6 +31,7 @@ import { diskStorage } from 'multer';
 import { CustomMaxFileSizeValidator } from 'src/common/validators/custom-max-file-size.validator';
 import { MimeTypeValidator } from 'src/common/validators/mime-type.validator';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { PaginationDto } from 'src/story/dto/pagination.dto';
 
 @Controller('users')
 export class UserController {
@@ -43,6 +44,18 @@ export class UserController {
         }
 
         return this.userService.getReward(userId);
+    }
+
+    @Get('me/coin-transactions')
+    async getMyCoinTransactions(
+        @Headers('x-user-id') userId: string,
+        @Query() paginationDto: PaginationDto,
+    ) {
+        if (!userId) {
+            throw new BadRequestException(ERROR_MESSAGES.USER_ID_REQUIRED);
+        }
+
+        return this.userService.getCoinTransactions(userId, paginationDto);
     }
 
     @Post('ads/watch')
