@@ -4,7 +4,7 @@ import { EntityManager, FindManyOptions, IsNull, Repository } from 'typeorm';
 import { IapProduct } from './entities/iap-product.entity';
 import { ERROR_MESSAGES } from 'src/common/constants/app.constant';
 import { BaseCrudService } from 'src/common/services/base-crud.service';
-import { IapPeriod, IapProductType } from 'src/common/enums/app.enum';
+import { IapPeriod, IapProductType, IapStore } from 'src/common/enums/app.enum';
 
 interface FormattedProductDto {
     id: string;
@@ -153,10 +153,12 @@ export class IapProductService extends BaseCrudService<IapProduct> {
         };
     }
 
-    async findAllWithDisplayOrder(): Promise<FormattedProductsResponseDto> {
+    async findAllWithDisplayOrder(
+        platform: IapStore,
+    ): Promise<FormattedProductsResponseDto> {
         const findOptions: FindManyOptions<IapProduct> = {
             order: { displayOrder: 'ASC' },
-            where: { isActive: true },
+            where: { isActive: true, store: platform },
         };
 
         const products = await this.iapProductRepository.find(findOptions);
