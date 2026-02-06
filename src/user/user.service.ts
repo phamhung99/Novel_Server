@@ -999,7 +999,6 @@ export class UserService extends BaseCrudService<User> {
                 amount: transaction.amount,
                 title: title,
                 description: transaction.description,
-                type: transaction.type,
                 createdAt: transaction.createdAt,
                 expiresAt: transaction.expiresAt,
             };
