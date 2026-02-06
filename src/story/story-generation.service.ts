@@ -836,21 +836,28 @@ export class StoryGenerationService {
         prompt?: string,
         model?: string,
     ): Promise<{ coverImageUrl: string }> {
-        let imageGenRecord = this.imageGenerationRepository.create({
-            requestId,
-            entityType: 'story',
-            entityId: storyId,
-            purpose: 'story_cover',
-            status: GenerationStatus.PROCESSING,
-            prompt,
-            attempts: 1,
-            lastAttemptAt: new Date(),
-        });
-
-        imageGenRecord =
-            await this.imageGenerationRepository.save(imageGenRecord);
+        let imageGenRecord;
 
         try {
+            const exists = await this.chapterGenerationRepository.findOne({
+                where: { requestId },
+            });
+
+            if (exists) throw new BadRequestException('Duplicate request');
+
+            imageGenRecord = this.imageGenerationRepository.create({
+                requestId,
+                entityType: 'story',
+                entityId: storyId,
+                purpose: 'story_cover',
+                status: GenerationStatus.PROCESSING,
+                attempts: 1,
+                lastAttemptAt: new Date(),
+            });
+
+            imageGenRecord =
+                await this.imageGenerationRepository.save(imageGenRecord);
+
             const story = await this.storyRepository.findOne({
                 where: { id: storyId, authorId: userId },
                 relations: ['generation'],
@@ -918,6 +925,7 @@ export class StoryGenerationService {
                 {
                     imagePath: newCoverImageKey,
                     status: GenerationStatus.COMPLETED,
+                    prompt: finalPrompt,
                 },
             );
 
@@ -929,6 +937,11 @@ export class StoryGenerationService {
                 err instanceof Error
                     ? err.message
                     : 'Failed to generate/upload cover';
+
+            this.logger.error(
+                `Error in generateStoryCoverForMobile for requestId ${requestId}: ${errorMsg}`,
+                err instanceof Error ? err.stack : undefined,
+            );
 
             await this.imageGenerationRepository.update(
                 { id: imageGenRecord.id },
