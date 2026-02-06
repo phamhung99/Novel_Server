@@ -22,6 +22,7 @@ interface PostgresError extends Error {
 }
 
 interface ErrorResponse {
+    success: boolean;
     statusCode: number;
     timestamp: string;
     path: string;
@@ -47,6 +48,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
         const correlationId = uuidv4();
 
         const errorResponse: ErrorResponse = {
+            success: false,
             statusCode,
             timestamp: new Date().toISOString(),
             path: request.url,

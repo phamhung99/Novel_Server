@@ -4,6 +4,7 @@ import serverlessExpress from '@vendia/serverless-express';
 import { Callback, Context, Handler } from 'aws-lambda';
 import { AppModule } from './app.module';
 import { CronService } from './cron/cron.service';
+import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 
 let server: Handler;
 let cronAppContext: any;
@@ -19,6 +20,8 @@ async function bootstrap() {
             forbidNonWhitelisted: false,
         }),
     );
+
+    app.useGlobalFilters(new AllExceptionsFilter());
     app.setGlobalPrefix('api/v1');
     await app.init();
 
