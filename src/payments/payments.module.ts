@@ -7,11 +7,17 @@ import { IapProduct } from './entities/iap-product.entity';
 import { UserModule } from 'src/user/user.module';
 import { GooglePlayService } from 'src/google-play/google-play.service';
 import { IapProductService } from './iap-product.service';
+import { AppStoreService } from 'src/app-store/app-store.service';
 
 @Module({
     controllers: [PaymentsController],
     imports: [TypeOrmModule.forFeature([Transaction, IapProduct]), UserModule],
-    providers: [PaymentsService, GooglePlayService, IapProductService],
+    providers: [
+        PaymentsService,
+        GooglePlayService,
+        IapProductService,
+        AppStoreService,
+    ],
     exports: [IapProductService],
 })
 export class PaymentsModule {}

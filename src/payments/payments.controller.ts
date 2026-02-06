@@ -19,6 +19,7 @@ export class PaymentsController {
             userId,
             purchaseToken: dto.purchaseToken,
             type: dto.type,
+            platform,
         });
     }
 

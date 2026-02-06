@@ -18,6 +18,7 @@ import { Transaction } from './entities/transaction.entity';
 import { IapProductService } from './iap-product.service';
 import { VerifyPurchaseResponseDto } from './dto/verify-purchase.response.dto';
 import { VerifyPurchaseParamsDto } from './dto/verify-purchase.dto';
+import { AppStoreService } from 'src/app-store/app-store.service';
 
 @Injectable()
 export class PaymentsService {
@@ -33,68 +34,113 @@ export class PaymentsService {
         private readonly googlePlayService: GooglePlayService,
         private readonly dataSource: DataSource,
         private readonly iapProductService: IapProductService,
+        private readonly appStoreService: AppStoreService,
     ) {
         this.testUserIds =
             this.configService.get<string[]>('testUserIds') || [];
     }
 
-    async verifyPurchase({
-        userId,
-        purchaseToken,
-        type,
-    }: VerifyPurchaseParamsDto): Promise<VerifyPurchaseResponseDto> {
+    async verifyPurchase(
+        params: VerifyPurchaseParamsDto,
+    ): Promise<VerifyPurchaseResponseDto> {
+        const { userId, purchaseToken, type, platform } = params;
+
         this.logger.log(
-            `Verifying purchase - user: ${userId}, token: ${purchaseToken}`,
+            `Verifying purchase - user: ${userId}, platform: ${platform}, token: ${purchaseToken}`,
         );
 
-        if (!userId || !purchaseToken) {
+        if (!userId || !purchaseToken || !platform) {
             throw new BadRequestException(
                 !userId
                     ? ERROR_MESSAGES.USER_ID_REQUIRED
-                    : ERROR_MESSAGES.MISSING_PURCHASE_TOKEN,
+                    : !purchaseToken
+                      ? ERROR_MESSAGES.MISSING_PURCHASE_TOKEN
+                      : 'Platform is required',
             );
         }
 
         const user = await this.userService.findById(userId);
+        if (!user) {
+            throw new BadRequestException(ERROR_MESSAGES.USER_NOT_FOUND);
+        }
 
-        // Xác thực Google Play
-        let googleData: any = null;
-        let parsed: any = null;
+        if (platform === IapStore.ANDROID) {
+            return this.verifyGooglePlayPurchase(
+                userId,
+                purchaseToken,
+                type,
+                user,
+            );
+        }
 
-        if (type === IapProductType.SUBSCRIPTION) {
-            googleData =
-                await this.googlePlayService.verifySubscription(purchaseToken);
+        if (platform === IapStore.IOS) {
+            return this.verifyAppStorePurchase(
+                userId,
+                purchaseToken,
+                type,
+                user,
+            );
+        }
 
-            if (!googleData) {
-                throw new BadRequestException(
-                    'Invalid or expired subscription purchase token',
-                );
+        throw new BadRequestException(`Unsupported platform: ${platform}`);
+    }
+
+    private async verifyGooglePlayPurchase(
+        userId: string,
+        purchaseToken: string,
+        type: IapProductType,
+        user: any, // thay bằng type User của bạn nếu có
+    ): Promise<VerifyPurchaseResponseDto> {
+        let googleData: any;
+        let parsed: any;
+
+        try {
+            if (type === IapProductType.SUBSCRIPTION) {
+                googleData =
+                    await this.googlePlayService.verifySubscription(
+                        purchaseToken,
+                    );
+
+                if (!googleData) {
+                    throw new BadRequestException(
+                        'Invalid or expired subscription purchase token',
+                    );
+                }
+
+                parsed =
+                    this.googlePlayService.parseSubscriptionResponse(
+                        googleData,
+                    );
+            } else {
+                googleData =
+                    await this.googlePlayService.verifyProductPurchase(
+                        purchaseToken,
+                    );
+
+                if (!googleData?.acknowledgementState) {
+                    throw new BadRequestException(
+                        'No acknowledgement info from Google Play',
+                    );
+                }
+
+                const lineItem = googleData.productLineItem?.[0];
+
+                if (!lineItem?.productId) {
+                    throw new BadRequestException(
+                        'Missing product information in Google response',
+                    );
+                }
+
+                parsed =
+                    this.googlePlayService.parseProductPurchaseResponse(
+                        googleData,
+                    );
             }
-
-            parsed =
-                this.googlePlayService.parseSubscriptionResponse(googleData);
-        } else {
-            googleData =
-                await this.googlePlayService.verifyProductPurchase(
-                    purchaseToken,
-                );
-
-            if (!googleData?.acknowledgementState) {
-                throw new BadRequestException(
-                    'No acknowledgement info from Google Play',
-                );
-            }
-
-            const lineItem = googleData.productLineItem?.[0];
-
-            if (!lineItem?.productId) {
-                throw new BadRequestException(
-                    'Missing product information in Google response',
-                );
-            }
-
-            parsed =
-                this.googlePlayService.parseProductPurchaseResponse(googleData);
+        } catch (err) {
+            this.logger.warn(`Google Play verification failed: ${err.message}`);
+            throw new BadRequestException(
+                `Google Play verification failed: ${err.message}`,
+            );
         }
 
         const {
@@ -107,12 +153,116 @@ export class PaymentsService {
             amountPaid,
         } = parsed;
 
+        return this.processVerifiedPurchase({
+            userId,
+            user,
+            purchaseToken,
+            platform: IapStore.ANDROID,
+            storeProductId,
+            basePlanId: basePlanId ?? null,
+            orderId,
+            purchaseTime,
+            currency,
+            expiryTime,
+            amountPaid,
+            googlePayload: googleData,
+            type,
+        });
+    }
+
+    private async verifyAppStorePurchase(
+        userId: string,
+        purchaseToken: string, // BÂY GIỜ là signedTransaction JWS string (từ client gửi lên)
+        type: IapProductType,
+        user: any,
+    ): Promise<VerifyPurchaseResponseDto> {
+        let appleData: any;
+        let parsed: any;
+
+        try {
+            // Verify local JWS
+            const { decoded } = await this.appStoreService.verifyTransaction(
+                purchaseToken,
+                type,
+            );
+
+            appleData = decoded; // lưu decoded payload
+
+            parsed = this.appStoreService.parseTransactionData(decoded, type);
+        } catch (err) {
+            this.logger.warn(
+                `App Store transaction verification failed: ${err.message}`,
+            );
+            throw new BadRequestException(
+                `App Store verification failed: ${err.message}`,
+            );
+        }
+
+        const {
+            storeProductId,
+            originalTransactionId,
+            purchaseTime,
+            currency,
+            expiryTime,
+            amountPaid,
+        } = parsed;
+
+        return this.processVerifiedPurchase({
+            userId,
+            user,
+            purchaseToken, // lưu JWS string để audit
+            platform: IapStore.IOS,
+            storeProductId,
+            basePlanId: null,
+            orderId: originalTransactionId || purchaseToken.substring(0, 50), // hoặc dùng transactionId
+            purchaseTime,
+            currency,
+            expiryTime,
+            amountPaid,
+            applePayload: appleData, // decoded JWSTransactionDecodedPayload
+            type,
+        });
+    }
+
+    private async processVerifiedPurchase(input: {
+        userId: string;
+        user: any;
+        purchaseToken: string;
+        platform: IapStore;
+        storeProductId: string;
+        basePlanId: string | null;
+        orderId: string;
+        purchaseTime: number | string;
+        currency: string;
+        expiryTime?: number | string;
+        amountPaid?: number;
+        googlePayload?: any;
+        applePayload?: any;
+        type: IapProductType;
+    }): Promise<VerifyPurchaseResponseDto> {
+        const {
+            userId,
+            purchaseToken,
+            platform,
+            storeProductId,
+            basePlanId,
+            orderId,
+            purchaseTime,
+            currency,
+            expiryTime,
+            amountPaid,
+            googlePayload,
+            applePayload,
+            type,
+            user,
+        } = input;
+
         const queryRunner = this.dataSource.createQueryRunner();
         await queryRunner.connect();
         await queryRunner.startTransaction();
 
         try {
-            // 1. Kiểm tra trùng purchase token
+            // 1. Check trùng token
             const existingTx = await queryRunner.manager.findOne(Transaction, {
                 where: { purchaseToken },
             });
@@ -125,19 +275,18 @@ export class PaymentsService {
                 }
 
                 const updatedUser = await this.userService.getUserInfo(user);
-
                 await queryRunner.commitTransaction();
 
+                const coins = existingTx.grantedCoins;
                 const isSub = type === IapProductType.SUBSCRIPTION;
-                const displayMessage = isSub
-                    ? `Subscription successful! You have been credited with ${existingTx.grantedCoins} coins.`
-                    : `Purchase successful! ${existingTx.grantedCoins} coins have been added to your account.`;
 
                 return {
                     success: true,
-                    message: displayMessage,
+                    message: isSub
+                        ? `Subscription successful! You have been credited with ${coins} coins.`
+                        : `Purchase successful! ${coins} coins have been added to your account.`,
                     data: {
-                        coinsAdded: existingTx.grantedCoins,
+                        coinsAdded: coins,
                         productId: existingTx.storeProductId,
                         transactionId: existingTx.id,
                         user: updatedUser,
@@ -145,11 +294,11 @@ export class PaymentsService {
                 };
             }
 
-            // 2. Tính số coin từ sản phẩm
+            // 2. Tính số coin
             const { coinsToAdd } =
                 await this.iapProductService.calculateCoinsForProduct({
                     storeProductId,
-                    basePlanId: basePlanId ?? null,
+                    basePlanId,
                     manager: queryRunner.manager,
                 });
 
@@ -159,12 +308,12 @@ export class PaymentsService {
                 );
             }
 
-            // 3. Lưu transaction (lịch sử)
+            // 3. Tạo transaction
             const transaction = this.transactionRepository.create({
                 userId,
                 orderId,
                 storeProductId,
-                basePlanId: basePlanId ?? null,
+                basePlanId,
                 subscriptionState:
                     type === IapProductType.SUBSCRIPTION
                         ? SUBSCRIPTION_STATUS.SUBSCRIPTION_STATE_ACTIVE
@@ -172,19 +321,19 @@ export class PaymentsService {
                 purchaseTime,
                 purchaseToken,
                 quantity: 1,
-                store: IapStore.ANDROID,
+                store: platform,
                 status: TransactionStatus.CONSUMED,
                 isOneTime: type === IapProductType.ONETIME,
                 amountPaid,
                 grantedCoins: coinsToAdd,
                 currency,
-                storePayload: googleData,
+                storePayload: googlePayload || applePayload || null,
                 expiryTime,
             });
 
             await queryRunner.manager.save(transaction);
 
-            // 4. Cấp coin vĩnh viễn
+            // 4. Cấp coin
             await this.userService.addCoins({
                 manager: queryRunner.manager,
                 userId,
@@ -201,17 +350,17 @@ export class PaymentsService {
             const updatedUser = await this.userService.getUserInfo(freshUser);
 
             this.logger.log(
-                `Granted ${coinsToAdd} permanent coins to ${userId} via ${storeProductId}`,
+                `Granted ${coinsToAdd} coins to ${userId} via ${storeProductId} (${platform})`,
             );
 
             const isSub = type === IapProductType.SUBSCRIPTION;
-            const displayMessage = isSub
+            const message = isSub
                 ? `Subscription successful! You have been credited with ${coinsToAdd} coins.`
                 : `Purchase successful! ${coinsToAdd} coins have been added to your account.`;
 
             return {
                 success: true,
-                message: displayMessage,
+                message,
                 data: {
                     coinsAdded: coinsToAdd,
                     productId: storeProductId,
@@ -222,7 +371,7 @@ export class PaymentsService {
         } catch (err: any) {
             await queryRunner.rollbackTransaction();
             this.logger.error(
-                `Verify purchase failed: ${err.message}`,
+                `Purchase processing failed: ${err.message}`,
                 err.stack,
             );
             throw new BadRequestException(
