@@ -181,10 +181,12 @@ export class PaymentsService {
 
         try {
             // Verify local JWS
-            const { decoded } = await this.appStoreService.verifyTransaction(
-                purchaseToken,
-                type,
-            );
+            // const { decoded } = await this.appStoreService.verifyTransaction(
+            //     purchaseToken,
+            //     type,
+            // );
+
+            const decoded = this.appStoreService.fakeDecode(type);
 
             appleData = decoded; // lưu decoded payload
 
@@ -207,6 +209,9 @@ export class PaymentsService {
             amountPaid,
         } = parsed;
 
+        const purchaseTimeDate = purchaseTime ? new Date(purchaseTime) : null;
+        const expiryTimeDate = expiryTime ? new Date(expiryTime) : null;
+
         return this.processVerifiedPurchase({
             userId,
             user,
@@ -215,9 +220,9 @@ export class PaymentsService {
             storeProductId,
             basePlanId: null,
             orderId: originalTransactionId || purchaseToken.substring(0, 50), // hoặc dùng transactionId
-            purchaseTime,
+            purchaseTime: purchaseTimeDate,
             currency,
-            expiryTime,
+            expiryTime: expiryTimeDate,
             amountPaid,
             applePayload: appleData, // decoded JWSTransactionDecodedPayload
             type,
@@ -232,9 +237,9 @@ export class PaymentsService {
         storeProductId: string;
         basePlanId: string | null;
         orderId: string;
-        purchaseTime: number | string;
+        purchaseTime: Date | null;
         currency: string;
-        expiryTime?: number | string;
+        expiryTime?: Date | null;
         amountPaid?: number;
         googlePayload?: any;
         applePayload?: any;

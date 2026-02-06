@@ -126,4 +126,53 @@ export class AppStoreService {
                 : undefined, // price thường là cent → convert
         };
     }
+
+    fakeDecode(type: IapProductType) {
+        const randomSuffix = Math.floor(Math.random() * 100000);
+
+        const fakeDecodedSubscription: JWSTransactionDecodedPayload = {
+            bundleId: 'com.yourcompany.bedread', // phải khớp với config của bạn
+            environment: 'Sandbox', // hoặc "Production"
+            transactionId: '2000000123456789',
+            originalTransactionId: `2000000098765432${randomSuffix}`,
+            productId: 'com.novel.bedread.weekly',
+            purchaseDate: Date.now() - 3 * 24 * 60 * 60 * 1000, // 3 ngày trước
+            signedDate: Date.now(),
+            expiresDate: Date.now() + 7 * 24 * 60 * 60 * 1000, // hết hạn sau 7 ngày
+            quantity: 1,
+            type: 'Auto-Renewable Subscription',
+            inAppOwnershipType: 'PURCHASED',
+            revocationDate: undefined,
+            revocationReason: undefined,
+            price: 99000, // 0.99 USD × 100000 (thường là đơn vị 1/1000 cent)
+            currency: 'USD',
+            offerType: undefined,
+            offerIdentifier: undefined,
+            subscriptionGroupIdentifier: 'com.novel.bedread.subs',
+            // các field khác nếu cần (webOrderLineItemId, isInIntroOfferPeriod, isTrialPeriod, ...)
+        };
+
+        const fakeDecodedOnetime: JWSTransactionDecodedPayload = {
+            bundleId: 'com.yourcompany.bedread',
+            environment: 'Sandbox',
+            transactionId: '2000000987654321',
+            originalTransactionId: `2000000987654321${randomSuffix}`, // với non-consumable thì thường giống transactionId
+            productId: 'com.novel.bedread.coins.1000',
+            purchaseDate: Date.now() - 2 * 3600 * 1000, // mua cách đây 2 tiếng
+            signedDate: Date.now(),
+            expiresDate: undefined, // không có expiry
+            quantity: 1,
+            type: 'Non-Consumable', // hoặc "Consumable" nếu là coins
+            inAppOwnershipType: 'PURCHASED',
+            revocationDate: undefined,
+            revocationReason: undefined,
+            price: 99000, // giả sử 9.99 USD × 100000
+            currency: 'USD',
+            // không cần subscriptionGroupIdentifier, offerType, expiresDate, ...
+        };
+
+        return type === IapProductType.SUBSCRIPTION
+            ? fakeDecodedSubscription
+            : fakeDecodedOnetime;
+    }
 }
