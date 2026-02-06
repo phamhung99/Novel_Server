@@ -58,7 +58,7 @@ export class UserService extends BaseCrudService<User> {
         100, 100, 100, 100, 100, 100, 100,
     ] as const;
 
-    private readonly AD_REWARD_COINS = 50;
+    private readonly AD_REWARD_COINS = 10;
     private readonly MAX_AD_VIEWS_PER_DAY = 5;
 
     constructor(
