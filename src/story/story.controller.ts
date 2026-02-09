@@ -575,6 +575,17 @@ export class StoryController {
             throw new BadRequestException(ERROR_MESSAGES.USER_ID_REQUIRED);
         }
 
+        const { canAccess, reason } =
+            await this.chapterUnlockService.canUserAccessChapterByIds(
+                userId,
+                storyId,
+                index,
+            );
+
+        if (!canAccess) {
+            throw new BadRequestException(reason);
+        }
+
         const chapter = await this.chapterService.findChapterByIndex(
             storyId,
             index,

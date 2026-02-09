@@ -29,55 +29,79 @@ export class ChapterUnlockService {
         private readonly userService: UserService,
     ) {}
 
-    private async canAccessChapter(
+    async canUserAccessChapterByIds(
         userId: string | null,
-        story: {
-            id: string;
-            authorId: string;
-            freeChaptersCount: number;
-            isFullyFree: boolean;
-        },
-        chapter: { id: string; index: number; title: string; storyId: string },
-    ): Promise<{ canAccess: boolean; reason?: string }> {
-        // Case 1: Story không tồn tại (đã check trước đó)
-        // Case 2: User là admin → luôn được xem
+        storyId: string,
+        chapterIndex: number,
+    ): Promise<{
+        canAccess: boolean;
+        reason?: string;
+        chapter?: { id: string; index: number; title?: string };
+    }> {
+        // 1. Lấy story (chỉ cần các field cần thiết)
+        const story = await this.storyRepository.findOne({
+            where: { id: storyId },
+            select: ['id', 'authorId', 'freeChaptersCount', 'isFullyFree'],
+        });
+
+        if (!story) {
+            return { canAccess: false, reason: 'Story not found' };
+        }
+
+        // 2. Lấy chapter
+        const chapter = await this.chapterRepository.findOne({
+            where: { storyId, index: chapterIndex },
+            select: ['id', 'index', 'title'],
+        });
+
+        if (!chapter) {
+            return {
+                canAccess: false,
+                reason: `Chapter ${chapterIndex} not found in this story`,
+            };
+        }
+
+        // 3. Quyền đặc biệt - Admin
         if (userId) {
             const role = await this.userService.findUserRoleById(userId);
             if (role === UserRole.ADMIN) {
-                return { canAccess: true };
+                return { canAccess: true, chapter };
             }
         }
 
-        // Case 3: User là tác giả → luôn được xem
+        // 4. Quyền đặc biệt - Tác giả
         if (userId === story.authorId) {
-            return { canAccess: true };
+            return { canAccess: true, chapter };
         }
 
-        // Case 4: Truyện miễn phí hoàn toàn
+        // 5. Truyện miễn phí hoàn toàn
         if (story.isFullyFree) {
-            return { canAccess: true };
+            return { canAccess: true, chapter };
         }
 
-        // Case 5: Chapter nằm trong số chương miễn phí
+        // 6. Chương nằm trong số chương miễn phí
         if (chapter.index <= story.freeChaptersCount) {
-            return { canAccess: true };
+            return { canAccess: true, chapter };
         }
 
-        // Case 6: Đã unlock trước đó
-        const state = await this.dataSource
-            .getRepository(ChapterState)
-            .findOne({
-                where: { userId: userId!, chapterId: chapter.id },
-            });
+        // 7. Đã unlock trước đó
+        if (userId) {
+            const state = await this.dataSource
+                .getRepository(ChapterState)
+                .findOne({
+                    where: { userId, chapterId: chapter.id },
+                });
 
-        if (state) {
-            return { canAccess: true };
+            if (state) {
+                return { canAccess: true, chapter };
+            }
         }
 
-        // Còn lại → bị khóa, cần unlock
+        // 8. Còn lại → khóa
         return {
             canAccess: false,
-            reason: 'This chapter is locked. Unlock with coins to read.',
+            reason: 'This chapter is locked. Please unlock with coins to read.',
+            chapter,
         };
     }
 
@@ -183,39 +207,35 @@ export class ChapterUnlockService {
             throw new BadRequestException('Invalid chapter index');
         }
 
-        const story = await this.storyRepository.findOne({
-            where: { id: storyId },
-            select: ['id', 'authorId', 'freeChaptersCount', 'isFullyFree'],
-        });
-        if (!story) throw new NotFoundException('Story not found');
+        const accessCheck = await this.canUserAccessChapterByIds(
+            userId,
+            storyId,
+            chapterIndex,
+        );
 
-        const chapter = await this.chapterRepository.findOne({
-            where: { storyId, index: chapterIndex },
-            select: ['id', 'index', 'title', 'storyId'],
-        });
-        if (!chapter) {
-            throw new NotFoundException(`Chapter ${chapterIndex} not found`);
+        if (!accessCheck.chapter) {
+            throw new NotFoundException(
+                accessCheck.reason || 'Chapter or story not found',
+            );
         }
 
-        // Sử dụng hàm check chung
-        const access = await this.canAccessChapter(userId, story, chapter);
-
-        if (access.canAccess) {
+        if (accessCheck.canAccess) {
             return {
                 success: true,
                 message: 'Chapter is already accessible',
                 data: {
-                    id: chapter.id,
-                    index: chapter.index,
-                    title: chapter.title,
+                    id: accessCheck.chapter.id,
+                    index: accessCheck.chapter.index,
+                    title: accessCheck.chapter.title,
                     isLock: false,
                 },
             };
         }
 
-        // Dùng transaction để đảm bảo atomicity
+        // Tiến hành unlock (giữ nguyên transaction logic cũ)
         return this.dataSource.transaction(async (manager) => {
-            // Trừ coin trước
+            const chapter = accessCheck.chapter!;
+
             const { newBalance } = await this.userService.spendCoins({
                 userId,
                 amount: CHAPTER_UNLOCK_FEE,
@@ -225,16 +245,11 @@ export class ChapterUnlockService {
                 manager,
             });
 
-            // Ghi trạng thái unlocked
-            const chapterStateRepo = manager.getRepository(ChapterState);
-
-            const newState = chapterStateRepo.create({
+            await manager.getRepository(ChapterState).save({
                 userId,
                 chapterId: chapter.id,
                 unlockedAt: new Date(),
             });
-
-            await chapterStateRepo.save(newState);
 
             return {
                 success: true,
