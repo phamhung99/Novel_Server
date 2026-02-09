@@ -374,123 +374,134 @@ export class PaymentsService {
         }
     }
 
-    // async handleGooglePlayWebhook(body: any) {
-    //     try {
-    //         const message = JSON.parse(
-    //             Buffer.from(body.message.data, 'base64').toString(),
-    //         );
-    //         const { subscriptionNotification } = message;
+    async handleGooglePlayWebhook(body: any) {
+        try {
+            const message = JSON.parse(
+                Buffer.from(body.message.data, 'base64').toString(),
+            );
+            const { subscriptionNotification } = message;
 
-    //         if (!subscriptionNotification) return;
+            if (!subscriptionNotification) return;
 
-    //         const { receipt, notificationType } =
-    //             subscriptionNotification;
+            const { purchaseToken, notificationType } =
+                subscriptionNotification;
 
-    //         this.logger.log(
-    //             `Google Play RTDN: type=${notificationType}, token=${receipt}`,
-    //         );
+            this.logger.log(
+                `Google Play RTDN: type=${notificationType}, token=${purchaseToken}`,
+            );
 
-    //         // Chỉ gọi verify 1 lần
-    //         const sub =
-    //             await this.googlePlayService.verifySubscription(receipt);
-    //         if (!sub) {
-    //             this.logger.warn(
-    //                 `Subscription not found for token: ${receipt}`,
-    //             );
-    //             return;
-    //         }
+            // Chỉ gọi verify 1 lần
+            const sub =
+                await this.googlePlayService.verifySubscription(purchaseToken);
 
-    //         const txn = await this.transactionRepository.findOne({
-    //             where: { receipt },
-    //             order: { createdAt: 'DESC' },
-    //         });
+            if (!sub) {
+                this.logger.warn(
+                    `Subscription not found for token: ${purchaseToken}`,
+                );
+                return;
+            }
 
-    //         if (!txn) {
-    //             this.logger.warn(
-    //                 `No initial transaction found for ${receipt}`,
-    //             );
-    //             // Có thể quyết định bỏ qua hoặc tạo record warning
-    //             return;
-    //         }
+            const txn = await this.transactionRepository.findOne({
+                where: { receipt: purchaseToken },
+                order: { createdAt: 'DESC' },
+            });
 
-    //         let shouldCreateNewTx = false;
-    //         let newSubscriptionState: SUBSCRIPTION_STATUS;
+            if (!txn) {
+                this.logger.warn(
+                    `No initial transaction found for ${purchaseToken}`,
+                );
+                return;
+            }
 
-    //         switch (notificationType) {
-    //             case NotificationType.RENEWED:
-    //             case NotificationType.RECOVERED:
-    //                 newSubscriptionState =
-    //                     SUBSCRIPTION_STATUS.SUBSCRIPTION_STATE_ACTIVE;
-    //                 shouldCreateNewTx = true;
-    //                 break;
+            let shouldCreateNewTx = false;
+            let newSubscriptionState: SUBSCRIPTION_STATUS;
 
-    //             case NotificationType.RESTARTED:
-    //                 newSubscriptionState =
-    //                     SUBSCRIPTION_STATUS.SUBSCRIPTION_STATE_ACTIVE;
-    //                 shouldCreateNewTx = false; // thường không tạo tx mới
-    //                 break;
+            switch (notificationType) {
+                case NotificationType.RENEWED:
+                case NotificationType.RECOVERED:
+                    newSubscriptionState =
+                        SUBSCRIPTION_STATUS.SUBSCRIPTION_STATE_ACTIVE;
+                    shouldCreateNewTx = true;
+                    break;
 
-    //             case NotificationType.CANCELED:
-    //             case NotificationType.EXPIRED:
-    //                 newSubscriptionState =
-    //                     SUBSCRIPTION_STATUS.SUBSCRIPTION_STATE_CANCELED; // hoặc EXPIRED tùy logic
-    //                 shouldCreateNewTx =
-    //                     notificationType === NotificationType.EXPIRED;
-    //                 break;
+                case NotificationType.RESTARTED:
+                    newSubscriptionState =
+                        SUBSCRIPTION_STATUS.SUBSCRIPTION_STATE_ACTIVE;
+                    shouldCreateNewTx = false; // thường không tạo tx mới
+                    break;
 
-    //             case NotificationType.REVOKED:
-    //                 newSubscriptionState =
-    //                     SUBSCRIPTION_STATUS.SUBSCRIPTION_STATE_EXPIRED;
-    //                 shouldCreateNewTx = true;
-    //                 break;
+                case NotificationType.CANCELED:
+                case NotificationType.EXPIRED:
+                    newSubscriptionState =
+                        SUBSCRIPTION_STATUS.SUBSCRIPTION_STATE_CANCELED; // hoặc EXPIRED tùy logic
+                    shouldCreateNewTx =
+                        notificationType === NotificationType.EXPIRED;
+                    break;
 
-    //             case NotificationType.ON_HOLD:
-    //             case NotificationType.IN_GRACE_PERIOD:
-    //                 newSubscriptionState =
-    //                     SUBSCRIPTION_STATUS.SUBSCRIPTION_STATE_PAUSED;
-    //                 shouldCreateNewTx = true;
-    //                 break;
+                case NotificationType.REVOKED:
+                    newSubscriptionState =
+                        SUBSCRIPTION_STATUS.SUBSCRIPTION_STATE_EXPIRED;
+                    shouldCreateNewTx = true;
+                    break;
 
-    //             default:
-    //                 this.logger.warn(
-    //                     `Unhandled RTDN type: ${notificationType}`,
-    //                 );
-    //                 return;
-    //         }
+                case NotificationType.ON_HOLD:
+                case NotificationType.IN_GRACE_PERIOD:
+                    newSubscriptionState =
+                        SUBSCRIPTION_STATUS.SUBSCRIPTION_STATE_PAUSED;
+                    shouldCreateNewTx = true;
+                    break;
 
-    //         // Nếu cần tạo transaction audit mới
-    //         if (shouldCreateNewTx) {
-    //             const transaction = this.transactionRepository.create({
-    //                 userId,
-    //                 orderId,
-    //                 storeProductId,
-    //                 basePlanId,
-    //                 subscriptionState:
-    //                     type === IapProductType.SUBSCRIPTION
-    //                         ? SUBSCRIPTION_STATUS.SUBSCRIPTION_STATE_ACTIVE
-    //                         : null,
-    //                 purchaseTime,
-    //                 receipt,
-    //                 quantity: 1,
-    //                 store: platform,
-    //                 status: TransactionStatus.CONSUMED,
-    //                 isOneTime: type === IapProductType.ONETIME,
-    //                 amountPaid,
-    //                 grantedCoins: coinsToAdd,
-    //                 currency,
-    //                 storePayload: googlePayload || applePayload || null,
-    //                 expiryTime,
-    //             });
+                default:
+                    this.logger.warn(
+                        `Unhandled RTDN type: ${notificationType}`,
+                    );
+                    return;
+            }
 
-    //             await this.transactionRepository.save(transaction);
-    //         }
+            const { orderId, purchaseTime, expiryTime, amountPaid, currency } =
+                this.googlePlayService.parseSubscriptionResponse(sub);
 
-    //         this.logger.log(
-    //             `Processed RTDN type=${notificationType} for user ${txn.userId}`,
-    //         );
-    //     } catch (e) {
-    //         this.logger.error('RTDN processing failed', e);
-    //         // Có thể throw để Google retry, hoặc chỉ log tùy policy
-    //     }
-    // }
+            const { coinsToAdd } =
+                await this.iapProductService.calculateCoinsForProduct({
+                    storeProductId: txn.storeProductId,
+                    basePlanId: txn.basePlanId,
+                });
+
+            if (coinsToAdd <= 0) {
+                throw new BadRequestException(
+                    `Product ${txn.storeProductId} has no coins configured or invalid plan`,
+                );
+            }
+
+            if (shouldCreateNewTx) {
+                const transaction = this.transactionRepository.create({
+                    userId: txn.userId,
+                    orderId,
+                    storeProductId: txn.storeProductId,
+                    basePlanId: txn.basePlanId,
+                    subscriptionState: newSubscriptionState,
+                    purchaseTime,
+                    receipt: purchaseToken,
+                    quantity: 1,
+                    store: IapStore.ANDROID,
+                    status: TransactionStatus.CONSUMED,
+                    isOneTime: false,
+                    amountPaid,
+                    grantedCoins: coinsToAdd,
+                    currency,
+                    storePayload: sub,
+                    expiryTime,
+                });
+
+                await this.transactionRepository.save(transaction);
+            }
+
+            this.logger.log(
+                `Processed RTDN type=${notificationType} for user ${txn.userId}`,
+            );
+        } catch (e) {
+            this.logger.error('RTDN processing failed', e);
+            // Có thể throw để Google retry, hoặc chỉ log tùy policy
+        }
+    }
 }

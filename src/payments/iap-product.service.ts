@@ -55,11 +55,11 @@ export class IapProductService extends BaseCrudService<IapProduct> {
     }: {
         storeProductId: string;
         basePlanId: string;
-        manager: EntityManager;
+        manager?: EntityManager;
     }) {
-        if (!manager) {
-            throw new Error(ERROR_MESSAGES.ENTITY_MANAGER_REQUIRED);
-        }
+        const repo = manager
+            ? manager.getRepository(IapProduct)
+            : this.iapProductRepository;
 
         const whereCondition: any = { storeProductId };
 
@@ -69,7 +69,7 @@ export class IapProductService extends BaseCrudService<IapProduct> {
             whereCondition.basePlanId = IsNull();
         }
 
-        const iapProduct = await manager.findOne(IapProduct, {
+        const iapProduct = await repo.findOne({
             where: whereCondition,
         });
 
