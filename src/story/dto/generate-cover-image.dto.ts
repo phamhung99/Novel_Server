@@ -8,4 +8,7 @@ export class GenerateCoverImageDto {
     @IsString()
     @IsOptional()
     model?: string;
+
+    @IsOptional()
+    save: boolean;
 }

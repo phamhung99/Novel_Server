@@ -200,6 +200,7 @@ export class StoryController {
                 storyId,
                 dto.prompt,
                 dto.model,
+                dto.save,
             );
         }
 

@@ -835,6 +835,7 @@ export class StoryGenerationService {
         storyId: string,
         prompt?: string,
         model?: string,
+        save?: boolean,
     ): Promise<{ coverImageUrl: string }> {
         let imageGenRecord;
 
@@ -928,6 +929,15 @@ export class StoryGenerationService {
                     prompt: finalPrompt,
                 },
             );
+
+            const shouldSave = save !== undefined ? save : !prompt?.trim();
+
+            if (shouldSave) {
+                await this.storyRepository.update(
+                    { id: storyId },
+                    { coverImage: newCoverImageKey },
+                );
+            }
 
             return {
                 coverImageUrl: newCoverImageUrl,
