@@ -11,6 +11,7 @@ import {
     CoinType,
     IapProductType,
     IapStore,
+    NotificationType,
     SUBSCRIPTION_STATUS,
     TransactionStatus,
 } from 'src/common/enums/app.enum';
@@ -43,17 +44,17 @@ export class PaymentsService {
     async verifyPurchase(
         params: VerifyPurchaseParamsDto,
     ): Promise<VerifyPurchaseResponseDto> {
-        const { userId, purchaseToken, type, platform } = params;
+        const { userId, receipt, type, platform } = params;
 
         this.logger.log(
-            `Verifying purchase - user: ${userId}, platform: ${platform}, token: ${purchaseToken}`,
+            `Verifying purchase - user: ${userId}, platform: ${platform}, token: ${receipt}`,
         );
 
-        if (!userId || !purchaseToken || !platform) {
+        if (!userId || !receipt || !platform) {
             throw new BadRequestException(
                 !userId
                     ? ERROR_MESSAGES.USER_ID_REQUIRED
-                    : !purchaseToken
+                    : !receipt
                       ? ERROR_MESSAGES.MISSING_PURCHASE_TOKEN
                       : 'Platform is required',
             );
@@ -65,21 +66,11 @@ export class PaymentsService {
         }
 
         if (platform === IapStore.ANDROID) {
-            return this.verifyGooglePlayPurchase(
-                userId,
-                purchaseToken,
-                type,
-                user,
-            );
+            return this.verifyGooglePlayPurchase(userId, receipt, type, user);
         }
 
         if (platform === IapStore.IOS) {
-            return this.verifyAppStorePurchase(
-                userId,
-                purchaseToken,
-                type,
-                user,
-            );
+            return this.verifyAppStorePurchase(userId, receipt, type, user);
         }
 
         throw new BadRequestException(`Unsupported platform: ${platform}`);
@@ -87,7 +78,7 @@ export class PaymentsService {
 
     private async verifyGooglePlayPurchase(
         userId: string,
-        purchaseToken: string,
+        receipt: string,
         type: IapProductType,
         user: any, // thay bằng type User của bạn nếu có
     ): Promise<VerifyPurchaseResponseDto> {
@@ -97,9 +88,7 @@ export class PaymentsService {
         try {
             if (type === IapProductType.SUBSCRIPTION) {
                 googleData =
-                    await this.googlePlayService.verifySubscription(
-                        purchaseToken,
-                    );
+                    await this.googlePlayService.verifySubscription(receipt);
 
                 if (!googleData) {
                     throw new BadRequestException(
@@ -113,9 +102,7 @@ export class PaymentsService {
                     );
             } else {
                 googleData =
-                    await this.googlePlayService.verifyProductPurchase(
-                        purchaseToken,
-                    );
+                    await this.googlePlayService.verifyProductPurchase(receipt);
 
                 if (!googleData?.acknowledgementState) {
                     throw new BadRequestException(
@@ -156,7 +143,7 @@ export class PaymentsService {
         return this.processVerifiedPurchase({
             userId,
             user,
-            purchaseToken,
+            receipt,
             platform: IapStore.ANDROID,
             storeProductId,
             basePlanId: basePlanId ?? null,
@@ -172,7 +159,7 @@ export class PaymentsService {
 
     private async verifyAppStorePurchase(
         userId: string,
-        purchaseToken: string, // BÂY GIỜ là signedTransaction JWS string (từ client gửi lên)
+        receipt: string, // BÂY GIỜ là signedTransaction JWS string (từ client gửi lên)
         type: IapProductType,
         user: any,
     ): Promise<VerifyPurchaseResponseDto> {
@@ -182,7 +169,7 @@ export class PaymentsService {
         try {
             // Verify local JWS
             // const { decoded } = await this.appStoreService.verifyTransaction(
-            //     purchaseToken,
+            //     receipt,
             //     type,
             // );
 
@@ -215,11 +202,11 @@ export class PaymentsService {
         return this.processVerifiedPurchase({
             userId,
             user,
-            purchaseToken, // lưu JWS string để audit
+            receipt, // lưu JWS string để audit
             platform: IapStore.IOS,
             storeProductId,
             basePlanId: null,
-            orderId: originalTransactionId || purchaseToken.substring(0, 50), // hoặc dùng transactionId
+            orderId: originalTransactionId || receipt.substring(0, 50), // hoặc dùng transactionId
             purchaseTime: purchaseTimeDate,
             currency,
             expiryTime: expiryTimeDate,
@@ -232,7 +219,7 @@ export class PaymentsService {
     private async processVerifiedPurchase(input: {
         userId: string;
         user: any;
-        purchaseToken: string;
+        receipt: string;
         platform: IapStore;
         storeProductId: string;
         basePlanId: string | null;
@@ -247,7 +234,7 @@ export class PaymentsService {
     }): Promise<VerifyPurchaseResponseDto> {
         const {
             userId,
-            purchaseToken,
+            receipt,
             platform,
             storeProductId,
             basePlanId,
@@ -269,7 +256,7 @@ export class PaymentsService {
         try {
             // 1. Check trùng token
             const existingTx = await queryRunner.manager.findOne(Transaction, {
-                where: { purchaseToken },
+                where: { receipt },
             });
 
             if (existingTx) {
@@ -324,7 +311,7 @@ export class PaymentsService {
                         ? SUBSCRIPTION_STATUS.SUBSCRIPTION_STATE_ACTIVE
                         : null,
                 purchaseTime,
-                purchaseToken,
+                receipt,
                 quantity: 1,
                 store: platform,
                 status: TransactionStatus.CONSUMED,
@@ -386,4 +373,124 @@ export class PaymentsService {
             await queryRunner.release();
         }
     }
+
+    // async handleGooglePlayWebhook(body: any) {
+    //     try {
+    //         const message = JSON.parse(
+    //             Buffer.from(body.message.data, 'base64').toString(),
+    //         );
+    //         const { subscriptionNotification } = message;
+
+    //         if (!subscriptionNotification) return;
+
+    //         const { receipt, notificationType } =
+    //             subscriptionNotification;
+
+    //         this.logger.log(
+    //             `Google Play RTDN: type=${notificationType}, token=${receipt}`,
+    //         );
+
+    //         // Chỉ gọi verify 1 lần
+    //         const sub =
+    //             await this.googlePlayService.verifySubscription(receipt);
+    //         if (!sub) {
+    //             this.logger.warn(
+    //                 `Subscription not found for token: ${receipt}`,
+    //             );
+    //             return;
+    //         }
+
+    //         const txn = await this.transactionRepository.findOne({
+    //             where: { receipt },
+    //             order: { createdAt: 'DESC' },
+    //         });
+
+    //         if (!txn) {
+    //             this.logger.warn(
+    //                 `No initial transaction found for ${receipt}`,
+    //             );
+    //             // Có thể quyết định bỏ qua hoặc tạo record warning
+    //             return;
+    //         }
+
+    //         let shouldCreateNewTx = false;
+    //         let newSubscriptionState: SUBSCRIPTION_STATUS;
+
+    //         switch (notificationType) {
+    //             case NotificationType.RENEWED:
+    //             case NotificationType.RECOVERED:
+    //                 newSubscriptionState =
+    //                     SUBSCRIPTION_STATUS.SUBSCRIPTION_STATE_ACTIVE;
+    //                 shouldCreateNewTx = true;
+    //                 break;
+
+    //             case NotificationType.RESTARTED:
+    //                 newSubscriptionState =
+    //                     SUBSCRIPTION_STATUS.SUBSCRIPTION_STATE_ACTIVE;
+    //                 shouldCreateNewTx = false; // thường không tạo tx mới
+    //                 break;
+
+    //             case NotificationType.CANCELED:
+    //             case NotificationType.EXPIRED:
+    //                 newSubscriptionState =
+    //                     SUBSCRIPTION_STATUS.SUBSCRIPTION_STATE_CANCELED; // hoặc EXPIRED tùy logic
+    //                 shouldCreateNewTx =
+    //                     notificationType === NotificationType.EXPIRED;
+    //                 break;
+
+    //             case NotificationType.REVOKED:
+    //                 newSubscriptionState =
+    //                     SUBSCRIPTION_STATUS.SUBSCRIPTION_STATE_EXPIRED;
+    //                 shouldCreateNewTx = true;
+    //                 break;
+
+    //             case NotificationType.ON_HOLD:
+    //             case NotificationType.IN_GRACE_PERIOD:
+    //                 newSubscriptionState =
+    //                     SUBSCRIPTION_STATUS.SUBSCRIPTION_STATE_PAUSED;
+    //                 shouldCreateNewTx = true;
+    //                 break;
+
+    //             default:
+    //                 this.logger.warn(
+    //                     `Unhandled RTDN type: ${notificationType}`,
+    //                 );
+    //                 return;
+    //         }
+
+    //         // Nếu cần tạo transaction audit mới
+    //         if (shouldCreateNewTx) {
+    //             const transaction = this.transactionRepository.create({
+    //                 userId,
+    //                 orderId,
+    //                 storeProductId,
+    //                 basePlanId,
+    //                 subscriptionState:
+    //                     type === IapProductType.SUBSCRIPTION
+    //                         ? SUBSCRIPTION_STATUS.SUBSCRIPTION_STATE_ACTIVE
+    //                         : null,
+    //                 purchaseTime,
+    //                 receipt,
+    //                 quantity: 1,
+    //                 store: platform,
+    //                 status: TransactionStatus.CONSUMED,
+    //                 isOneTime: type === IapProductType.ONETIME,
+    //                 amountPaid,
+    //                 grantedCoins: coinsToAdd,
+    //                 currency,
+    //                 storePayload: googlePayload || applePayload || null,
+    //                 expiryTime,
+    //             });
+
+    //             await this.transactionRepository.save(transaction);
+    //         }
+
+    //         this.logger.log(
+    //             `Processed RTDN type=${notificationType} for user ${txn.userId}`,
+    //         );
+    //     } catch (e) {
+    //         this.logger.error('RTDN processing failed', e);
+    //         // Có thể throw để Google retry, hoặc chỉ log tùy policy
+    //     }
+    // }
 }

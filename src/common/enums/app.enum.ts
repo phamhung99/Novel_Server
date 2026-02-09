@@ -165,3 +165,14 @@ export enum CoinReferenceType {
     REFUND = 'refund',
     GIFT_CODE = 'gift_code',
 }
+
+export enum NotificationType {
+    RECOVERED = 1,
+    RENEWED = 2,
+    RESTARTED = 7,
+    ON_HOLD = 5,
+    IN_GRACE_PERIOD = 6,
+    CANCELED = 3,
+    REVOKED = 12,
+    EXPIRED = 13,
+}

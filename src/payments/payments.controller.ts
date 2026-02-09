@@ -15,9 +15,19 @@ export class PaymentsController {
         @Headers('x-platform') platform: IapStore,
         @Body() dto: VerifyPurchaseDto,
     ) {
+        if (platform === IapStore.ANDROID && !dto.purchaseToken) {
+            throw new Error('Purchase token is required for Android purchases');
+        }
+
+        if (platform === IapStore.IOS && !dto.jws) {
+            throw new Error('JWS is required for iOS purchases');
+        }
+
+        const receipt = platform === IapStore.IOS ? dto.jws : dto.purchaseToken;
+
         return this.paymentsService.verifyPurchase({
             userId,
-            purchaseToken: dto.purchaseToken,
+            receipt,
             type: dto.type,
             platform,
         });

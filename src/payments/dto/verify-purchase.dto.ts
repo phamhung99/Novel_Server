@@ -1,10 +1,14 @@
-import { IsEnum, IsNotEmpty, IsString } from 'class-validator';
+import { IsEnum, IsNotEmpty, IsOptional, IsString } from 'class-validator';
 import { IapProductType, IapStore } from 'src/common/enums/app.enum';
 
 export class VerifyPurchaseDto {
     @IsString()
-    @IsNotEmpty()
-    purchaseToken: string;
+    @IsOptional()
+    purchaseToken?: string;
+
+    @IsString()
+    @IsOptional()
+    jws?: string;
 
     @IsString()
     @IsNotEmpty()
@@ -14,7 +18,7 @@ export class VerifyPurchaseDto {
 
 export class VerifyPurchaseParamsDto {
     userId: string;
-    purchaseToken: string;
+    receipt: string;
     type: IapProductType;
     platform: IapStore;
 }

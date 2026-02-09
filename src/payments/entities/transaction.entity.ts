@@ -34,8 +34,9 @@ export class Transaction {
     @Column({ name: 'base_plan_id', nullable: true })
     basePlanId: string;
 
-    @Column({ name: 'purchase_token' })
-    purchaseToken: string;
+    // purchase token for android, jws for ios
+    @Column({ name: 'receipt' })
+    receipt: string;
 
     @Column({ name: 'purchase_time', type: 'timestamptz' })
     purchaseTime: Date;
