@@ -23,11 +23,17 @@ import {
     CoinReferenceType,
     CoinTransactionType,
     CoinType,
-    SUBSCRIPTION_STATUS,
+    TransactionStatus,
 } from 'src/common/enums/app.enum';
 import { MediaService } from 'src/media/media.service';
 import { UserDailyAction } from './entities/user-daily-action.entity';
-import { addDays } from 'src/common/utils/date.utils';
+import {
+    addDays,
+    shouldResetByInterval,
+    shouldResetMonthly,
+    shouldResetWeekly,
+    shouldResetYearly,
+} from 'src/common/utils/date.utils';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { PaginatedStoryPreviewResponse } from 'src/story/dto/paginated-story-preview.response';
 import { enrichStoriesToPreviewDto } from 'src/common/mappers/story-preview.mapper';
@@ -37,6 +43,8 @@ import { RewardResponseDto, WeekDayDto } from './dto/weekly-checkin.dto';
 import { CoinTransaction } from './entities/coin-transaction.entity';
 import { Transaction } from 'src/payments/entities/transaction.entity';
 import { PaginationDto } from 'src/story/dto/pagination.dto';
+import { IapProductService } from 'src/payments/iap-product.service';
+import { ConfigService } from '@nestjs/config';
 
 const coinTransactionTitles: Record<CoinReferenceType, string> = {
     [CoinReferenceType.IAP]: 'In-App Purchase',
@@ -61,6 +69,9 @@ export class UserService extends BaseCrudService<User> {
     private readonly AD_REWARD_COINS = 10;
     private readonly MAX_AD_VIEWS_PER_DAY = 5;
 
+    private readonly enableTestSubscription: boolean;
+    private readonly testSubscriptionIntervalMinutes: number;
+
     constructor(
         @InjectRepository(User) userRepo: Repository<User>,
         @InjectRepository(UserCategoryPreference)
@@ -75,8 +86,17 @@ export class UserService extends BaseCrudService<User> {
         private readonly coinTransactionRepo: Repository<CoinTransaction>,
         @InjectRepository(Transaction)
         private readonly transactionRepo: Repository<Transaction>,
+        private readonly iapProductService: IapProductService,
+        private readonly configService: ConfigService,
     ) {
         super(userRepo);
+
+        this.enableTestSubscription = this.configService.get<boolean>(
+            'ENABLE_TEST_SUBSCRIPTION',
+        );
+        this.testSubscriptionIntervalMinutes = this.configService.get<number>(
+            'TEST_SUBSCRIPTION_INTERVAL_MINUTES',
+        );
     }
 
     protected getEntityName(): string {
@@ -447,7 +467,6 @@ export class UserService extends BaseCrudService<User> {
                         userId,
                         amount: todayBonus,
                         coinType: CoinType.TEMPORARY,
-                        source: ActionType.LOGIN,
                         description: `Daily login streak bonus (day ${currentStreak})`,
                         referenceType: CoinReferenceType.LOGIN,
                     });
@@ -464,7 +483,6 @@ export class UserService extends BaseCrudService<User> {
                         userId,
                         amount: todayPremiumBonus,
                         coinType: CoinType.TEMPORARY,
-                        source: ActionType.LOGIN,
                         description: `Premium daily login streak bonus (day ${currentStreak})`,
                         referenceType: CoinReferenceType.LOGIN,
                     });
@@ -482,16 +500,27 @@ export class UserService extends BaseCrudService<User> {
             where: {
                 userId: userId,
                 expiryTime: MoreThan(now),
-                subscriptionState:
-                    SUBSCRIPTION_STATUS.SUBSCRIPTION_STATE_ACTIVE,
+                status: TransactionStatus.ACTIVE,
             },
             order: {
                 expiryTime: 'DESC',
             },
-            select: ['basePlanId'],
+            select: [
+                'id',
+                'basePlanId',
+                'storeProductId',
+                'createdAt',
+                'lastCoinResetAt',
+            ],
         });
 
         if (activeSubscription) {
+            // Check and reset coins based on subscription renewal periods
+            await this.checkAndResetSubscriptionCoins(
+                userId,
+                activeSubscription,
+            );
+
             return {
                 isSubUser: true,
                 basePlanId: activeSubscription.basePlanId,
@@ -594,7 +623,6 @@ export class UserService extends BaseCrudService<User> {
                 userId,
                 amount: this.AD_REWARD_COINS,
                 coinType: CoinType.TEMPORARY,
-                source: ActionType.WATCH_AD,
                 description: `Ad reward - view #${todayAction.count}`,
                 referenceType: CoinReferenceType.WATCH_AD,
             });
@@ -785,7 +813,6 @@ export class UserService extends BaseCrudService<User> {
         userId,
         amount,
         coinType = CoinType.PERMANENT, // hoặc TEMPORARY
-        source,
         referenceType,
         referenceId,
         description,
@@ -794,8 +821,7 @@ export class UserService extends BaseCrudService<User> {
         userId: string;
         amount: number;
         coinType?: CoinType;
-        source?: ActionType | string;
-        referenceType: string;
+        referenceType: CoinReferenceType;
         referenceId?: string;
         description?: string;
         manager?: EntityManager;
@@ -835,7 +861,7 @@ export class UserService extends BaseCrudService<User> {
                 referenceId,
                 description:
                     description ||
-                    `Added ${amount} ${coinType} coins from ${source || 'system'}`,
+                    `Added ${amount} ${coinType} coins from ${referenceType || 'system'}`,
                 createdAt: new Date(),
                 expiresAt: coinRecord.expiresAt,
             });
@@ -1010,5 +1036,92 @@ export class UserService extends BaseCrudService<User> {
             total,
             items,
         };
+    }
+
+    /**
+     * Check and reset subscription coins based on weekly, monthly, or yearly renewal
+     */
+    private async checkAndResetSubscriptionCoins(
+        userId: string,
+        subscription: Transaction,
+    ): Promise<void> {
+        const now = new Date();
+        const lastReset =
+            subscription.lastCoinResetAt || subscription.createdAt;
+
+        // Determine reset period based on plan (you may need to adjust this logic)
+        const planId = subscription.basePlanId;
+        let shouldReset = false;
+        let resetPeriod: 'weekly' | 'monthly' | 'yearly' | 'test' | null = null;
+
+        // Check if this is a Google Play test subscription (5-minute interval)
+        const isTestSubscription =
+            subscription.storeProductId?.includes('test') ||
+            this.enableTestSubscription;
+
+        if (isTestSubscription) {
+            // For Google Play test subscriptions (5-minute renewal)
+            resetPeriod = 'test';
+            const testIntervalMinutes =
+                this.testSubscriptionIntervalMinutes || 5;
+
+            shouldReset = shouldResetByInterval(
+                lastReset,
+                now,
+                testIntervalMinutes,
+            );
+        } else if (planId?.includes('weekly')) {
+            resetPeriod = 'weekly';
+            shouldReset = shouldResetWeekly(lastReset, now);
+        } else if (planId?.includes('monthly')) {
+            resetPeriod = 'monthly';
+            shouldReset = shouldResetMonthly(lastReset, now);
+        } else if (planId?.includes('yearly')) {
+            resetPeriod = 'yearly';
+            shouldReset = shouldResetYearly(lastReset, now);
+        }
+
+        if (shouldReset && resetPeriod) {
+            await this.dataSource.transaction(async (manager) => {
+                // Reset coins for the subscription period
+                const { coinsToAdd } =
+                    await this.iapProductService.calculateCoinsForProduct({
+                        storeProductId: subscription.storeProductId,
+                        basePlanId: subscription.basePlanId,
+                    });
+
+                if (coinsToAdd <= 0) {
+                    this.logger.warn(
+                        `No coins to add for subscription ${subscription.id} during ${resetPeriod} reset`,
+                    );
+                    return;
+                }
+
+                console.log(
+                    `Resetting coins for subscription ${subscription.id} with ${coinsToAdd} coins during ${resetPeriod} reset lastCoinResetAt=${lastReset} now=${now}`,
+                );
+
+                await this.addCoins({
+                    manager,
+                    userId,
+                    amount: coinsToAdd,
+                    coinType: CoinType.PERMANENT,
+                    description: `${resetPeriod} subscription coin reset`,
+                    referenceType: CoinReferenceType.IAP,
+                    referenceId: subscription.id,
+                });
+
+                // Update last reset timestamp
+                await manager
+                    .getRepository(Transaction)
+                    .update(subscription.id, {
+                        lastCoinResetAt: now,
+                    });
+
+                this.logger.log(
+                    `Reset ${coinsToAdd} coins for user ${userId} (${resetPeriod} subscription)`,
+                );
+            });
+        }
     }
 }

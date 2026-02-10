@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 import { PaymentsService } from './payments.service';
 import { PaymentsController } from './payments.controller';
 import { TypeOrmModule } from '@nestjs/typeorm';
@@ -11,7 +11,10 @@ import { AppStoreService } from 'src/app-store/app-store.service';
 
 @Module({
     controllers: [PaymentsController],
-    imports: [TypeOrmModule.forFeature([Transaction, IapProduct]), UserModule],
+    imports: [
+        TypeOrmModule.forFeature([Transaction, IapProduct]),
+        forwardRef(() => UserModule),
+    ],
     providers: [
         PaymentsService,
         GooglePlayService,

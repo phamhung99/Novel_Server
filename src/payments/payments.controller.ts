@@ -33,10 +33,10 @@ export class PaymentsController {
         });
     }
 
-    // @Post('/webhooks/google-play')
-    // async handleWebhook(@Body() body: any) {
-    //     return this.paymentsService.handleGooglePlayWebhook(body);
-    // }
+    @Post('/webhooks/google-play')
+    async handleWebhook(@Body() body: any) {
+        return this.paymentsService.handleGooglePlayWebhook(body);
+    }
 
     @Get('/plus-coin')
     async checkUser(): Promise<boolean> {

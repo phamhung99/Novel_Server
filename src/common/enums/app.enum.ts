@@ -135,8 +135,6 @@ export enum SUBSCRIPTION_STATUS {
 
 export enum TransactionStatus {
     ACTIVE = 'ACTIVE',
-    PAUSED = 'PAUSED',
-    CANCELED = 'CANCELED',
     EXPIRED = 'EXPIRED',
     // cho one-time
     PURCHASED = 'PURCHASED',

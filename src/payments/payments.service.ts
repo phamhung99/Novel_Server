@@ -314,7 +314,10 @@ export class PaymentsService {
                 receipt,
                 quantity: 1,
                 store: platform,
-                status: TransactionStatus.CONSUMED,
+                status:
+                    type === IapProductType.SUBSCRIPTION
+                        ? TransactionStatus.ACTIVE
+                        : TransactionStatus.PURCHASED,
                 isOneTime: type === IapProductType.ONETIME,
                 amountPaid,
                 grantedCoins: coinsToAdd,
@@ -331,7 +334,7 @@ export class PaymentsService {
                 userId,
                 amount: coinsToAdd,
                 coinType: CoinType.PERMANENT,
-                source: `iap:${storeProductId}${basePlanId ? `:${basePlanId}` : ''}`,
+                description: `iap:${storeProductId}${basePlanId ? `:${basePlanId}` : ''}`,
                 referenceType: CoinReferenceType.IAP,
                 referenceId: transaction?.id,
             });
@@ -413,42 +416,41 @@ export class PaymentsService {
                 return;
             }
 
-            let shouldCreateNewTx = false;
             let newSubscriptionState: SUBSCRIPTION_STATUS;
+            let newStatus = txn.status;
 
             switch (notificationType) {
                 case NotificationType.RENEWED:
                 case NotificationType.RECOVERED:
-                    newSubscriptionState =
-                        SUBSCRIPTION_STATUS.SUBSCRIPTION_STATE_ACTIVE;
-                    shouldCreateNewTx = true;
-                    break;
-
                 case NotificationType.RESTARTED:
                     newSubscriptionState =
                         SUBSCRIPTION_STATUS.SUBSCRIPTION_STATE_ACTIVE;
-                    shouldCreateNewTx = false; // thường không tạo tx mới
+                    newStatus = TransactionStatus.ACTIVE;
                     break;
-
                 case NotificationType.CANCELED:
+                    newSubscriptionState =
+                        SUBSCRIPTION_STATUS.SUBSCRIPTION_STATE_CANCELED;
+                    break;
                 case NotificationType.EXPIRED:
                     newSubscriptionState =
-                        SUBSCRIPTION_STATUS.SUBSCRIPTION_STATE_CANCELED; // hoặc EXPIRED tùy logic
-                    shouldCreateNewTx =
-                        notificationType === NotificationType.EXPIRED;
+                        SUBSCRIPTION_STATUS.SUBSCRIPTION_STATE_EXPIRED;
+                    newStatus = TransactionStatus.EXPIRED;
                     break;
 
                 case NotificationType.REVOKED:
                     newSubscriptionState =
-                        SUBSCRIPTION_STATUS.SUBSCRIPTION_STATE_EXPIRED;
-                    shouldCreateNewTx = true;
+                        SUBSCRIPTION_STATUS.SUBSCRIPTION_STATE_REVOKED;
+                    newStatus = TransactionStatus.EXPIRED;
                     break;
 
                 case NotificationType.ON_HOLD:
+                    newSubscriptionState =
+                        SUBSCRIPTION_STATUS.SUBSCRIPTION_STATE_ON_HOLD;
+                    break;
+
                 case NotificationType.IN_GRACE_PERIOD:
                     newSubscriptionState =
-                        SUBSCRIPTION_STATUS.SUBSCRIPTION_STATE_PAUSED;
-                    shouldCreateNewTx = true;
+                        SUBSCRIPTION_STATUS.SUBSCRIPTION_STATE_IN_GRACE_PERIOD;
                     break;
 
                 default:
@@ -461,47 +463,26 @@ export class PaymentsService {
             const { orderId, purchaseTime, expiryTime, amountPaid, currency } =
                 this.googlePlayService.parseSubscriptionResponse(sub);
 
-            const { coinsToAdd } =
-                await this.iapProductService.calculateCoinsForProduct({
-                    storeProductId: txn.storeProductId,
-                    basePlanId: txn.basePlanId,
-                });
-
-            if (coinsToAdd <= 0) {
-                throw new BadRequestException(
-                    `Product ${txn.storeProductId} has no coins configured or invalid plan`,
-                );
-            }
-
-            if (shouldCreateNewTx) {
-                const transaction = this.transactionRepository.create({
-                    userId: txn.userId,
-                    orderId,
-                    storeProductId: txn.storeProductId,
-                    basePlanId: txn.basePlanId,
-                    subscriptionState: newSubscriptionState,
-                    purchaseTime,
-                    receipt: purchaseToken,
-                    quantity: 1,
-                    store: IapStore.ANDROID,
-                    status: TransactionStatus.CONSUMED,
-                    isOneTime: false,
-                    amountPaid,
-                    grantedCoins: coinsToAdd,
-                    currency,
-                    storePayload: sub,
-                    expiryTime,
-                });
-
-                await this.transactionRepository.save(transaction);
-            }
+            await this.transactionRepository.update(txn.id, {
+                orderId,
+                purchaseTime,
+                expiryTime,
+                amountPaid,
+                currency,
+                subscriptionState:
+                    newSubscriptionState ?? txn.subscriptionState,
+                status: newStatus,
+                storePayload: sub as any,
+            });
 
             this.logger.log(
                 `Processed RTDN type=${notificationType} for user ${txn.userId}`,
             );
         } catch (e) {
             this.logger.error('RTDN processing failed', e);
-            // Có thể throw để Google retry, hoặc chỉ log tùy policy
+            throw new BadRequestException(
+                `RTDN processing failed: ${e.message}`,
+            );
         }
     }
 }

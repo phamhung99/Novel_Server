@@ -73,6 +73,9 @@ export class Transaction {
     @Column({ name: 'store_payload', type: 'jsonb' })
     storePayload: any;
 
+    @Column({ name: 'last_coin_reset_at', type: 'timestamptz', nullable: true })
+    lastCoinResetAt: Date | null;
+
     @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
     createdAt: Date;
 

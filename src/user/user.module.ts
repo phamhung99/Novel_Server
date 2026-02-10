@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 import { UserService } from './user.service';
 import { UserController } from './user.controller';
 import { TypeOrmModule } from '@nestjs/typeorm';
@@ -13,6 +13,7 @@ import { DoSpacesService } from 'src/upload/do-spaces.service';
 import { UserDailyAction } from './entities/user-daily-action.entity';
 import { CoinTransaction } from './entities/coin-transaction.entity';
 import { Transaction } from 'src/payments/entities/transaction.entity';
+import { PaymentsModule } from 'src/payments/payments.module';
 
 @Module({
     controllers: [UserController],
@@ -29,6 +30,7 @@ import { Transaction } from 'src/payments/entities/transaction.entity';
             CoinTransaction,
             Transaction,
         ]),
+        forwardRef(() => PaymentsModule),
     ],
     exports: [UserService, TypeOrmModule],
 })
