@@ -58,7 +58,7 @@ export class UserController {
         return this.userService.getCoinTransactions(userId, paginationDto);
     }
 
-    @Post('ads/watch')
+    @Post('ads/watch/coin')
     @SkipTransform()
     async watchAds(@Headers('x-user-id') userId: string) {
         if (!userId) {
@@ -67,6 +67,19 @@ export class UserController {
 
         const result = await this.userService.watchAdsAndGrantBonus(userId);
         return result;
+    }
+
+    @Post('ads/watch/unlock-chapter/:chapterId')
+    @SkipTransform()
+    async watchAdsToUnlockChapter(
+        @Headers('x-user-id') userId: string,
+        @Param('chapterId') chapterId: string,
+    ) {
+        if (!userId) {
+            throw new BadRequestException(ERROR_MESSAGES.USER_ID_REQUIRED);
+        }
+
+        return this.userService.watchAdsAndUnlockChapter(userId, chapterId);
     }
 
     @Patch('me')

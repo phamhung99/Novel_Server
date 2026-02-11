@@ -1,5 +1,7 @@
 import {
     BadRequestException,
+    forwardRef,
+    Inject,
     Injectable,
     NotFoundException,
 } from '@nestjs/common';
@@ -26,10 +28,129 @@ export class ChapterUnlockService {
         @InjectRepository(Story)
         private storyRepository: Repository<Story>,
         private dataSource: DataSource,
+        @Inject(forwardRef(() => UserService))
         private readonly userService: UserService,
     ) {}
 
-    async canUserAccessChapterByIds(
+    async canUserAccessChapter(
+        userId: string | null,
+        chapterId: string,
+    ): Promise<{
+        canAccess: boolean;
+        reason?: string;
+        chapter?: { id: string; index: number; title?: string };
+        story?: { id: string; authorId: string };
+    }> {
+        // 1. Lấy chapter (cần index để so sánh freeChaptersCount)
+        const chapter = await this.chapterRepository.findOne({
+            where: { id: chapterId },
+            select: ['id', 'index', 'title', 'storyId'],
+        });
+
+        if (!chapter) {
+            return { canAccess: false, reason: 'Chapter not found' };
+        }
+
+        // 2. Lấy story (chỉ các field cần thiết)
+        const story = await this.storyRepository.findOne({
+            where: { id: chapter.storyId },
+            select: ['id', 'authorId', 'freeChaptersCount', 'isFullyFree'],
+        });
+
+        if (!story) {
+            return { canAccess: false, reason: 'Story not found' };
+        }
+
+        // 3. Quyền đặc biệt - Admin
+        if (userId) {
+            const role = await this.userService.findUserRoleById(userId);
+            if (role === UserRole.ADMIN) {
+                return {
+                    canAccess: true,
+                    chapter: {
+                        id: chapter.id,
+                        index: chapter.index,
+                        title: chapter.title,
+                    },
+                    story: { id: story.id, authorId: story.authorId },
+                };
+            }
+        }
+
+        // 4. Quyền đặc biệt - Tác giả
+        if (userId === story.authorId) {
+            return {
+                canAccess: true,
+                chapter: {
+                    id: chapter.id,
+                    index: chapter.index,
+                    title: chapter.title,
+                },
+                story: { id: story.id, authorId: story.authorId },
+            };
+        }
+
+        // 5. Truyện miễn phí hoàn toàn
+        if (story.isFullyFree) {
+            return {
+                canAccess: true,
+                chapter: {
+                    id: chapter.id,
+                    index: chapter.index,
+                    title: chapter.title,
+                },
+                story: { id: story.id, authorId: story.authorId },
+            };
+        }
+
+        // 6. Chương nằm trong số chương miễn phí
+        if (chapter.index <= story.freeChaptersCount) {
+            return {
+                canAccess: true,
+                chapter: {
+                    id: chapter.id,
+                    index: chapter.index,
+                    title: chapter.title,
+                },
+                story: { id: story.id, authorId: story.authorId },
+            };
+        }
+
+        // 7. Đã unlock trước đó
+        if (userId) {
+            const state = await this.dataSource
+                .getRepository(ChapterState)
+                .findOne({
+                    where: { userId, chapterId: chapter.id },
+                });
+
+            if (state) {
+                return {
+                    canAccess: true,
+                    chapter: {
+                        id: chapter.id,
+                        index: chapter.index,
+                        title: chapter.title,
+                    },
+                    story: { id: story.id, authorId: story.authorId },
+                };
+            }
+        }
+
+        // 8. Còn lại → khóa
+        return {
+            canAccess: false,
+            reason: 'This chapter is locked. Please unlock with coins to read.',
+            chapter: {
+                id: chapter.id,
+                index: chapter.index,
+                title: chapter.title,
+            },
+            story: { id: story.id, authorId: story.authorId },
+        };
+    }
+
+    async canUserAccessChapterByStoryAndIndex(
         userId: string | null,
         storyId: string,
         chapterIndex: number,
@@ -207,7 +328,7 @@ export class ChapterUnlockService {
             throw new BadRequestException('Invalid chapter index');
         }
 
-        const accessCheck = await this.canUserAccessChapterByIds(
+        const accessCheck = await this.canUserAccessChapterByStoryAndIndex(
             userId,
             storyId,
             chapterIndex,

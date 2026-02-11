@@ -118,7 +118,8 @@ export enum UserRole {
 
 export enum ActionType {
     LOGIN = 'login',
-    WATCH_AD = 'watch_ad',
+    WATCH_AD_COIN = 'watch_ad_coin',
+    WATCH_AD_UNLOCK = 'watch_ad_unlock',
     SHARE_STORY = 'share_story',
 }
 
@@ -157,7 +158,7 @@ export enum CoinTransactionType {
 export enum CoinReferenceType {
     IAP = 'iap',
     LOGIN = 'login',
-    WATCH_AD = 'watch_ad',
+    WATCH_AD_COIN = 'watch_ad_coin',
     CHAPTER_UNLOCK = 'chapter_unlock',
     ADMIN_ADJUST = 'admin_adjust',
     REFUND = 'refund',

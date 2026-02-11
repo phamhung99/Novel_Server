@@ -50,6 +50,6 @@ import { ChapterUnlockService } from './chapter/chapter-unlock.service';
         ChapterService,
         ChapterUnlockService,
     ],
-    exports: [StoryService, ChapterService],
+    exports: [StoryService, ChapterService, ChapterUnlockService],
 })
 export class StoryModule {}

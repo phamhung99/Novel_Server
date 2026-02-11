@@ -23,3 +23,21 @@ export class RewardResponseDto {
     adInfo: AdInfoDto;
     wallet: WalletDto;
 }
+
+export class WatchAdsResponseDto {
+    success: boolean;
+    message: string;
+    data: {
+        adInfo: AdInfoDto;
+        wallet: WalletDto;
+    };
+}
+
+export class WatchAdsUnlockChapterResponseDto {
+    success: boolean;
+    message: string;
+    data: {
+        adInfo: AdInfoDto;
+        chapterId: string;
+    };
+}

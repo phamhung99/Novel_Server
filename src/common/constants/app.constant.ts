@@ -34,6 +34,7 @@ export const ERROR_MESSAGES = {
     AI_RESPONSE_MISSING_CONTENT: 'AI response missing content',
 
     STORY_ID_REQUIRED: 'storyId is required',
+    CHAPTER_ID_REQUIRED: 'chapterId is required',
 
     STORY_NOT_FOUND: 'Story not found',
 

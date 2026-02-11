@@ -14,6 +14,7 @@ import { UserDailyAction } from './entities/user-daily-action.entity';
 import { CoinTransaction } from './entities/coin-transaction.entity';
 import { Transaction } from 'src/payments/entities/transaction.entity';
 import { PaymentsModule } from 'src/payments/payments.module';
+import { StoryModule } from 'src/story/story.module';
 
 @Module({
     controllers: [UserController],
@@ -31,6 +32,7 @@ import { PaymentsModule } from 'src/payments/payments.module';
             Transaction,
         ]),
         forwardRef(() => PaymentsModule),
+        forwardRef(() => StoryModule),
     ],
     exports: [UserService, TypeOrmModule],
 })

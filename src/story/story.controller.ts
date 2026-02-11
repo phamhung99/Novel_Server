@@ -576,7 +576,7 @@ export class StoryController {
         }
 
         const { canAccess, reason } =
-            await this.chapterUnlockService.canUserAccessChapterByIds(
+            await this.chapterUnlockService.canUserAccessChapterByStoryAndIndex(
                 userId,
                 storyId,
                 index,

@@ -1,5 +1,7 @@
 import {
     BadRequestException,
+    forwardRef,
+    Inject,
     Injectable,
     Logger,
     NotFoundException,
@@ -39,17 +41,23 @@ import { PaginatedStoryPreviewResponse } from 'src/story/dto/paginated-story-pre
 import { enrichStoriesToPreviewDto } from 'src/common/mappers/story-preview.mapper';
 import { Chapter } from 'src/story/entities/chapter.entity';
 import { WalletDto } from './dto/wallet.dto';
-import { RewardResponseDto, WeekDayDto } from './dto/weekly-checkin.dto';
+import {
+    RewardResponseDto,
+    WatchAdsResponseDto,
+    WatchAdsUnlockChapterResponseDto,
+    WeekDayDto,
+} from './dto/weekly-checkin.dto';
 import { CoinTransaction } from './entities/coin-transaction.entity';
 import { Transaction } from 'src/payments/entities/transaction.entity';
 import { PaginationDto } from 'src/story/dto/pagination.dto';
 import { IapProductService } from 'src/payments/iap-product.service';
 import { ConfigService } from '@nestjs/config';
+import { ChapterUnlockService } from 'src/story/chapter/chapter-unlock.service';
 
 const coinTransactionTitles: Record<CoinReferenceType, string> = {
     [CoinReferenceType.IAP]: 'In-App Purchase',
     [CoinReferenceType.LOGIN]: 'Daily Login Bonus',
-    [CoinReferenceType.WATCH_AD]: 'Ad Watch Reward',
+    [CoinReferenceType.WATCH_AD_COIN]: 'Ad Watch Coin Reward',
     [CoinReferenceType.CHAPTER_UNLOCK]: 'Chapter Unlock',
     [CoinReferenceType.ADMIN_ADJUST]: 'Admin Adjustment',
     [CoinReferenceType.REFUND]: 'Refund',
@@ -67,7 +75,8 @@ export class UserService extends BaseCrudService<User> {
     ] as const;
 
     private readonly AD_REWARD_COINS = 10;
-    private readonly MAX_AD_VIEWS_PER_DAY = 5;
+    private readonly MAX_AD_VIEWS_COIN_PER_DAY = 5;
+    private readonly MAX_AD_VIEWS_UNLOCK_PER_DAY = 5;
 
     private readonly enableTestSubscription: boolean;
     private readonly testSubscriptionIntervalMinutes: number;
@@ -88,6 +97,8 @@ export class UserService extends BaseCrudService<User> {
         private readonly transactionRepo: Repository<Transaction>,
         private readonly iapProductService: IapProductService,
         private readonly configService: ConfigService,
+        @Inject(forwardRef(() => ChapterUnlockService))
+        private readonly chapterUnlockService: ChapterUnlockService,
     ) {
         super(userRepo);
 
@@ -570,7 +581,7 @@ export class UserService extends BaseCrudService<User> {
         };
     }
 
-    async watchAdsAndGrantBonus(userId: string) {
+    async watchAdsAndGrantBonus(userId: string): Promise<WatchAdsResponseDto> {
         const todayStr = new Date().toISOString().split('T')[0];
 
         return this.dataSource.transaction(async (manager) => {
@@ -579,24 +590,29 @@ export class UserService extends BaseCrudService<User> {
             let todayAction = await actionRepo.findOne({
                 where: {
                     userId,
-                    actionType: ActionType.WATCH_AD,
+                    actionType: ActionType.WATCH_AD_COIN,
                     actionDate: todayStr,
                 },
                 lock: { mode: 'pessimistic_write' },
             });
 
-            if (todayAction && todayAction.count >= this.MAX_AD_VIEWS_PER_DAY) {
+            if (
+                todayAction &&
+                todayAction.count >= this.MAX_AD_VIEWS_COIN_PER_DAY
+            ) {
                 const updatedCoins = await this.calculateUserCoins(userId, {
                     manager,
                 });
 
                 return {
                     success: false,
-                    message: `You've reached the daily limit of ${this.MAX_AD_VIEWS_PER_DAY} ads. Come back tomorrow!`,
+                    message: `You've reached the daily limit of ${this.MAX_AD_VIEWS_COIN_PER_DAY} ads. Come back tomorrow!`,
                     data: {
-                        coinsGranted: 0,
-                        currentViews: todayAction.count,
-                        maxViews: this.MAX_AD_VIEWS_PER_DAY,
+                        adInfo: {
+                            coinsGranted: 0,
+                            currentViews: todayAction.count,
+                            maxViews: this.MAX_AD_VIEWS_COIN_PER_DAY,
+                        },
                         wallet: updatedCoins,
                     },
                 };
@@ -605,7 +621,7 @@ export class UserService extends BaseCrudService<User> {
             if (!todayAction) {
                 todayAction = actionRepo.create({
                     userId,
-                    actionType: ActionType.WATCH_AD,
+                    actionType: ActionType.WATCH_AD_COIN,
                     actionDate: todayStr,
                     count: 1,
                     lastActionAt: new Date(),
@@ -624,7 +640,7 @@ export class UserService extends BaseCrudService<User> {
                 amount: this.AD_REWARD_COINS,
                 coinType: CoinType.TEMPORARY,
                 description: `Ad reward - view #${todayAction.count}`,
-                referenceType: CoinReferenceType.WATCH_AD,
+                referenceType: CoinReferenceType.WATCH_AD_COIN,
             });
 
             const updatedCoins = await this.calculateUserCoins(userId, {
@@ -638,9 +654,99 @@ export class UserService extends BaseCrudService<User> {
                     adInfo: {
                         coinsGranted: coinsToGrant,
                         currentViews: todayAction.count,
-                        maxViews: this.MAX_AD_VIEWS_PER_DAY,
+                        maxViews: this.MAX_AD_VIEWS_COIN_PER_DAY,
                     },
                     wallet: updatedCoins,
+                },
+            };
+        });
+    }
+
+    async watchAdsAndUnlockChapter(
+        userId: string,
+        chapterId: string,
+    ): Promise<WatchAdsUnlockChapterResponseDto> {
+        const todayStr = new Date().toISOString().split('T')[0];
+
+        return this.dataSource.transaction(async (manager) => {
+            const accessCheck =
+                await this.chapterUnlockService.canUserAccessChapter(
+                    userId,
+                    chapterId,
+                );
+
+            if (!accessCheck.chapter) {
+                throw new NotFoundException(
+                    accessCheck.reason || 'Chapter or story not found',
+                );
+            }
+
+            if (accessCheck.canAccess) {
+                throw new BadRequestException(
+                    'You already have access to this chapter',
+                );
+            }
+
+            const actionRepo = manager.getRepository(UserDailyAction);
+
+            let todayAction = await actionRepo.findOne({
+                where: {
+                    userId,
+                    actionType: ActionType.WATCH_AD_UNLOCK,
+                    actionDate: todayStr,
+                },
+                lock: { mode: 'pessimistic_write' },
+            });
+
+            if (
+                todayAction &&
+                todayAction.count >= this.MAX_AD_VIEWS_UNLOCK_PER_DAY
+            ) {
+                return {
+                    success: false,
+                    message: `You've reached the daily limit of ${this.MAX_AD_VIEWS_UNLOCK_PER_DAY} ads. Come back tomorrow!`,
+                    data: {
+                        adInfo: {
+                            coinsGranted: 0,
+                            currentViews: todayAction.count,
+                            maxViews: this.MAX_AD_VIEWS_UNLOCK_PER_DAY,
+                        },
+                        chapterId: chapterId,
+                    },
+                };
+            }
+
+            await this.chapterUnlockService.unlockChapter({
+                userId,
+                storyId: accessCheck.story.id,
+                index: accessCheck.chapter.index,
+            });
+
+            if (!todayAction) {
+                todayAction = actionRepo.create({
+                    userId,
+                    actionType: ActionType.WATCH_AD_UNLOCK,
+                    actionDate: todayStr,
+                    count: 1,
+                    lastActionAt: new Date(),
+                });
+            } else {
+                todayAction.count += 1;
+                todayAction.lastActionAt = new Date();
+            }
+
+            await actionRepo.save(todayAction);
+
+            return {
+                success: true,
+                message: `Ad watched successfully! You unlocked the chapter without spending coins.`,
+                data: {
+                    adInfo: {
+                        coinsGranted: 0,
+                        currentViews: todayAction.count,
+                        maxViews: this.MAX_AD_VIEWS_UNLOCK_PER_DAY,
+                    },
+                    chapterId: chapterId,
                 },
             };
         });
@@ -783,7 +889,7 @@ export class UserService extends BaseCrudService<User> {
         const todayAdAction = await this.userDailyActionRepo.findOne({
             where: {
                 userId,
-                actionType: ActionType.WATCH_AD,
+                actionType: ActionType.WATCH_AD_COIN,
                 actionDate: todayStr,
             },
         });
@@ -800,7 +906,7 @@ export class UserService extends BaseCrudService<User> {
             adInfo: {
                 coinsGranted: this.AD_REWARD_COINS,
                 currentViews,
-                maxViews: this.MAX_AD_VIEWS_PER_DAY,
+                maxViews: this.MAX_AD_VIEWS_COIN_PER_DAY,
             },
             wallet,
         };
