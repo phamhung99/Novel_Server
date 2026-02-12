@@ -32,6 +32,15 @@ export class Category {
     @Column({ type: 'boolean', default: true, name: 'is_active' })
     isActive: boolean;
 
+    @Column({ type: 'text', nullable: true })
+    description: string;
+
+    @Column({ type: 'varchar', nullable: true, name: 'icon_url' })
+    iconUrl: string;
+
+    @Column({ type: 'varchar', nullable: true, name: 'background_image_url' })
+    backgroundImageUrl: string;
+
     @CreateDateColumn({ type: 'timestamptz', name: 'created_at' })
     createdAt: Date;
 

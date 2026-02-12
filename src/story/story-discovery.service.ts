@@ -372,13 +372,24 @@ export class StoryDiscoveryService {
     }
 
     async getAllCategories(): Promise<
-        Pick<Category, 'id' | 'name' | 'displayOrder' | 'isActive'>[]
+        Pick<
+            Category,
+            | 'id'
+            | 'name'
+            | 'displayOrder'
+            | 'iconUrl'
+            | 'backgroundImageUrl'
+            | 'description'
+        >[]
     > {
         return this.categoryRepository.find({
             select: {
                 id: true,
                 name: true,
                 displayOrder: true,
+                iconUrl: true,
+                backgroundImageUrl: true,
+                description: true,
             },
             where: {
                 isActive: true,
