@@ -5,6 +5,7 @@ import { GrokApiService } from './providers/grok-api.service';
 import { StoryGenerationProviderFactory } from './providers/story-generation-provider.factory';
 import { StoryGenerationApiService } from './providers/story-generation-api.service';
 import { GeminiApiService } from './providers/gemini-api.service';
+import { AiController } from './ai.controller';
 
 @Module({
     providers: [
@@ -16,5 +17,6 @@ import { GeminiApiService } from './providers/gemini-api.service';
         StoryGenerationApiService,
     ],
     exports: [StoryGenerationApiService, StoryGenerationProviderFactory],
+    controllers: [AiController],
 })
 export class AiModule {}

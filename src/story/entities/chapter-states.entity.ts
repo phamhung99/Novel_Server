@@ -4,12 +4,16 @@ import {
     ManyToOne,
     JoinColumn,
     CreateDateColumn,
+    PrimaryGeneratedColumn,
 } from 'typeorm';
 import { User } from 'src/user/entities/user.entity';
 import { Chapter } from './chapter.entity';
 
 @Entity('chapter_states')
 export class ChapterState {
+    @PrimaryGeneratedColumn('uuid')
+    id: string;
+
     @PrimaryColumn({ name: 'user_id', type: 'varchar' })
     userId: string;
 

@@ -550,54 +550,36 @@ Architecture Alignment: Verify events serve story's core objectives from origina
             }
         }
     }
-    /**
-     * Parse complete chapter response from AI
-     * Expects structured JSON response with content, summary, and imagePrompt
-     */
-    // private parseCompleteChapter(
-    //     content: string,
-    //     chapterNumber: number,
-    // ): CompleteChapterResponseDto {
-    //     try {
-    //         // Try to parse as JSON first (from structured response)
-    //         const parsed = JSON.parse(content);
-    //         return {
-    //             chapterNumber: parsed.chapterNumber || chapterNumber,
-    //             content: parsed.content || '',
-    //             summary: parsed.summary || '',
-    //             imagePrompt: parsed.imagePrompt || '',
-    //         };
-    //     } catch (jsonError) {
-    //         // Fallback to text parsing if JSON parsing fails
-    //         this.logger.warn(
-    //             'Failed to parse JSON response, falling back to text parsing',
-    //         );
-    //         try {
-    //             const chapterContent = this.extractSection(
-    //                 content,
-    //                 'NỘI DUNG CHƯƠNG|Content',
-    //             );
-    //             const summary = this.extractSection(content, 'TÓM TẮT|Summary');
-    //             const imagePrompt = this.extractSection(
-    //                 content,
-    //                 'IMAGE PROMPT|Image Prompt',
-    //             );
 
-    //             return {
-    //                 chapterNumber,
-    //                 content: chapterContent || content,
-    //                 summary: summary || '',
-    //                 imagePrompt: imagePrompt || '',
-    //             };
-    //         } catch (error) {
-    //             this.logger.error('Error parsing complete chapter:', error);
-    //             return {
-    //                 chapterNumber,
-    //                 content: content,
-    //                 summary: '',
-    //                 imagePrompt: '',
-    //             };
-    //         }
-    //     }
-    // }
+    async generateRawContent(dto: {
+        prompt: string; // Nội dung prompt chính (user message)
+        systemPrompt?: string; // System prompt tùy chọn (nếu không truyền sẽ dùng mặc định đơn giản)
+        aiProvider?: string; // 'grok', 'gemini', 'claude',... (default: grok)
+    }): Promise<string> {
+        const providerName = dto.aiProvider || 'grok';
+        const aiProvider =
+            this.storyGenerationProviderFactory.getProvider(providerName);
+
+        const effectiveSystemPrompt =
+            dto.systemPrompt ||
+            `
+You are a helpful, creative and precise AI assistant.
+Respond naturally and directly to the user's request.
+Keep your answer focused, high-quality and well-structured.
+`.trim();
+
+        try {
+            const response = await aiProvider.generateContent(
+                effectiveSystemPrompt,
+                dto.prompt,
+            );
+
+            return response;
+        } catch (error) {
+            this.logger.error('Error in generateRawContent:', error);
+            throw new BadRequestException(
+                `Failed to generate raw content: ${error.message || 'Unknown error'}`,
+            );
+        }
+    }
 }

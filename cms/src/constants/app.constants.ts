@@ -8,6 +8,7 @@ export const ROUTES = {
     CHAPTER_GENERATOR: '/dashboard/chapter-generator',
     MANAGE_STORIES: '/dashboard/stories/manage',
     MANUAL_CREATION: '/dashboard/stories/manual-creation',
+    AI_CHAT: '/dashboard/ai-chat',
 };
 
 export const SERVER_URL = import.meta.env.VITE_SERVER_URL;
