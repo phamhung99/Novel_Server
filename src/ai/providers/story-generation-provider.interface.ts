@@ -1,3 +1,5 @@
+import { GenerateRawContentDto } from "../dto/generate-raw-content.dto";
+
 /**
  * Story Generation Provider Interface
  * Defines the contract for AI providers that support story chapter generation
@@ -13,16 +15,10 @@
 export interface IStoryGenerationProvider {
     /**
      * Generate chapter content using AI
-     * @param systemPrompt - System instructions for the AI
-     * @param userPrompt - User request/prompt
-     * @param responseSchema - Optional JSON schema for structured response (Grok only)
+     * @param dto - Configuration object for content generation
      * @returns Generated content as string
      */
-    generateContent(
-        systemPrompt: string,
-        userPrompt: string,
-        responseSchema?: object,
-    ): Promise<string>;
+    generateContent(dto: GenerateRawContentDto): Promise<string>;
 
     generateImage(prompt: string, model?: string): Promise<string>;
 

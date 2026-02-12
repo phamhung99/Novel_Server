@@ -10,11 +10,23 @@ import {
     Avatar,
     Divider,
     useTheme,
+    Drawer,
+    List,
+    ListItem,
+    Select,
+    MenuItem,
+    FormControl,
+    InputLabel,
+    Slider,
+    Tooltip,
+    AppBar,
+    Toolbar,
 } from '@mui/material';
 import SendIcon from '@mui/icons-material/Send';
 import SmartToyOutlinedIcon from '@mui/icons-material/SmartToyOutlined';
+import SettingsIcon from '@mui/icons-material/Settings';
 import PersonOutlineIcon from '@mui/icons-material/PersonOutline';
-import axios from '../api/axios'; // ← your axios instance
+import axios from '../api/axios';
 
 interface Message {
     role: 'user' | 'assistant';
@@ -22,12 +34,37 @@ interface Message {
     timestamp: Date;
 }
 
+type AiProvider = 'grok' | 'gpt' | 'gemini';
+
+interface AiSettings {
+    systemPrompt: string;
+    aiProvider: AiProvider;
+    maxTokens: number;
+}
+
+const DEFAULT_SETTINGS: AiSettings = {
+    systemPrompt: 'You are a helpful AI assistant.',
+    aiProvider: 'gemini',
+    maxTokens: 2048,
+};
+
 export default function AiChat() {
     const theme = useTheme();
     const [messages, setMessages] = useState<Message[]>([]);
     const [input, setInput] = useState('');
     const [loading, setLoading] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
+
+    // ── Settings ────────────────────────────────────────────────
+    const [settingsOpen, setSettingsOpen] = useState(false);
+    const [settings, setSettings] = useState<AiSettings>(() => {
+        const saved = localStorage.getItem('aiChatSettings');
+        return saved ? JSON.parse(saved) : DEFAULT_SETTINGS;
+    });
+
+    useEffect(() => {
+        localStorage.setItem('aiChatSettings', JSON.stringify(settings));
+    }, [settings]);
 
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -53,35 +90,32 @@ export default function AiChat() {
         try {
             const payload = {
                 prompt: userMessage.content,
+                systemPrompt: settings.systemPrompt,
+                aiProvider: settings.aiProvider,
+                maxTokens: settings.maxTokens,
             };
 
-            const res = await axios.post(
-                '/api/v1/ai/generate',
-                payload,
-                {
-                    headers: { 'Content-Type': 'application/json' },
-                },
-            );
+            const res = await axios.post('/api/v1/ai/generate', payload, {
+                headers: { 'Content-Type': 'application/json' },
+            });
 
             const data = res.data.data;
 
-            const assistantMessage: Message = {
-                role: 'assistant',
-                content: data,
-                timestamp: new Date(),
-            };
-
-            setMessages((prev) => [...prev, assistantMessage]);
+            setMessages((prev) => [
+                ...prev,
+                { role: 'assistant', content: data, timestamp: new Date() },
+            ]);
         } catch (error) {
             console.error('AI request failed:', error);
-
-            const errorMessage: Message = {
-                role: 'assistant',
-                content:
-                    'Sorry, something went wrong. Please try again later. 😔',
-                timestamp: new Date(),
-            };
-            setMessages((prev) => [...prev, errorMessage]);
+            setMessages((prev) => [
+                ...prev,
+                {
+                    role: 'assistant',
+                    content:
+                        'Sorry, something went wrong. Please try again later. 😔',
+                    timestamp: new Date(),
+                },
+            ]);
         } finally {
             setLoading(false);
         }
@@ -101,26 +135,29 @@ export default function AiChat() {
                 display: 'flex',
                 flexDirection: 'column',
                 bgcolor: theme.palette.mode === 'dark' ? '#0f0f11' : '#f8fafc',
+                position: 'relative',
             }}
         >
-            {/* Header */}
-            <Paper
-                elevation={2}
-                sx={{
-                    p: 2,
-                    borderRadius: 0,
-                    bgcolor: theme.palette.primary.main,
-                    color: 'white',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 2,
-                }}
-            >
-                <SmartToyOutlinedIcon fontSize="large" />
-                <Typography variant="h6" fontWeight={600}>
-                    AI Assistant
-                </Typography>
-            </Paper>
+            {/* Header with settings button */}
+            <AppBar position="static" elevation={2}>
+                <Toolbar sx={{ justifyContent: 'space-between' }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                        <SmartToyOutlinedIcon fontSize="large" />
+                        <Typography variant="h6" fontWeight={600}>
+                            AI Assistant
+                        </Typography>
+                    </Box>
+
+                    <Tooltip title="Settings">
+                        <IconButton
+                            color="inherit"
+                            onClick={() => setSettingsOpen(true)}
+                        >
+                            <SettingsIcon />
+                        </IconButton>
+                    </Tooltip>
+                </Toolbar>
+            </AppBar>
 
             {/* Messages Area */}
             <Box
@@ -133,7 +170,7 @@ export default function AiChat() {
                     gap: 3,
                 }}
             >
-                {messages.length === 0 && (
+                {messages.length === 0 && !loading && (
                     <Box
                         sx={{
                             flex: 1,
@@ -197,7 +234,6 @@ export default function AiChat() {
                                     msg.role === 'user'
                                         ? 'primary.contrastText'
                                         : 'text.primary',
-                                position: 'relative',
                             }}
                         >
                             <Typography
@@ -245,12 +281,11 @@ export default function AiChat() {
                 <div ref={messagesEndRef} />
             </Box>
 
-            {/* Input Area */}
+            {/* Input Area – unchanged */}
             <Paper
                 elevation={3}
                 sx={{
                     p: 2,
-                    borderRadius: 0,
                     display: 'flex',
                     alignItems: 'center',
                     gap: 2,
@@ -274,7 +309,6 @@ export default function AiChat() {
                         },
                     }}
                 />
-
                 <IconButton
                     color="primary"
                     onClick={handleSend}
@@ -290,14 +324,117 @@ export default function AiChat() {
                             input.trim() && !loading
                                 ? 'white'
                                 : 'text.secondary',
-                        '&:hover': {
-                            bgcolor: 'primary.dark',
-                        },
+                        '&:hover': { bgcolor: 'primary.dark' },
                     }}
                 >
                     <SendIcon />
                 </IconButton>
             </Paper>
+
+            {/* ── Settings Drawer ──────────────────────────────────────── */}
+            <Drawer
+                anchor="right"
+                open={settingsOpen}
+                onClose={() => setSettingsOpen(false)}
+                PaperProps={{
+                    sx: {
+                        width: { xs: '85%', sm: 420 },
+                        p: 3,
+                        bgcolor: 'background.default',
+                    },
+                }}
+            >
+                <Typography variant="h6" gutterBottom>
+                    AI Settings
+                </Typography>
+                <Divider sx={{ my: 2 }} />
+
+                <List disablePadding>
+                    {/* AI Provider */}
+                    <ListItem disableGutters sx={{ mt: 1 }}>
+                        <FormControl fullWidth size="small">
+                            <InputLabel>AI Provider</InputLabel>
+                            <Select
+                                value={settings.aiProvider}
+                                label="AI Provider"
+                                onChange={(e) =>
+                                    setSettings((prev) => ({
+                                        ...prev,
+                                        aiProvider: e.target
+                                            .value as AiProvider,
+                                    }))
+                                }
+                            >
+                                <MenuItem value="gemini">Gemini</MenuItem>
+                                <MenuItem value="gpt">
+                                    ChatGPT (OpenAI)
+                                </MenuItem>
+                                <MenuItem value="grok">Grok (xAI)</MenuItem>
+                            </Select>
+                        </FormControl>
+                    </ListItem>
+
+                    {/* Max Tokens */}
+                    <ListItem disableGutters sx={{ mt: 3 }}>
+                        <Box sx={{ width: '100%' }}>
+                            <Typography variant="body2" gutterBottom>
+                                Max tokens: {settings.maxTokens}
+                            </Typography>
+                            <Slider
+                                value={settings.maxTokens}
+                                onChange={(_, v) =>
+                                    setSettings((prev) => ({
+                                        ...prev,
+                                        maxTokens: v as number,
+                                    }))
+                                }
+                                min={256}
+                                max={20000}
+                                step={256}
+                                marks
+                                valueLabelDisplay="auto"
+                            />
+                        </Box>
+                    </ListItem>
+
+                    {/* System Prompt */}
+                    <ListItem
+                        disableGutters
+                        sx={{
+                            mt: 3,
+                            flexDirection: 'column',
+                            alignItems: 'stretch',
+                        }}
+                    >
+                        <Typography variant="subtitle2" gutterBottom>
+                            System Prompt
+                        </Typography>
+                        <TextField
+                            fullWidth
+                            multiline
+                            minRows={4}
+                            maxRows={8}
+                            variant="outlined"
+                            size="small"
+                            value={settings.systemPrompt}
+                            onChange={(e) =>
+                                setSettings((prev) => ({
+                                    ...prev,
+                                    systemPrompt: e.target.value,
+                                }))
+                            }
+                            placeholder="You are a helpful, concise assistant..."
+                            helperText="Instructions given to the AI at the beginning of every conversation"
+                        />
+                    </ListItem>
+                </List>
+
+                <Box sx={{ mt: 'auto', pt: 3 }}>
+                    <Typography variant="caption" color="text.secondary">
+                        Changes apply to new messages
+                    </Typography>
+                </Box>
+            </Drawer>
         </Box>
     );
 }

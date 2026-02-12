@@ -1,11 +1,6 @@
 import { Controller, Post, Body } from '@nestjs/common';
 import { AiService } from './ai.service';
-
-export interface GenerateRawContentDto {
-    prompt: string;
-    systemPrompt?: string;
-    aiProvider?: string;
-}
+import { GenerateRawContentDto } from './dto/generate-raw-content.dto';
 
 @Controller('ai')
 export class AiController {

@@ -1,11 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { StoryGenerationApiService } from './providers/story-generation-api.service';
-
-export interface GenerateRawContentDto {
-    prompt: string;
-    systemPrompt?: string;
-    aiProvider?: string;
-}
+import { GenerateRawContentDto } from './dto/generate-raw-content.dto';
 
 @Injectable()
 export class AiService {

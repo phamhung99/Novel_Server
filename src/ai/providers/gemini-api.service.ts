@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import axios, { AxiosInstance } from 'axios';
 import { IStoryGenerationProvider } from './story-generation-provider.interface';
+import { GenerateRawContentDto } from '../dto/generate-raw-content.dto';
 
 @Injectable()
 export class GeminiApiService implements IStoryGenerationProvider {
@@ -32,30 +33,27 @@ export class GeminiApiService implements IStoryGenerationProvider {
         });
     }
 
-    async generateContent(
-        systemPrompt: string,
-        userPrompt: string,
-        responseSchema?: object,
-    ): Promise<string> {
+    async generateContent(dto: GenerateRawContentDto): Promise<string> {
         try {
             const requestBody: any = {
-                contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
+                contents: [{ role: 'user', parts: [{ text: dto.prompt }] }],
                 generationConfig: {
-                    temperature: 0.7,
-                    maxOutputTokens: 10000,
+                    temperature: dto.temperature || 0.7,
+                    maxOutputTokens: dto.maxTokens || 10000,
                 },
             };
 
-            if (systemPrompt) {
+            if (dto.systemPrompt) {
                 requestBody.systemInstruction = {
-                    parts: [{ text: systemPrompt }],
+                    parts: [{ text: dto.systemPrompt }],
                 };
             }
 
-            if (responseSchema) {
+            if (dto.responseSchema) {
                 requestBody.generationConfig.responseMimeType =
                     'application/json';
-                requestBody.generationConfig.responseSchema = responseSchema;
+                requestBody.generationConfig.responseSchema =
+                    dto.responseSchema;
             }
 
             // URL đúng format

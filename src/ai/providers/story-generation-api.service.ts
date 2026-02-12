@@ -5,6 +5,7 @@ import {
     STORY_OUTLINE_SCHEMA,
     CHAPTER_STRUCTURE_SCHEMA,
 } from './response-schemas';
+import { GenerateRawContentDto } from '../dto/generate-raw-content.dto';
 
 // Internal DTOs for 3-step flow
 export interface StoryOutlineResponse {
@@ -79,11 +80,11 @@ You think in three dimensions simultaneously:
 `;
 
         try {
-            const response = await aiProvider.generateContent(
+            const response = await aiProvider.generateContent({
+                prompt: userPrompt,
                 systemPrompt,
-                userPrompt,
-                STORY_OUTLINE_SCHEMA,
-            );
+                responseSchema: STORY_OUTLINE_SCHEMA,
+            });
 
             return this.parseStoryOutline(response, dto.numberOfChapters);
         } catch (error) {
@@ -211,11 +212,11 @@ Return ONLY the JSON object. No additional text.
 `;
 
         try {
-            const response = await aiProvider.generateContent(
+            const response = await aiProvider.generateContent({
+                prompt: userPrompt,
                 systemPrompt,
-                userPrompt,
-                CHAPTER_STRUCTURE_SCHEMA,
-            );
+                responseSchema: CHAPTER_STRUCTURE_SCHEMA,
+            });
             return this.parseChapterStructure(response, dto.chapterNumber);
         } catch (error) {
             this.logger.error('Error generating chapter structure:', error);
@@ -325,11 +326,11 @@ Return ONLY the JSON object. No additional text or commentary.
 `;
 
         try {
-            const response = await aiProvider.generateContent(
+            const response = await aiProvider.generateContent({
+                prompt: userPrompt,
                 systemPrompt,
-                userPrompt,
-                CHAPTER_STRUCTURE_SCHEMA,
-            );
+                responseSchema: CHAPTER_STRUCTURE_SCHEMA,
+            });
             return this.parseChapterStructure(response, dto.chapterNumber);
         } catch (error) {
             this.logger.error('Error generating chapter structure:', error);
@@ -409,10 +410,10 @@ Architecture Alignment: Verify events serve story's core objectives from origina
 `;
 
         try {
-            const response = await aiProvider.generateContent(
+            const response = await aiProvider.generateContent({
+                prompt: userPrompt,
                 systemPrompt,
-                userPrompt,
-            );
+            });
 
             return response;
         } catch (error) {
@@ -551,11 +552,7 @@ Architecture Alignment: Verify events serve story's core objectives from origina
         }
     }
 
-    async generateRawContent(dto: {
-        prompt: string; // Nội dung prompt chính (user message)
-        systemPrompt?: string; // System prompt tùy chọn (nếu không truyền sẽ dùng mặc định đơn giản)
-        aiProvider?: string; // 'grok', 'gemini', 'claude',... (default: grok)
-    }): Promise<string> {
+    async generateRawContent(dto: GenerateRawContentDto): Promise<string> {
         const providerName = dto.aiProvider || 'grok';
         const aiProvider =
             this.storyGenerationProviderFactory.getProvider(providerName);
@@ -569,10 +566,10 @@ Keep your answer focused, high-quality and well-structured.
 `.trim();
 
         try {
-            const response = await aiProvider.generateContent(
-                effectiveSystemPrompt,
-                dto.prompt,
-            );
+            const response = await aiProvider.generateContent({
+                prompt: dto.prompt,
+                systemPrompt: effectiveSystemPrompt,
+            });
 
             return response;
         } catch (error) {
