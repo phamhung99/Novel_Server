@@ -27,6 +27,8 @@ import SmartToyOutlinedIcon from '@mui/icons-material/SmartToyOutlined';
 import SettingsIcon from '@mui/icons-material/Settings';
 import PersonOutlineIcon from '@mui/icons-material/PersonOutline';
 import axios from '../api/axios';
+import { POLL_INTERVAL } from '../constants/app.constants';
+import { v4 as uuidv4 } from 'uuid';
 
 interface Message {
     role: 'user' | 'assistant';
@@ -74,6 +76,36 @@ export default function AiChat() {
         scrollToBottom();
     }, [messages]);
 
+    const pollResult = async (
+        requestId: string,
+    ): Promise<{ content: string }> => {
+        return new Promise((resolve, reject) => {
+            let attempts = 0;
+            const maxAttempts = 30;
+            const interval = setInterval(async () => {
+                attempts++;
+                try {
+                    const res = await axios.get(
+                        `/api/v1/ai/generate/result?requestId=${requestId}`,
+                    );
+                    if (res.data?.data) {
+                        clearInterval(interval);
+                        resolve(res.data.data);
+                    }
+                } catch (err: any) {
+                    if (err.response?.status !== 202) {
+                        clearInterval(interval);
+                        reject(err);
+                    }
+                }
+                if (attempts >= maxAttempts) {
+                    clearInterval(interval);
+                    reject(new Error('Timeout waiting for AI response'));
+                }
+            }, POLL_INTERVAL);
+        });
+    };
+
     const handleSend = async () => {
         if (!input.trim() || loading) return;
 
@@ -95,15 +127,23 @@ export default function AiChat() {
                 maxTokens: settings.maxTokens,
             };
 
-            const res = await axios.post('/api/v1/ai/generate', payload, {
+            const requestId = uuidv4();
+
+            axios.post(`/api/v1/ai/generate?requestId=${requestId}`, payload, {
                 headers: { 'Content-Type': 'application/json' },
             });
 
-            const data = res.data.data;
+            const data = await pollResult(requestId);
+
+            const content = data.content;
 
             setMessages((prev) => [
                 ...prev,
-                { role: 'assistant', content: data, timestamp: new Date() },
+                {
+                    role: 'assistant',
+                    content: content,
+                    timestamp: new Date(),
+                },
             ]);
         } catch (error) {
             console.error('AI request failed:', error);
@@ -238,7 +278,13 @@ export default function AiChat() {
                         >
                             <Typography
                                 variant="body1"
-                                sx={{ whiteSpace: 'pre-wrap', lineHeight: 1.6 }}
+                                sx={{
+                                    whiteSpace: 'pre-wrap', // ← keep this
+                                    wordBreak: 'break-word', // modern & good default
+                                    overflowWrap: 'break-word', // fallback + helps some browsers
+                                    hyphens: 'auto', // optional: adds soft hyphens in supported languages
+                                    lineHeight: 1.6,
+                                }}
                             >
                                 {msg.content}
                             </Typography>
