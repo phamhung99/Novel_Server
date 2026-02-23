@@ -40,3 +40,22 @@ export interface StoryDto {
     chapters: ChapterDto[];
     generation?: any;
 }
+
+export interface Message {
+    id: string;
+    role: 'user' | 'assistant' | 'system';
+    content: string;
+    timestamp: string;
+}
+
+export interface GenerateRawContentDto {
+    prompt: string;
+    systemPrompt?: string;
+    aiProvider?: string;
+}
+
+export interface GenerateResponse {
+    // tùy theo server trả về, tạm giả định
+    content: string;
+    // có thể thêm usage, model, finishReason,...
+}

@@ -31,7 +31,7 @@ import {
     DEFAULT_COVER_IMAGE_URL,
     IMAGE_PREFIX,
 } from 'src/common/constants/app.constant';
-import { ChapterService } from './chapter.service';
+import { ChapterService } from './chapter/chapter.service';
 import { UserService } from 'src/user/user.service';
 import { ILike } from 'typeorm';
 import { Category } from './entities/categories.entity';
@@ -379,6 +379,12 @@ export class StoryGenerationService {
                 `Initializing chapter generation for requestId: ${requestId}`,
             );
 
+            const exists = await this.chapterGenerationRepository.findOne({
+                where: { requestId },
+            });
+
+            if (exists) throw new BadRequestException('Duplicate request');
+
             // Tạo preGen trước, để luôn có record lưu lỗi
             savedPreGen = this.chapterGenerationRepository.create({
                 storyGenerationId: null, // tạm thời null, sẽ update sau nếu có storyGeneration
@@ -394,11 +400,6 @@ export class StoryGenerationService {
             if (!storyId) {
                 throw new BadRequestException('storyId is required');
             }
-
-            const exists = await this.chapterGenerationRepository.findOne({
-                where: { requestId },
-            });
-            if (exists) throw new BadRequestException('Duplicate request');
 
             const storyGeneration =
                 await this.storyGenerationRepository.findOne({
@@ -834,22 +835,30 @@ export class StoryGenerationService {
         storyId: string,
         prompt?: string,
         model?: string,
+        save?: boolean,
     ): Promise<{ coverImageUrl: string }> {
-        let imageGenRecord = this.imageGenerationRepository.create({
-            requestId,
-            entityType: 'story',
-            entityId: storyId,
-            purpose: 'story_cover',
-            status: GenerationStatus.PROCESSING,
-            prompt,
-            attempts: 1,
-            lastAttemptAt: new Date(),
-        });
-
-        imageGenRecord =
-            await this.imageGenerationRepository.save(imageGenRecord);
+        let imageGenRecord;
 
         try {
+            const exists = await this.chapterGenerationRepository.findOne({
+                where: { requestId },
+            });
+
+            if (exists) throw new BadRequestException('Duplicate request');
+
+            imageGenRecord = this.imageGenerationRepository.create({
+                requestId,
+                entityType: 'story',
+                entityId: storyId,
+                purpose: 'story_cover',
+                status: GenerationStatus.PROCESSING,
+                attempts: 1,
+                lastAttemptAt: new Date(),
+            });
+
+            imageGenRecord =
+                await this.imageGenerationRepository.save(imageGenRecord);
+
             const story = await this.storyRepository.findOne({
                 where: { id: storyId, authorId: userId },
                 relations: ['generation'],
@@ -917,8 +926,18 @@ export class StoryGenerationService {
                 {
                     imagePath: newCoverImageKey,
                     status: GenerationStatus.COMPLETED,
+                    prompt: finalPrompt,
                 },
             );
+
+            const shouldSave = save !== undefined ? save : !prompt?.trim();
+
+            if (shouldSave) {
+                await this.storyRepository.update(
+                    { id: storyId },
+                    { coverImage: newCoverImageKey },
+                );
+            }
 
             return {
                 coverImageUrl: newCoverImageUrl,
@@ -928,6 +947,11 @@ export class StoryGenerationService {
                 err instanceof Error
                     ? err.message
                     : 'Failed to generate/upload cover';
+
+            this.logger.error(
+                `Error in generateStoryCoverForMobile for requestId ${requestId}: ${errorMsg}`,
+                err instanceof Error ? err.stack : undefined,
+            );
 
             await this.imageGenerationRepository.update(
                 { id: imageGenRecord.id },

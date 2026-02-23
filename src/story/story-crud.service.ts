@@ -493,6 +493,8 @@ export class StoryCrudService {
             );
         }
 
+        console.log(updateStoryDto);
+
         Object.assign(story, updateStoryDto);
         await this.storyRepository.save(story);
 

@@ -1,8 +1,3 @@
-export enum LightningActionType {
-    COMIC_STORY_GENERATION = 'COMIC_STORY_GENERATION',
-    COMIC_IMAGE_GENERATION = 'COMIC_IMAGE_GENERATION',
-}
-
 export enum GenerationType {
     IMAGE = 'image',
     TEXT = 'text',
@@ -41,8 +36,9 @@ export enum IapProductType {
     ONETIME = 'onetime',
 }
 
-export enum IapPeriodType {
+export enum IapPeriod {
     DAY = 'day',
+    WEEK = 'week',
     MONTH = 'month',
     YEAR = 'year',
 }
@@ -117,6 +113,60 @@ export enum UserRole {
 
 export enum ActionType {
     LOGIN = 'login',
-    WATCH_AD = 'watch_ad',
+    WATCH_AD_COIN = 'watch_ad_coin',
+    WATCH_AD_UNLOCK = 'watch_ad_unlock',
     SHARE_STORY = 'share_story',
+}
+
+export enum SUBSCRIPTION_STATUS {
+    SUBSCRIPTION_STATE_ACTIVE = 'SUBSCRIPTION_STATE_ACTIVE',
+    SUBSCRIPTION_STATE_CANCELED = 'SUBSCRIPTION_STATE_CANCELED',
+    SUBSCRIPTION_STATE_EXPIRED = 'SUBSCRIPTION_STATE_EXPIRED',
+    SUBSCRIPTION_STATE_ON_HOLD = 'SUBSCRIPTION_STATE_ON_HOLD',
+    SUBSCRIPTION_STATE_PAUSED = 'SUBSCRIPTION_STATE_PAUSED',
+    SUBSCRIPTION_STATE_IN_GRACE_PERIOD = 'SUBSCRIPTION_STATE_IN_GRACE_PERIOD',
+    SUBSCRIPTION_STATE_PENDING = 'SUBSCRIPTION_STATE_PENDING',
+    SUBSCRIPTION_STATE_REVOKED = 'SUBSCRIPTION_STATE_REVOKED',
+}
+
+export enum TransactionStatus {
+    ACTIVE = 'ACTIVE',
+    EXPIRED = 'EXPIRED',
+    // cho one-time
+    PURCHASED = 'PURCHASED',
+    CONSUMED = 'CONSUMED',
+    // lỗi hoặc pending
+    PENDING = 'PENDING',
+    FAILED = 'FAILED',
+
+    REFUNDED = 'REFUNDED',
+}
+
+export enum CoinTransactionType {
+    ADD = 'add',
+    SPEND = 'spend',
+    EXPIRE = 'expire',
+    ADJUSTMENT = 'adjustment',
+    REFUND = 'refund',
+}
+
+export enum CoinReferenceType {
+    IAP = 'iap',
+    LOGIN = 'login',
+    WATCH_AD_COIN = 'watch_ad_coin',
+    CHAPTER_UNLOCK = 'chapter_unlock',
+    ADMIN_ADJUST = 'admin_adjust',
+    REFUND = 'refund',
+    GIFT_CODE = 'gift_code',
+}
+
+export enum NotificationType {
+    RECOVERED = 1,
+    RENEWED = 2,
+    RESTARTED = 7,
+    ON_HOLD = 5,
+    IN_GRACE_PERIOD = 6,
+    CANCELED = 3,
+    REVOKED = 12,
+    EXPIRED = 13,
 }

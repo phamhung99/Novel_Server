@@ -1,11 +1,13 @@
 import {
     BadRequestException,
+    forwardRef,
+    Inject,
     Injectable,
     Logger,
     NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, EntityManager, Repository } from 'typeorm';
+import { DataSource, EntityManager, MoreThan, Repository } from 'typeorm';
 import { User } from './entities/user.entity';
 import { BaseCrudService } from 'src/common/services/base-crud.service';
 import { UserCategoryPreference } from './entities/user-category-preference.entity';
@@ -18,27 +20,66 @@ import {
 import { ReadingHistory } from './entities/reading-history.entity';
 import { StoryStatus } from 'src/common/enums/story-status.enum';
 import { UserCoins } from './entities/user-coins.entity';
-import { ActionType, CoinType } from 'src/common/enums/app.enum';
+import {
+    ActionType,
+    CoinReferenceType,
+    CoinTransactionType,
+    CoinType,
+    TransactionStatus,
+} from 'src/common/enums/app.enum';
 import { MediaService } from 'src/media/media.service';
 import { UserDailyAction } from './entities/user-daily-action.entity';
-import { addDays } from 'src/common/utils/date.utils';
+import {
+    addDays,
+    shouldResetByInterval,
+    shouldResetMonthly,
+    shouldResetWeekly,
+    shouldResetYearly,
+} from 'src/common/utils/date.utils';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { PaginatedStoryPreviewResponse } from 'src/story/dto/paginated-story-preview.response';
 import { enrichStoriesToPreviewDto } from 'src/common/mappers/story-preview.mapper';
 import { Chapter } from 'src/story/entities/chapter.entity';
 import { WalletDto } from './dto/wallet.dto';
-import { RewardResponseDto } from './dto/weekly-checkin.dto';
+import {
+    RewardResponseDto,
+    WatchAdsResponseDto,
+    WatchAdsUnlockChapterResponseDto,
+    WeekDayDto,
+} from './dto/weekly-checkin.dto';
+import { CoinTransaction } from './entities/coin-transaction.entity';
+import { Transaction } from 'src/payments/entities/transaction.entity';
+import { PaginationDto } from 'src/story/dto/pagination.dto';
+import { IapProductService } from 'src/payments/iap-product.service';
+import { ConfigService } from '@nestjs/config';
+import { ChapterUnlockService } from 'src/story/chapter/chapter-unlock.service';
+
+const coinTransactionTitles: Record<CoinReferenceType, string> = {
+    [CoinReferenceType.IAP]: 'In-App Purchase',
+    [CoinReferenceType.LOGIN]: 'Daily Login Bonus',
+    [CoinReferenceType.WATCH_AD_COIN]: 'Ad Watch Coin Reward',
+    [CoinReferenceType.CHAPTER_UNLOCK]: 'Chapter Unlock',
+    [CoinReferenceType.ADMIN_ADJUST]: 'Admin Adjustment',
+    [CoinReferenceType.REFUND]: 'Refund',
+    [CoinReferenceType.GIFT_CODE]: 'Gift Code Reward',
+};
 
 @Injectable()
 export class UserService extends BaseCrudService<User> {
     private readonly logger = new Logger(UserService.name);
 
-    private readonly LOGIN_STREAK_BONUS_SCHEDULE = [
-        10, 15, 40, 10, 15, 15, 30,
+    private readonly STREAK_REWARDS = [10, 15, 40, 10, 15, 15, 30] as const;
+
+    private readonly PREMIUM_STREAK_REWARDS = [
+        100, 100, 100, 100, 100, 100, 100,
     ] as const;
 
-    private readonly AD_REWARD_COINS = 50;
-    private readonly MAX_AD_VIEWS_PER_DAY = 5;
+    private readonly AD_REWARD_COINS = 10;
+    private readonly MAX_AD_VIEWS_COIN_PER_DAY = 5;
+    private readonly MAX_AD_VIEWS_UNLOCK_PER_DAY = 5;
+
+    private readonly enableTestSubscription: boolean;
+    private readonly testSubscriptionIntervalMinutes: number;
 
     constructor(
         @InjectRepository(User) userRepo: Repository<User>,
@@ -50,8 +91,23 @@ export class UserService extends BaseCrudService<User> {
         private mediaService: MediaService,
         @InjectRepository(UserDailyAction)
         private readonly userDailyActionRepo: Repository<UserDailyAction>,
+        @InjectRepository(CoinTransaction)
+        private readonly coinTransactionRepo: Repository<CoinTransaction>,
+        @InjectRepository(Transaction)
+        private readonly transactionRepo: Repository<Transaction>,
+        private readonly iapProductService: IapProductService,
+        private readonly configService: ConfigService,
+        @Inject(forwardRef(() => ChapterUnlockService))
+        private readonly chapterUnlockService: ChapterUnlockService,
     ) {
         super(userRepo);
+
+        this.enableTestSubscription = this.configService.get<boolean>(
+            'ENABLE_TEST_SUBSCRIPTION',
+        );
+        this.testSubscriptionIntervalMinutes = this.configService.get<number>(
+            'TEST_SUBSCRIPTION_INTERVAL_MINUTES',
+        );
     }
 
     protected getEntityName(): string {
@@ -60,6 +116,10 @@ export class UserService extends BaseCrudService<User> {
 
     protected getUniqueField(): keyof User {
         return;
+    }
+
+    private getTransactionTitle(referenceType: CoinReferenceType): string {
+        return coinTransactionTitles[referenceType] ?? 'Coin Transaction';
     }
 
     private generateRandomUsername(): string {
@@ -304,9 +364,13 @@ export class UserService extends BaseCrudService<User> {
         }
     }
 
-    async calculateLoginStreakAndBonus(userId: string): Promise<{
+    async calculateLoginStreakAndBonus(
+        userId: string,
+        isSubUser?: boolean,
+    ): Promise<{
         currentStreak: number;
         todayBonus: number | null;
+        todayPremiumBonus: number | null;
     }> {
         const today = new Date();
         today.setHours(0, 0, 0, 0);
@@ -319,7 +383,10 @@ export class UserService extends BaseCrudService<User> {
         if (loginActions.length === 0) {
             return {
                 currentStreak: 0,
-                todayBonus: this.LOGIN_STREAK_BONUS_SCHEDULE[0],
+                todayBonus: this.STREAK_REWARDS[0],
+                todayPremiumBonus: isSubUser
+                    ? this.PREMIUM_STREAK_REWARDS[0]
+                    : null,
             };
         }
 
@@ -352,7 +419,11 @@ export class UserService extends BaseCrudService<User> {
             currentStreak,
             todayBonus: hasLoggedInToday
                 ? null
-                : this.LOGIN_STREAK_BONUS_SCHEDULE[bonusIndex],
+                : this.STREAK_REWARDS[bonusIndex],
+            todayPremiumBonus:
+                hasLoggedInToday || !isSubUser
+                    ? null
+                    : this.PREMIUM_STREAK_REWARDS[bonusIndex],
         };
     }
 
@@ -391,56 +462,86 @@ export class UserService extends BaseCrudService<User> {
             await repo.save(todayLogin);
 
             if (isFirstLoginToday) {
-                const { todayBonus } =
-                    await this.calculateLoginStreakAndBonus(userId);
+                const { isSubUser } = await this.getSubscriptionStatus(userId);
 
+                const { todayBonus, todayPremiumBonus, currentStreak } =
+                    await this.calculateLoginStreakAndBonus(userId, isSubUser);
+
+                // Grant normal bonus
                 if (todayBonus !== null && todayBonus > 0) {
                     this.logger.log(
                         `Granting login bonus of ${todayBonus} coins to user ${userId} for login on ${todayStr}`,
                     );
 
-                    await this.grantCoins({
+                    await this.addCoins({
                         manager,
                         userId,
                         amount: todayBonus,
-                        type: CoinType.TEMPORARY,
-                        source: ActionType.LOGIN,
+                        coinType: CoinType.TEMPORARY,
+                        description: `Daily login streak bonus (day ${currentStreak})`,
+                        referenceType: CoinReferenceType.LOGIN,
+                    });
+                }
+
+                // Grant premium bonus if applicable
+                if (todayPremiumBonus !== null && todayPremiumBonus > 0) {
+                    this.logger.log(
+                        `Granting premium login bonus of ${todayPremiumBonus} coins to user ${userId} for login on ${todayStr}`,
+                    );
+
+                    await this.addCoins({
+                        manager,
+                        userId,
+                        amount: todayPremiumBonus,
+                        coinType: CoinType.TEMPORARY,
+                        description: `Premium daily login streak bonus (day ${currentStreak})`,
+                        referenceType: CoinReferenceType.LOGIN,
                     });
                 }
             }
         });
     }
 
-    private async grantCoins({
-        manager,
-        userId,
-        amount,
-        type,
-        source,
-    }: {
-        manager: EntityManager;
-        userId: string;
-        amount: number;
-        type: CoinType;
-        source?: string;
-    }): Promise<void> {
-        if (amount <= 0) return;
+    async getSubscriptionStatus(
+        userId: string,
+    ): Promise<{ isSubUser: boolean; basePlanId: string | null }> {
+        const now = new Date();
 
-        const coinRepo = manager.getRepository(UserCoins);
-
-        const newRecord = coinRepo.create({
-            userId,
-            type,
-            remaining: amount,
-            amount: amount,
-            expiresAt:
-                type === CoinType.TEMPORARY
-                    ? addDays(new Date(), TEMPORARY_COIN_DAYS)
-                    : null,
-            source: source,
+        const activeSubscription = await this.transactionRepo.findOne({
+            where: {
+                userId: userId,
+                expiryTime: MoreThan(now),
+                status: TransactionStatus.ACTIVE,
+            },
+            order: {
+                expiryTime: 'DESC',
+            },
+            select: [
+                'id',
+                'basePlanId',
+                'storeProductId',
+                'createdAt',
+                'lastCoinResetAt',
+            ],
         });
 
-        await coinRepo.save(newRecord);
+        if (activeSubscription) {
+            // Check and reset coins based on subscription renewal periods
+            await this.checkAndResetSubscriptionCoins(
+                userId,
+                activeSubscription,
+            );
+
+            return {
+                isSubUser: true,
+                basePlanId: activeSubscription.basePlanId,
+            };
+        }
+
+        return {
+            isSubUser: false,
+            basePlanId: null,
+        };
     }
 
     async getUserInfo(user: User): Promise<any> {
@@ -448,7 +549,10 @@ export class UserService extends BaseCrudService<User> {
             throw new NotFoundException('User not found');
         }
 
-        const coinsData = await this.calculateUserCoins(user.id);
+        const [coinsData, subscriptionData] = await Promise.all([
+            this.calculateUserCoins(user.id),
+            this.getSubscriptionStatus(user.id),
+        ]);
 
         // Preferred categories (sorted by some order — you may want to add order column later)
         const preferredCategories =
@@ -471,16 +575,13 @@ export class UserService extends BaseCrudService<User> {
         return {
             ...user,
             profileImageUrl,
-            subscription: {
-                isSubUser: false,
-                basePlanId: null,
-            },
+            subscription: subscriptionData,
             wallet: coinsData,
             preferredCategories,
         };
     }
 
-    async watchAdsAndGrantBonus(userId: string) {
+    async watchAdsAndGrantBonus(userId: string): Promise<WatchAdsResponseDto> {
         const todayStr = new Date().toISOString().split('T')[0];
 
         return this.dataSource.transaction(async (manager) => {
@@ -489,24 +590,29 @@ export class UserService extends BaseCrudService<User> {
             let todayAction = await actionRepo.findOne({
                 where: {
                     userId,
-                    actionType: ActionType.WATCH_AD,
+                    actionType: ActionType.WATCH_AD_COIN,
                     actionDate: todayStr,
                 },
                 lock: { mode: 'pessimistic_write' },
             });
 
-            if (todayAction && todayAction.count >= this.MAX_AD_VIEWS_PER_DAY) {
+            if (
+                todayAction &&
+                todayAction.count >= this.MAX_AD_VIEWS_COIN_PER_DAY
+            ) {
                 const updatedCoins = await this.calculateUserCoins(userId, {
                     manager,
                 });
 
                 return {
                     success: false,
-                    message: `You've reached the daily limit of ${this.MAX_AD_VIEWS_PER_DAY} ads. Come back tomorrow!`,
+                    message: `You've reached the daily limit of ${this.MAX_AD_VIEWS_COIN_PER_DAY} ads. Come back tomorrow!`,
                     data: {
-                        coinsGranted: 0,
-                        currentViews: todayAction.count,
-                        maxViews: this.MAX_AD_VIEWS_PER_DAY,
+                        adInfo: {
+                            coinsGranted: 0,
+                            currentViews: todayAction.count,
+                            maxViews: this.MAX_AD_VIEWS_COIN_PER_DAY,
+                        },
                         wallet: updatedCoins,
                     },
                 };
@@ -515,7 +621,7 @@ export class UserService extends BaseCrudService<User> {
             if (!todayAction) {
                 todayAction = actionRepo.create({
                     userId,
-                    actionType: ActionType.WATCH_AD,
+                    actionType: ActionType.WATCH_AD_COIN,
                     actionDate: todayStr,
                     count: 1,
                     lastActionAt: new Date(),
@@ -528,12 +634,13 @@ export class UserService extends BaseCrudService<User> {
             await actionRepo.save(todayAction);
 
             const coinsToGrant = this.AD_REWARD_COINS;
-            await this.grantCoins({
+            await this.addCoins({
                 manager,
                 userId,
-                amount: coinsToGrant,
-                type: CoinType.TEMPORARY,
-                source: ActionType.WATCH_AD,
+                amount: this.AD_REWARD_COINS,
+                coinType: CoinType.TEMPORARY,
+                description: `Ad reward - view #${todayAction.count}`,
+                referenceType: CoinReferenceType.WATCH_AD_COIN,
             });
 
             const updatedCoins = await this.calculateUserCoins(userId, {
@@ -547,9 +654,99 @@ export class UserService extends BaseCrudService<User> {
                     adInfo: {
                         coinsGranted: coinsToGrant,
                         currentViews: todayAction.count,
-                        maxViews: this.MAX_AD_VIEWS_PER_DAY,
+                        maxViews: this.MAX_AD_VIEWS_COIN_PER_DAY,
                     },
                     wallet: updatedCoins,
+                },
+            };
+        });
+    }
+
+    async watchAdsAndUnlockChapter(
+        userId: string,
+        chapterId: string,
+    ): Promise<WatchAdsUnlockChapterResponseDto> {
+        const todayStr = new Date().toISOString().split('T')[0];
+
+        return this.dataSource.transaction(async (manager) => {
+            const accessCheck =
+                await this.chapterUnlockService.canUserAccessChapter(
+                    userId,
+                    chapterId,
+                );
+
+            if (!accessCheck.chapter) {
+                throw new NotFoundException(
+                    accessCheck.reason || 'Chapter or story not found',
+                );
+            }
+
+            if (accessCheck.canAccess) {
+                throw new BadRequestException(
+                    'You already have access to this chapter',
+                );
+            }
+
+            const actionRepo = manager.getRepository(UserDailyAction);
+
+            let todayAction = await actionRepo.findOne({
+                where: {
+                    userId,
+                    actionType: ActionType.WATCH_AD_UNLOCK,
+                    actionDate: todayStr,
+                },
+                lock: { mode: 'pessimistic_write' },
+            });
+
+            if (
+                todayAction &&
+                todayAction.count >= this.MAX_AD_VIEWS_UNLOCK_PER_DAY
+            ) {
+                return {
+                    success: false,
+                    message: `You've reached the daily limit of ${this.MAX_AD_VIEWS_UNLOCK_PER_DAY} ads. Come back tomorrow!`,
+                    data: {
+                        adInfo: {
+                            coinsGranted: 0,
+                            currentViews: todayAction.count,
+                            maxViews: this.MAX_AD_VIEWS_UNLOCK_PER_DAY,
+                        },
+                        chapterId: chapterId,
+                    },
+                };
+            }
+
+            await this.chapterUnlockService.unlockChapter({
+                userId,
+                storyId: accessCheck.story.id,
+                index: accessCheck.chapter.index,
+            });
+
+            if (!todayAction) {
+                todayAction = actionRepo.create({
+                    userId,
+                    actionType: ActionType.WATCH_AD_UNLOCK,
+                    actionDate: todayStr,
+                    count: 1,
+                    lastActionAt: new Date(),
+                });
+            } else {
+                todayAction.count += 1;
+                todayAction.lastActionAt = new Date();
+            }
+
+            await actionRepo.save(todayAction);
+
+            return {
+                success: true,
+                message: `Ad watched successfully! You unlocked the chapter without spending coins.`,
+                data: {
+                    adInfo: {
+                        coinsGranted: 0,
+                        currentViews: todayAction.count,
+                        maxViews: this.MAX_AD_VIEWS_UNLOCK_PER_DAY,
+                    },
+                    chapterId: chapterId,
                 },
             };
         });
@@ -584,14 +781,6 @@ export class UserService extends BaseCrudService<User> {
                 c.expiresAt > now,
         );
 
-        const temporaryCoinsForDisplay = activeTemporary.map((c) => ({
-            id: c.id,
-            amount: c.remaining,
-            source: c.source,
-            expiresAt: c.expiresAt!.toISOString(),
-            createdAt: c.createdAt.toISOString(),
-        }));
-
         const activeTemporaryAmount = activeTemporary.reduce(
             (sum, c) => sum + c.remaining,
             0,
@@ -602,7 +791,7 @@ export class UserService extends BaseCrudService<User> {
         return {
             totalCoins,
             permanentCoins,
-            temporaryCoins: temporaryCoinsForDisplay,
+            temporaryCoins: activeTemporaryAmount,
         };
     }
 
@@ -681,23 +870,26 @@ export class UserService extends BaseCrudService<User> {
 
         const hasCheckedToday = todayBonus === null;
 
-        const weekDays = this.LOGIN_STREAK_BONUS_SCHEDULE.map((coin, index) => {
-            const day = index + 1;
-            const isChecked =
-                day < currentDay || (day === currentDay && hasCheckedToday);
+        const weekDays: WeekDayDto[] = this.STREAK_REWARDS.map(
+            (coin, index) => {
+                const day = index + 1;
+                const isChecked =
+                    day < currentDay || (day === currentDay && hasCheckedToday);
 
-            return {
-                day,
-                isChecked,
-                coin,
-            };
-        });
+                return {
+                    day,
+                    isChecked,
+                    coin,
+                    coinPremium: this.PREMIUM_STREAK_REWARDS[index],
+                };
+            },
+        );
 
         const todayStr = new Date().toISOString().split('T')[0];
         const todayAdAction = await this.userDailyActionRepo.findOne({
             where: {
                 userId,
-                actionType: ActionType.WATCH_AD,
+                actionType: ActionType.WATCH_AD_COIN,
                 actionDate: todayStr,
             },
         });
@@ -714,9 +906,328 @@ export class UserService extends BaseCrudService<User> {
             adInfo: {
                 coinsGranted: this.AD_REWARD_COINS,
                 currentViews,
-                maxViews: this.MAX_AD_VIEWS_PER_DAY,
+                maxViews: this.MAX_AD_VIEWS_COIN_PER_DAY,
             },
             wallet,
         };
+    }
+
+    /**
+     * Cộng coin và ghi lịch sử giao dịch
+     */
+    async addCoins({
+        userId,
+        amount,
+        coinType = CoinType.PERMANENT, // hoặc TEMPORARY
+        referenceType,
+        referenceId,
+        description,
+        manager, // optional - dùng trong transaction lớn
+    }: {
+        userId: string;
+        amount: number;
+        coinType?: CoinType;
+        referenceType: CoinReferenceType;
+        referenceId?: string;
+        description?: string;
+        manager?: EntityManager;
+    }): Promise<number> {
+        if (amount <= 0) {
+            throw new BadRequestException('Amount must be positive');
+        }
+
+        const execute = async (tx: EntityManager) => {
+            // 1. Tạo bản ghi coin mới (theo logic hiện tại của bạn)
+            const coinRecord = tx.getRepository(UserCoins).create({
+                userId,
+                type: coinType,
+                amount,
+                remaining: amount,
+                expiresAt:
+                    coinType === CoinType.TEMPORARY
+                        ? addDays(new Date(), TEMPORARY_COIN_DAYS)
+                        : null,
+            });
+
+            await tx.getRepository(UserCoins).save(coinRecord);
+
+            // 2. Tính tổng số dư hiện tại SAU khi cộng
+            const wallet = await this.calculateUserCoins(userId, {
+                manager: tx,
+            });
+            const newTotalBalance = wallet.totalCoins;
+
+            // 3. Ghi lịch sử giao dịch
+            const transaction = tx.getRepository(CoinTransaction).create({
+                userId,
+                type: CoinTransactionType.ADD,
+                amount,
+                balanceAfter: newTotalBalance,
+                referenceType,
+                referenceId,
+                description:
+                    description ||
+                    `Added ${amount} ${coinType} coins from ${referenceType || 'system'}`,
+                createdAt: new Date(),
+                expiresAt: coinRecord.expiresAt,
+            });
+
+            await tx.getRepository(CoinTransaction).save(transaction);
+
+            return newTotalBalance;
+        };
+
+        if (manager) {
+            // đang trong transaction lớn → dùng luôn
+            return execute(manager);
+        }
+
+        // transaction riêng
+        return this.dataSource.transaction(execute);
+    }
+
+    /**
+     * Trừ coin với ưu tiên: temporary (sắp hết hạn trước) → permanent
+     * @throws BadRequestException nếu không đủ coin hoặc amount <= 0
+     */
+    async spendCoins({
+        userId,
+        amount,
+        referenceType,
+        referenceId,
+        description,
+        manager,
+    }: {
+        userId: string;
+        amount: number;
+        referenceType?: string;
+        referenceId?: string;
+        description: string;
+        manager?: EntityManager;
+    }): Promise<{ newBalance: number; spentDetails: any[] }> {
+        if (amount <= 0) {
+            throw new BadRequestException('Amount must be positive');
+        }
+
+        const execute = async (tx: EntityManager): Promise<any> => {
+            const now = new Date();
+
+            const coinRecords = await tx.getRepository(UserCoins).find({
+                where: [
+                    {
+                        userId,
+                        type: CoinType.PERMANENT,
+                        remaining: MoreThan(0),
+                    },
+                    {
+                        userId,
+                        type: CoinType.TEMPORARY,
+                        remaining: MoreThan(0),
+                        expiresAt: MoreThan(now),
+                    },
+                ],
+                order: {
+                    expiresAt: 'ASC',
+                },
+                lock: { mode: 'pessimistic_write' },
+            });
+
+            if (!coinRecords.length) {
+                throw new BadRequestException('No available coins');
+            }
+
+            let remainingToSpend = amount;
+            const spentDetails: Array<{
+                id: string;
+                type: CoinType;
+                amountSpent: number;
+                expiresAt?: string;
+            }> = [];
+            const recordsToUpdate: UserCoins[] = [];
+
+            for (const record of coinRecords) {
+                if (remainingToSpend <= 0) break;
+
+                const canSpend = Math.min(remainingToSpend, record.remaining);
+                if (canSpend <= 0) continue;
+
+                // Chuẩn bị cập nhật (chưa save)
+                record.remaining -= canSpend;
+                recordsToUpdate.push(record);
+
+                spentDetails.push({
+                    id: record.id,
+                    type: record.type,
+                    amountSpent: canSpend,
+                    expiresAt: record.expiresAt?.toISOString(),
+                });
+
+                remainingToSpend -= canSpend;
+            }
+
+            if (remainingToSpend > 0) {
+                throw new BadRequestException(
+                    `Insufficient coins. Required: ${amount}, Available: ${amount - remainingToSpend}`,
+                );
+            }
+
+            // Bulk update – chỉ 1 query (hoặc rất ít query)
+            if (recordsToUpdate.length > 0) {
+                await tx
+                    .getRepository(UserCoins)
+                    .save(recordsToUpdate, { chunk: 100 });
+            }
+
+            // 3. Tính tổng số dư sau khi trừ
+            const walletAfter = await this.calculateUserCoins(userId, {
+                manager: tx,
+            });
+            const newTotalBalance = walletAfter.totalCoins;
+
+            // 4. Ghi lịch sử giao dịch (amount âm để biểu thị trừ)
+            const transaction = tx.getRepository(CoinTransaction).create({
+                userId,
+                type: CoinTransactionType.SPEND,
+                amount: -amount,
+                balanceAfter: newTotalBalance,
+                referenceType,
+                referenceId,
+                description: description,
+                createdAt: new Date(),
+                expiresAt: null,
+            });
+
+            await tx.getRepository(CoinTransaction).save(transaction);
+
+            return {
+                newBalance: newTotalBalance,
+                spentDetails,
+            };
+        };
+
+        return manager
+            ? execute(manager)
+            : this.dataSource.transaction(execute);
+    }
+
+    async getCoinTransactions(userId: string, paginationDto: PaginationDto) {
+        const { page = 1, limit = 20 } = paginationDto;
+        const skip = (page - 1) * limit;
+
+        const [transactions, total] =
+            await this.coinTransactionRepo.findAndCount({
+                where: { userId },
+                order: { createdAt: 'DESC' },
+                skip,
+                take: limit,
+            });
+
+        const items = transactions.map((transaction) => {
+            const title = this.getTransactionTitle(
+                transaction.referenceType as CoinReferenceType,
+            );
+
+            return {
+                amount: transaction.amount,
+                title: title,
+                description: transaction.description,
+                createdAt: transaction.createdAt,
+                expiresAt: transaction.expiresAt,
+            };
+        });
+
+        return {
+            page,
+            limit,
+            total,
+            items,
+        };
+    }
+
+    /**
+     * Check and reset subscription coins based on weekly, monthly, or yearly renewal
+     */
+    private async checkAndResetSubscriptionCoins(
+        userId: string,
+        subscription: Transaction,
+    ): Promise<void> {
+        const now = new Date();
+        const lastReset =
+            subscription.lastCoinResetAt || subscription.createdAt;
+
+        // Determine reset period based on plan (you may need to adjust this logic)
+        const planId = subscription.basePlanId;
+        let shouldReset = false;
+        let resetPeriod: 'weekly' | 'monthly' | 'yearly' | 'test' | null = null;
+
+        // Check if this is a Google Play test subscription (5-minute interval)
+        const isTestSubscription =
+            subscription.storeProductId?.includes('test') ||
+            this.enableTestSubscription;
+
+        if (isTestSubscription) {
+            // For Google Play test subscriptions (5-minute renewal)
+            resetPeriod = 'test';
+            const testIntervalMinutes =
+                this.testSubscriptionIntervalMinutes || 5;
+
+            shouldReset = shouldResetByInterval(
+                lastReset,
+                now,
+                testIntervalMinutes,
+            );
+        } else if (planId?.includes('weekly')) {
+            resetPeriod = 'weekly';
+            shouldReset = shouldResetWeekly(lastReset, now);
+        } else if (planId?.includes('monthly')) {
+            resetPeriod = 'monthly';
+            shouldReset = shouldResetMonthly(lastReset, now);
+        } else if (planId?.includes('yearly')) {
+            resetPeriod = 'yearly';
+            shouldReset = shouldResetYearly(lastReset, now);
+        }
+
+        if (shouldReset && resetPeriod) {
+            await this.dataSource.transaction(async (manager) => {
+                // Reset coins for the subscription period
+                const { coinsToAdd } =
+                    await this.iapProductService.calculateCoinsForProduct({
+                        storeProductId: subscription.storeProductId,
+                        basePlanId: subscription.basePlanId,
+                    });
+
+                if (coinsToAdd <= 0) {
+                    this.logger.warn(
+                        `No coins to add for subscription ${subscription.id} during ${resetPeriod} reset`,
+                    );
+                    return;
+                }
+
+                console.log(
+                    `Resetting coins for subscription ${subscription.id} with ${coinsToAdd} coins during ${resetPeriod} reset lastCoinResetAt=${lastReset} now=${now}`,
+                );
+
+                await this.addCoins({
+                    manager,
+                    userId,
+                    amount: coinsToAdd,
+                    coinType: CoinType.PERMANENT,
+                    description: `${resetPeriod} subscription coin reset`,
+                    referenceType: CoinReferenceType.IAP,
+                    referenceId: subscription.id,
+                });
+
+                // Update last reset timestamp
+                await manager
+                    .getRepository(Transaction)
+                    .update(subscription.id, {
+                        lastCoinResetAt: now,
+                    });
+
+                this.logger.log(
+                    `Reset ${coinsToAdd} coins for user ${userId} (${resetPeriod} subscription)`,
+                );
+            });
+        }
     }
 }

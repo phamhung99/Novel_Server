@@ -29,9 +29,6 @@ export class UserCoins {
     @Column({ type: 'int' })
     remaining: number;
 
-    @Column()
-    source: string;
-
     @Column({ name: 'expires_at', type: 'timestamptz', nullable: true })
     expiresAt: Date | null;
 

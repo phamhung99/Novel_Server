@@ -5,6 +5,9 @@ import { GrokApiService } from './providers/grok-api.service';
 import { StoryGenerationProviderFactory } from './providers/story-generation-provider.factory';
 import { StoryGenerationApiService } from './providers/story-generation-api.service';
 import { GeminiApiService } from './providers/gemini-api.service';
+import { AiController } from './ai.controller';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { ChatGeneration } from './entities/chat-generation.entity';
 
 @Module({
     providers: [
@@ -16,5 +19,7 @@ import { GeminiApiService } from './providers/gemini-api.service';
         StoryGenerationApiService,
     ],
     exports: [StoryGenerationApiService, StoryGenerationProviderFactory],
+    imports: [TypeOrmModule.forFeature([ChatGeneration])],
+    controllers: [AiController],
 })
 export class AiModule {}

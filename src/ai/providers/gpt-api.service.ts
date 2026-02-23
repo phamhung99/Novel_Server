@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import axios, { AxiosInstance } from 'axios';
 import { IStoryGenerationProvider } from './story-generation-provider.interface';
+import { GenerateRawContentDto } from '../dto/generate-raw-content.dto';
 
 /**
  * GPT API Service for Story Generation
@@ -28,29 +29,29 @@ export class GptApiService implements IStoryGenerationProvider {
         });
     }
 
-    async generateContent(
-        systemPrompt: string,
-        userPrompt: string,
-        responseSchema?: object,
-    ): Promise<string> {
+    async generateContent(dto: GenerateRawContentDto): Promise<string> {
         try {
             const requestBody: any = {
                 model: this.modelName,
                 messages: [
-                    { role: 'system', content: systemPrompt },
-                    { role: 'user', content: userPrompt },
+                    {
+                        role: 'system',
+                        content:
+                            dto.systemPrompt || 'You are a helpful assistant.',
+                    },
+                    { role: 'user', content: dto.prompt },
                 ],
-                temperature: 0.7,
-                max_tokens: 2000,
+                temperature: dto.temperature || 0.7,
+                max_tokens: dto.maxTokens || 2000,
             };
 
             // Add response_format with JSON schema if provided
-            if (responseSchema) {
+            if (dto.responseSchema) {
                 requestBody.response_format = {
                     type: 'json_schema',
                     json_schema: {
                         name: 'response',
-                        schema: responseSchema,
+                        schema: dto.responseSchema,
                         strict: true,
                     },
                 };

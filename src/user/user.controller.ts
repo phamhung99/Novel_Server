@@ -31,6 +31,7 @@ import { diskStorage } from 'multer';
 import { CustomMaxFileSizeValidator } from 'src/common/validators/custom-max-file-size.validator';
 import { MimeTypeValidator } from 'src/common/validators/mime-type.validator';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { PaginationDto } from 'src/story/dto/pagination.dto';
 
 @Controller('users')
 export class UserController {
@@ -45,7 +46,19 @@ export class UserController {
         return this.userService.getReward(userId);
     }
 
-    @Post('ads/watch')
+    @Get('me/coin-transactions')
+    async getMyCoinTransactions(
+        @Headers('x-user-id') userId: string,
+        @Query() paginationDto: PaginationDto,
+    ) {
+        if (!userId) {
+            throw new BadRequestException(ERROR_MESSAGES.USER_ID_REQUIRED);
+        }
+
+        return this.userService.getCoinTransactions(userId, paginationDto);
+    }
+
+    @Post('ads/watch/coin')
     @SkipTransform()
     async watchAds(@Headers('x-user-id') userId: string) {
         if (!userId) {
@@ -54,6 +67,19 @@ export class UserController {
 
         const result = await this.userService.watchAdsAndGrantBonus(userId);
         return result;
+    }
+
+    @Post('ads/watch/unlock-chapter/:chapterId')
+    @SkipTransform()
+    async watchAdsToUnlockChapter(
+        @Headers('x-user-id') userId: string,
+        @Param('chapterId') chapterId: string,
+    ) {
+        if (!userId) {
+            throw new BadRequestException(ERROR_MESSAGES.USER_ID_REQUIRED);
+        }
+
+        return this.userService.watchAdsAndUnlockChapter(userId, chapterId);
     }
 
     @Patch('me')

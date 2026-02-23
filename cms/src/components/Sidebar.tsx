@@ -13,6 +13,7 @@ const menuItems = [
     { label: 'Manual Creation', path: ROUTES.MANUAL_CREATION },
     { label: 'AI Creation', path: ROUTES.STORY_UPLOAD },
     { label: 'Manage Stories', path: ROUTES.MANAGE_STORIES },
+    { label: 'AI Chat', path: ROUTES.AI_CHAT },
 ];
 
 export default function Sidebar({

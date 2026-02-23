@@ -29,8 +29,8 @@ export class ImageGeneration {
     })
     status: GenerationStatus;
 
-    @Column({ name: 'prompt', type: 'text' })
-    prompt: string;
+    @Column({ name: 'prompt', type: 'text', nullable: true })
+    prompt: string | null;
 
     @Column({ name: 'image_path', nullable: true })
     imagePath: string | null;

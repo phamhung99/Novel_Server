@@ -11,6 +11,7 @@ import PrivateRoute from './utils/PrivateRoute';
 import ChapterReaderPage from './pages/ChapterReaderPage';
 import ManualChaptersPage from './pages/ManualChaptersPage';
 import { USER_ROLES } from './constants/app.constants';
+import AiChat from './pages/AiChat';
 
 export default function App() {
     return (
@@ -63,6 +64,7 @@ export default function App() {
                             path="/dashboard/stories/manual-creation/:storyId"
                             element={<ManualChaptersPage />}
                         />
+                        <Route path="ai-chat" element={<AiChat />} />
                     </Route>
                 </Route>
             </Routes>

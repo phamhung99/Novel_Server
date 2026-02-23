@@ -12,12 +12,15 @@ import { IapStore } from 'src/common/enums/app.enum';
 
 @Entity('transactions')
 export class Transaction {
-    @PrimaryGeneratedColumn()
-    id: number;
+    @PrimaryGeneratedColumn('uuid')
+    id: string;
 
     @ManyToOne(() => User)
     @JoinColumn({ name: 'user_id' })
     user: User;
+
+    @Column({ name: 'user_id' })
+    userId: string;
 
     @Column({ name: 'order_id', unique: true })
     orderId: string;
@@ -31,17 +34,29 @@ export class Transaction {
     @Column({ name: 'base_plan_id', nullable: true })
     basePlanId: string;
 
-    @Column({ name: 'purchase_token' })
-    purchaseToken: string;
+    // purchase token for android, jws for ios
+    @Column({ name: 'receipt' })
+    receipt: string;
 
     @Column({ name: 'purchase_time', type: 'timestamptz' })
     purchaseTime: Date;
+
+    @Column({ default: false })
+    isOneTime: boolean;
 
     @Column({ name: 'expiry_time', type: 'timestamptz', nullable: true })
     expiryTime: Date | null;
 
     @Column({ default: 1 })
     quantity: number;
+
+    @Column({
+        name: 'granted_coins',
+        type: 'int',
+        nullable: true,
+        default: null,
+    })
+    grantedCoins: number | null;
 
     @Column({ name: 'amount_paid', type: 'float', nullable: true })
     amountPaid: number | null;
@@ -57,6 +72,9 @@ export class Transaction {
 
     @Column({ name: 'store_payload', type: 'jsonb' })
     storePayload: any;
+
+    @Column({ name: 'last_coin_reset_at', type: 'timestamptz', nullable: true })
+    lastCoinResetAt: Date | null;
 
     @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
     createdAt: Date;
