@@ -8,6 +8,8 @@ import {
     JWSRenewalInfoDecodedPayload,
 } from '@apple/app-store-server-library';
 import { IapProductType } from 'src/common/enums/app.enum';
+import * as fs from 'fs';
+import * as path from 'path';
 
 @Injectable()
 export class AppStoreService {
@@ -39,10 +41,46 @@ export class AppStoreService {
 
         const env = isSandbox ? Environment.SANDBOX : Environment.PRODUCTION;
 
-        // SignedDataVerifier để verify JWS local (không gọi API)
+        // Load Apple root certificates
+        const certsPath = path.join(process.cwd(), 'certs');
+        const rootCerts: Buffer[] = [];
+
+        try {
+            const certFiles = [
+                'AppleIncRootCertificate.cer',
+                'AppleRootCA-G2.cer',
+                'AppleRootCA-G3.cer',
+            ];
+
+            for (const certFile of certFiles) {
+                const certPath = path.join(certsPath, certFile);
+                if (fs.existsSync(certPath)) {
+                    const cert = fs.readFileSync(certPath);
+                    rootCerts.push(cert);
+                    this.logger.log(`Loaded certificate: ${certFile}`);
+                } else {
+                    this.logger.warn(`Certificate not found: ${certFile}`);
+                }
+            }
+
+            if (rootCerts.length === 0) {
+                this.logger.warn(
+                    'No root certificates loaded, using library defaults',
+                );
+            } else {
+                this.logger.log(
+                    `Loaded ${rootCerts.length} Apple root certificates`,
+                );
+            }
+        } catch (error) {
+            this.logger.error(`Failed to load certificates: ${error.message}`);
+            this.logger.warn('Using library default certificates');
+        }
+
+        // SignedDataVerifier with loaded certificates
         this.verifier = new SignedDataVerifier(
-            [], // root certs: thư viện tự load default Apple certs nếu để []
-            true, // enableOnlineChecks: true để check revocation nếu cần
+            rootCerts.length > 0 ? rootCerts : [], // Use loaded certs or library defaults
+            true, // enableOnlineChecks: true for revocation checks
             env,
             bundleId,
             appAppleId,
@@ -125,54 +163,5 @@ export class AppStoreService {
                 ? Number(decoded.price) / 1000
                 : undefined, // price thường là cent → convert
         };
-    }
-
-    fakeDecode(type: IapProductType) {
-        const randomSuffix = Math.floor(Math.random() * 100000);
-
-        const fakeDecodedSubscription: JWSTransactionDecodedPayload = {
-            bundleId: 'com.yourcompany.bedread', // phải khớp với config của bạn
-            environment: 'Sandbox', // hoặc "Production"
-            transactionId: '2000000123456789',
-            originalTransactionId: `2000000098765432${randomSuffix}`,
-            productId: 'com.novel.bedread.weekly',
-            purchaseDate: Date.now() - 3 * 24 * 60 * 60 * 1000, // 3 ngày trước
-            signedDate: Date.now(),
-            expiresDate: Date.now() + 7 * 24 * 60 * 60 * 1000, // hết hạn sau 7 ngày
-            quantity: 1,
-            type: 'Auto-Renewable Subscription',
-            inAppOwnershipType: 'PURCHASED',
-            revocationDate: undefined,
-            revocationReason: undefined,
-            price: 99000, // 0.99 USD × 100000 (thường là đơn vị 1/1000 cent)
-            currency: 'USD',
-            offerType: undefined,
-            offerIdentifier: undefined,
-            subscriptionGroupIdentifier: 'com.novel.bedread.subs',
-            // các field khác nếu cần (webOrderLineItemId, isInIntroOfferPeriod, isTrialPeriod, ...)
-        };
-
-        const fakeDecodedOnetime: JWSTransactionDecodedPayload = {
-            bundleId: 'com.yourcompany.bedread',
-            environment: 'Sandbox',
-            transactionId: '2000000987654321',
-            originalTransactionId: `2000000987654321${randomSuffix}`, // với non-consumable thì thường giống transactionId
-            productId: 'com.novel.bedread.coins.1000',
-            purchaseDate: Date.now() - 2 * 3600 * 1000, // mua cách đây 2 tiếng
-            signedDate: Date.now(),
-            expiresDate: undefined, // không có expiry
-            quantity: 1,
-            type: 'Non-Consumable', // hoặc "Consumable" nếu là coins
-            inAppOwnershipType: 'PURCHASED',
-            revocationDate: undefined,
-            revocationReason: undefined,
-            price: 99000, // giả sử 9.99 USD × 100000
-            currency: 'USD',
-            // không cần subscriptionGroupIdentifier, offerType, expiresDate, ...
-        };
-
-        return type === IapProductType.SUBSCRIPTION
-            ? fakeDecodedSubscription
-            : fakeDecodedOnetime;
     }
 }

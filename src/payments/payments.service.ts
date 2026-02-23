@@ -167,15 +167,12 @@ export class PaymentsService {
         let parsed: any;
 
         try {
-            // Verify local JWS
-            // const { decoded } = await this.appStoreService.verifyTransaction(
-            //     receipt,
-            //     type,
-            // );
+            const { decoded } = await this.appStoreService.verifyTransaction(
+                receipt,
+                type,
+            );
 
-            const decoded = this.appStoreService.fakeDecode(type);
-
-            appleData = decoded; // lưu decoded payload
+            appleData = decoded;
 
             parsed = this.appStoreService.parseTransactionData(decoded, type);
         } catch (err) {
