@@ -14,6 +14,9 @@ export class VerifyPurchaseDto {
     @IsNotEmpty()
     @IsEnum(IapProductType)
     type: IapProductType;
+
+    @IsOptional()
+    isXcodeTest?: boolean;
 }
 
 export class VerifyPurchaseParamsDto {
@@ -21,4 +24,5 @@ export class VerifyPurchaseParamsDto {
     receipt: string;
     type: IapProductType;
     platform: IapStore;
+    xcodeTest?: boolean;
 }

@@ -8,12 +8,14 @@ import { UserModule } from 'src/user/user.module';
 import { GooglePlayService } from 'src/google-play/google-play.service';
 import { IapProductService } from './iap-product.service';
 import { AppStoreService } from 'src/app-store/app-store.service';
+import { JwtModule } from '@nestjs/jwt';
 
 @Module({
     controllers: [PaymentsController],
     imports: [
         TypeOrmModule.forFeature([Transaction, IapProduct]),
         forwardRef(() => UserModule),
+        JwtModule.register({}),
     ],
     providers: [
         PaymentsService,

@@ -29,6 +29,7 @@ export class PaymentsController {
             userId,
             receipt,
             type: dto.type,
+            xcodeTest: dto.isXcodeTest,
             platform,
         });
     }

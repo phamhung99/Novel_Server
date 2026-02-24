@@ -70,7 +70,13 @@ export class PaymentsService {
         }
 
         if (platform === IapStore.IOS) {
-            return this.verifyAppStorePurchase(userId, receipt, type, user);
+            return this.verifyAppStorePurchase(
+                userId,
+                receipt,
+                type,
+                user,
+                params.xcodeTest,
+            );
         }
 
         throw new BadRequestException(`Unsupported platform: ${platform}`);
@@ -159,9 +165,10 @@ export class PaymentsService {
 
     private async verifyAppStorePurchase(
         userId: string,
-        receipt: string, // BÂY GIỜ là signedTransaction JWS string (từ client gửi lên)
+        receipt: string,
         type: IapProductType,
         user: any,
+        isXcodeTest?: boolean,
     ): Promise<VerifyPurchaseResponseDto> {
         let appleData: any;
         let parsed: any;
@@ -169,7 +176,7 @@ export class PaymentsService {
         try {
             const { decoded } = await this.appStoreService.verifyTransaction(
                 receipt,
-                type,
+                isXcodeTest,
             );
 
             appleData = decoded;
@@ -208,7 +215,7 @@ export class PaymentsService {
             currency,
             expiryTime: expiryTimeDate,
             amountPaid,
-            applePayload: appleData, // decoded JWSTransactionDecodedPayload
+            applePayload: appleData,
             type,
         });
     }
