@@ -25,6 +25,7 @@ import {
     CoinReferenceType,
     CoinTransactionType,
     CoinType,
+    IapStore,
     TransactionStatus,
 } from 'src/common/enums/app.enum';
 import { MediaService } from 'src/media/media.service';
@@ -63,6 +64,12 @@ const coinTransactionTitles: Record<CoinReferenceType, string> = {
     [CoinReferenceType.REFUND]: 'Refund',
     [CoinReferenceType.GIFT_CODE]: 'Gift Code Reward',
 };
+
+enum ResetPeriod {
+    Weekly = 'weekly',
+    Monthly = 'monthly',
+    Yearly = 'yearly',
+}
 
 @Injectable()
 export class UserService extends BaseCrudService<User> {
@@ -165,6 +172,47 @@ export class UserService extends BaseCrudService<User> {
         const number = Math.floor(Math.random() * 9000) + 1000; // 1000-9999
 
         return `${adjective}${noun}_${number}`;
+    }
+
+    private getIosSubscriptionPeriod(
+        storeProductId: string | null | undefined,
+    ): ResetPeriod | null {
+        if (!storeProductId) return null;
+
+        const id = storeProductId.toLowerCase().trim();
+
+        if (
+            id.includes('week') ||
+            id.includes('7day') ||
+            id.includes('weekly') ||
+            id.endsWith('.weekly')
+        ) {
+            return ResetPeriod.Weekly;
+        }
+
+        if (
+            id.includes('month') ||
+            id.includes('30day') ||
+            id.includes('monthly') ||
+            id.endsWith('.monthly')
+        ) {
+            return ResetPeriod.Monthly;
+        }
+
+        if (
+            id.includes('year') ||
+            id.includes('annual') ||
+            id.includes('365') ||
+            id.includes('yearly') ||
+            id.endsWith('.yearly')
+        ) {
+            return ResetPeriod.Yearly;
+        }
+
+        this.logger.warn(
+            `Cannot determine subscription period from storeProductId: ${storeProductId}`,
+        );
+        return null;
     }
 
     async findByEmail(email: string): Promise<User> {
@@ -1149,90 +1197,148 @@ export class UserService extends BaseCrudService<User> {
         };
     }
 
-    /**
-     * Check and reset subscription coins based on weekly, monthly, or yearly renewal
-     */
     private async checkAndResetSubscriptionCoins(
         userId: string,
         subscription: Transaction,
     ): Promise<void> {
         const now = new Date();
+
+        // Lấy thông tin cần thiết một lần
         const lastReset =
             subscription.lastCoinResetAt || subscription.createdAt;
+        const platform = subscription.store;
 
-        // Determine reset period based on plan (you may need to adjust this logic)
-        const planId = subscription.basePlanId;
         let shouldReset = false;
         let resetPeriod: 'weekly' | 'monthly' | 'yearly' | 'test' | null = null;
+        let coinsToAdd = 0;
 
-        // Check if this is a Google Play test subscription (5-minute interval)
-        const isTestSubscription =
-            subscription.storeProductId?.includes('test') ||
-            this.enableTestSubscription;
+        // Dispatch theo platform
+        if (platform === IapStore.ANDROID) {
+            ({ shouldReset, resetPeriod, coinsToAdd } =
+                await this.handleAndroidReset(subscription, lastReset, now));
+        } else if (platform === IapStore.IOS) {
+            ({ shouldReset, resetPeriod, coinsToAdd } =
+                await this.handleIosReset(subscription, lastReset, now));
+        } else {
+            this.logger.warn(`Unsupported platform for reset: ${platform}`);
+            return;
+        }
 
-        if (isTestSubscription) {
-            // For Google Play test subscriptions (5-minute renewal)
-            resetPeriod = 'test';
-            const testIntervalMinutes =
-                this.testSubscriptionIntervalMinutes || 5;
+        if (!shouldReset || !resetPeriod || coinsToAdd <= 0) {
+            return;
+        }
 
-            shouldReset = shouldResetByInterval(
-                lastReset,
-                now,
-                testIntervalMinutes,
+        // Phần chung: thực hiện reset trong transaction
+        await this.dataSource.transaction(async (manager) => {
+            this.logger.log(
+                `Resetting ${coinsToAdd} coins for ${platform} subscription ` +
+                    `${subscription.id} (${resetPeriod}) user=${userId}`,
             );
-        } else if (planId?.includes('weekly')) {
-            resetPeriod = 'weekly';
+
+            await this.addCoins({
+                manager,
+                userId,
+                amount: coinsToAdd,
+                coinType: CoinType.PERMANENT,
+                description: `${resetPeriod} subscription coin reset (${platform})`,
+                referenceType: CoinReferenceType.IAP,
+                referenceId: subscription.id,
+            });
+
+            await manager.getRepository(Transaction).update(subscription.id, {
+                lastCoinResetAt: now,
+            });
+
+            this.logger.log(
+                `Reset completed: ${coinsToAdd} coins → user ${userId}`,
+            );
+        });
+    }
+
+    // ─── Android logic ────────────────────────────────────────
+    private async handleAndroidReset(
+        sub: Transaction,
+        lastReset: Date,
+        now: Date,
+    ): Promise<{
+        shouldReset: boolean;
+        resetPeriod: ResetPeriod;
+        coinsToAdd: number;
+    }> {
+        const planId = sub.basePlanId || '';
+        let resetPeriod: ResetPeriod | null = null;
+        let shouldReset = false;
+
+        const isTest = this.enableTestSubscription;
+
+        if (isTest) {
+            const intervalMin = this.testSubscriptionIntervalMinutes || 5;
+            shouldReset = shouldResetByInterval(lastReset, now, intervalMin);
+        } else if (planId.includes('weekly')) {
+            resetPeriod = ResetPeriod.Weekly;
             shouldReset = shouldResetWeekly(lastReset, now);
-        } else if (planId?.includes('monthly')) {
-            resetPeriod = 'monthly';
+        } else if (planId.includes('monthly')) {
+            resetPeriod = ResetPeriod.Monthly;
             shouldReset = shouldResetMonthly(lastReset, now);
-        } else if (planId?.includes('yearly')) {
-            resetPeriod = 'yearly';
+        } else if (planId.includes('yearly')) {
+            resetPeriod = ResetPeriod.Yearly;
             shouldReset = shouldResetYearly(lastReset, now);
         }
 
+        let coinsToAdd = 0;
         if (shouldReset && resetPeriod) {
-            await this.dataSource.transaction(async (manager) => {
-                // Reset coins for the subscription period
-                const { coinsToAdd } =
-                    await this.iapProductService.calculateCoinsForProduct({
-                        storeProductId: subscription.storeProductId,
-                        basePlanId: subscription.basePlanId,
-                    });
-
-                if (coinsToAdd <= 0) {
-                    this.logger.warn(
-                        `No coins to add for subscription ${subscription.id} during ${resetPeriod} reset`,
-                    );
-                    return;
-                }
-
-                this.logger.log(
-                    `Resetting coins for subscription ${subscription.id} with ${coinsToAdd} coins during ${resetPeriod} reset lastCoinResetAt=${lastReset} now=${now}`,
-                );
-
-                await this.addCoins({
-                    manager,
-                    userId,
-                    amount: coinsToAdd,
-                    coinType: CoinType.PERMANENT,
-                    description: `${resetPeriod} subscription coin reset`,
-                    referenceType: CoinReferenceType.IAP,
-                    referenceId: subscription.id,
-                });
-
-                // Update last reset timestamp
-                await manager
-                    .getRepository(Transaction)
-                    .update(subscription.id, {
-                        lastCoinResetAt: now,
-                    });
-
-                this.logger.log(
-                    `Reset ${coinsToAdd} coins for user ${userId} (${resetPeriod} subscription)`,
-                );
+            const calc = await this.iapProductService.calculateCoinsForProduct({
+                storeProductId: sub.storeProductId,
+                basePlanId: sub.basePlanId,
             });
+            coinsToAdd = calc.coinsToAdd;
         }
+
+        return { shouldReset, resetPeriod, coinsToAdd };
+    }
+
+    // ─── iOS logic ────────────────────────────────────────────
+    private async handleIosReset(
+        sub: Transaction,
+        lastReset: Date,
+        now: Date,
+    ): Promise<{
+        shouldReset: boolean;
+        resetPeriod: ResetPeriod | null;
+        coinsToAdd: number;
+    }> {
+        const productId = sub.storeProductId || '';
+
+        const period = this.getIosSubscriptionPeriod(productId);
+
+        let shouldReset = false;
+        let resetPeriod: ResetPeriod | null = null;
+
+        const isTest = this.enableTestSubscription;
+
+        if (isTest) {
+            const intervalMin = this.testSubscriptionIntervalMinutes || 5;
+            shouldReset = shouldResetByInterval(lastReset, now, intervalMin);
+        } else if (period === ResetPeriod.Weekly) {
+            resetPeriod = ResetPeriod.Weekly;
+            shouldReset = shouldResetWeekly(lastReset, now);
+        } else if (period === ResetPeriod.Monthly) {
+            resetPeriod = ResetPeriod.Monthly;
+            shouldReset = shouldResetMonthly(lastReset, now);
+        } else if (period === ResetPeriod.Yearly) {
+            resetPeriod = ResetPeriod.Yearly;
+            shouldReset = shouldResetYearly(lastReset, now);
+        }
+
+        let coinsToAdd = 0;
+        if (shouldReset && resetPeriod) {
+            const calc = await this.iapProductService.calculateCoinsForProduct({
+                storeProductId: sub.storeProductId,
+                basePlanId: null,
+            });
+            coinsToAdd = calc.coinsToAdd;
+        }
+
+        return { shouldReset, resetPeriod, coinsToAdd };
     }
 }

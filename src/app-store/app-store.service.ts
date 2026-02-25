@@ -5,12 +5,24 @@ import {
     Environment,
     SignedDataVerifier,
     JWSTransactionDecodedPayload,
+    ResponseBodyV2DecodedPayload,
 } from '@apple/app-store-server-library';
 import { IapProductType } from 'src/common/enums/app.enum';
 import * as fs from 'fs';
 import * as path from 'path';
+import { v4 as uuidv4 } from 'uuid';
 
 import { JwtService } from '@nestjs/jwt';
+
+export interface ParsedTransactionData {
+    storeProductId: string;
+    orderId: string;
+    originalTransactionId: string;
+    purchaseTime: number;
+    currency: string;
+    expiryTime?: number;
+    amountPaid?: number;
+}
 
 @Injectable()
 export class AppStoreService {
@@ -126,6 +138,9 @@ export class AppStoreService {
                 if (!decoded) {
                     throw new Error('Cannot decode transaction payload');
                 }
+
+                const fakeOriginalId = `xcode-${uuidv4()}`;
+                decoded.originalTransactionId = fakeOriginalId;
             } else {
                 // Môi trường thật (sandbox/production) → verify đầy đủ
                 decoded =
@@ -148,22 +163,39 @@ export class AppStoreService {
         }
     }
 
+    async verifyNotification(signedPayload: string): Promise<{
+        decoded: ResponseBodyV2DecodedPayload;
+    }> {
+        try {
+            const decoded =
+                await this.verifier.verifyAndDecodeNotification(signedPayload);
+
+            // Optional: check bundleId matches
+            if (decoded.data?.bundleId !== this.bundleId) {
+                throw new Error('Bundle ID mismatch in notification');
+            }
+
+            return { decoded };
+        } catch (err) {
+            this.logger.error(
+                `Notification verification failed: ${err.message}`,
+            );
+            throw new BadRequestException(
+                `Invalid Apple notification signature: ${err.message}`,
+            );
+        }
+    }
+
     /**
      * Parse dữ liệu decoded để đưa vào processVerifiedPurchase
      */
     parseTransactionData(
         decoded: JWSTransactionDecodedPayload,
         type: IapProductType,
-    ): {
-        storeProductId: string;
-        originalTransactionId: string;
-        purchaseTime: number;
-        currency: string;
-        expiryTime?: number;
-        amountPaid?: number;
-    } {
+    ): ParsedTransactionData {
         return {
             storeProductId: decoded.productId,
+            orderId: decoded.transactionId,
             originalTransactionId: decoded.originalTransactionId,
             purchaseTime: decoded.purchaseDate, // milliseconds
             currency: decoded.currency || 'USD',

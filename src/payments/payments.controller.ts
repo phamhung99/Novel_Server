@@ -39,6 +39,11 @@ export class PaymentsController {
         return this.paymentsService.handleGooglePlayWebhook(body);
     }
 
+    @Post('/webhooks/app-store')
+    async handleAppStoreWebhook(@Body() body: any) {
+        return this.paymentsService.handleAppStoreWebhook(body);
+    }
+
     @Get('/plus-coin')
     async checkUser(): Promise<boolean> {
         return true;
