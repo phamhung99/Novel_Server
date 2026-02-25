@@ -502,9 +502,11 @@ export class UserService extends BaseCrudService<User> {
         });
     }
 
-    async getSubscriptionStatus(
-        userId: string,
-    ): Promise<{ isSubUser: boolean; basePlanId: string | null }> {
+    async getSubscriptionStatus(userId: string): Promise<{
+        isSubUser: boolean;
+        basePlanId: string | null;
+        expiresAt: string | null;
+    }> {
         const now = new Date();
 
         const activeSubscription = await this.transactionRepo.findOne({
@@ -522,6 +524,7 @@ export class UserService extends BaseCrudService<User> {
                 'storeProductId',
                 'createdAt',
                 'lastCoinResetAt',
+                'expiryTime',
             ],
         });
 
@@ -535,12 +538,14 @@ export class UserService extends BaseCrudService<User> {
             return {
                 isSubUser: true,
                 basePlanId: activeSubscription.basePlanId,
+                expiresAt: activeSubscription.expiryTime.toISOString(),
             };
         }
 
         return {
             isSubUser: false,
             basePlanId: null,
+            expiresAt: null,
         };
     }
 
@@ -1203,7 +1208,7 @@ export class UserService extends BaseCrudService<User> {
                     return;
                 }
 
-                console.log(
+                this.logger.log(
                     `Resetting coins for subscription ${subscription.id} with ${coinsToAdd} coins during ${resetPeriod} reset lastCoinResetAt=${lastReset} now=${now}`,
                 );
 
