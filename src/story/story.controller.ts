@@ -618,7 +618,7 @@ export class StoryController {
             throw new BadRequestException('Chapter index is required');
         }
 
-        return this.chapterUnlockService.unlockChapter({
+        return this.chapterUnlockService.unlockChapterWithCoin({
             userId,
             index,
             storyId,

@@ -723,24 +723,6 @@ export class UserService extends BaseCrudService<User> {
         const todayStr = new Date().toISOString().split('T')[0];
 
         return this.dataSource.transaction(async (manager) => {
-            const accessCheck =
-                await this.chapterUnlockService.canUserAccessChapter(
-                    userId,
-                    chapterId,
-                );
-
-            if (!accessCheck.chapter) {
-                throw new NotFoundException(
-                    accessCheck.reason || 'Chapter or story not found',
-                );
-            }
-
-            if (accessCheck.canAccess) {
-                throw new BadRequestException(
-                    'You already have access to this chapter',
-                );
-            }
-
             const actionRepo = manager.getRepository(UserDailyAction);
 
             let todayAction = await actionRepo.findOne({
@@ -770,11 +752,27 @@ export class UserService extends BaseCrudService<User> {
                 };
             }
 
-            await this.chapterUnlockService.unlockChapter({
-                userId,
-                storyId: accessCheck.story.id,
-                index: accessCheck.chapter.index,
-            });
+            const unlockResult =
+                await this.chapterUnlockService.unlockChapterWithAds({
+                    userId,
+                    chapterId,
+                    manager,
+                });
+
+            if (!unlockResult.success) {
+                return {
+                    success: false,
+                    message: unlockResult.message,
+                    data: {
+                        adInfo: {
+                            coinsGranted: 0,
+                            currentViews: todayAction?.count || 0,
+                            maxViews: this.MAX_AD_VIEWS_UNLOCK_PER_DAY,
+                        },
+                        chapterId: chapterId,
+                    },
+                };
+            }
 
             if (!todayAction) {
                 todayAction = actionRepo.create({
