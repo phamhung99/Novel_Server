@@ -573,6 +573,7 @@ export class UserService extends BaseCrudService<User> {
                 'createdAt',
                 'lastCoinResetAt',
                 'expiryTime',
+                'store',
             ],
         });
 
@@ -1209,7 +1210,7 @@ export class UserService extends BaseCrudService<User> {
         const platform = subscription.store;
 
         let shouldReset = false;
-        let resetPeriod: 'weekly' | 'monthly' | 'yearly' | 'test' | null = null;
+        let resetPeriod: ResetPeriod | null = null;
         let coinsToAdd = 0;
 
         // Dispatch theo platform

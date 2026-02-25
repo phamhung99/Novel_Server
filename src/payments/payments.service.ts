@@ -25,6 +25,7 @@ import {
     AppStoreService,
     ParsedTransactionData,
 } from 'src/app-store/app-store.service';
+import { toDate } from 'src/common/utils/date.utils';
 
 @Injectable()
 export class PaymentsService {
@@ -268,9 +269,28 @@ export class PaymentsService {
 
         try {
             // 1. Check trùng token
-            const existingTx = await queryRunner.manager.findOne(Transaction, {
-                where: { receipt },
-            });
+            let existingTx: Transaction;
+
+            if (platform === IapStore.IOS) {
+                existingTx = await queryRunner.manager.findOne(Transaction, {
+                    where: {
+                        originalTransactionId,
+                        storeProductId: storeProductId,
+                        orderId: orderId,
+                    },
+                });
+            } else if (platform === IapStore.ANDROID) {
+                existingTx = await queryRunner.manager.findOne(Transaction, {
+                    where: { receipt },
+                });
+            } else {
+                this.logger.error(
+                    `Unsupported platform for transaction check: ${platform}`,
+                );
+                throw new BadRequestException(
+                    'Unsupported platform for transaction check',
+                );
+            }
 
             if (existingTx) {
                 if (existingTx.userId !== userId) {
@@ -379,10 +399,8 @@ export class PaymentsService {
             };
         } catch (err: any) {
             await queryRunner.rollbackTransaction();
-            this.logger.error(
-                `Purchase processing failed: ${err.message}`,
-                err.stack,
-            );
+            console.log(err);
+            this.logger.error(`Purchase processing failed: ${err}`, err.stack);
             throw new BadRequestException(
                 `${ERROR_MESSAGES.SUBSCRIPTION_VERIFICATION_FAILED} - ${err.message}`,
             );
@@ -543,14 +561,22 @@ export class PaymentsService {
                 amountPaid,
                 orderId,
                 originalTransactionId,
+                storeProductId,
             } = this.appStoreService.parseTransactionData(
                 transactionData,
                 IapProductType.SUBSCRIPTION,
             );
 
+            const purchaseTimeDate = toDate(purchaseTime);
+            const expiryTimeDate = toDate(expiryTime);
+
             // Find existing transaction
             const txn = await this.transactionRepository.findOne({
-                where: { originalTransactionId: originalTransactionId },
+                where: {
+                    originalTransactionId: originalTransactionId,
+                    storeProductId: storeProductId,
+                    orderId: orderId,
+                },
                 order: { createdAt: 'DESC' },
             });
 
@@ -624,8 +650,8 @@ export class PaymentsService {
             }
 
             await this.transactionRepository.update(txn.id, {
-                purchaseTime,
-                expiryTime,
+                purchaseTime: purchaseTimeDate,
+                expiryTime: expiryTimeDate,
                 amountPaid,
                 subscriptionState:
                     newSubscriptionState ?? txn.subscriptionState,
