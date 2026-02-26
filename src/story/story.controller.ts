@@ -73,8 +73,6 @@ export class StoryController {
             categoryIds = categoriesQuery.split(',').map((id) => id.trim());
         }
 
-        console.log(categoriesQuery);
-
         return this.storyService.getPromptSuggestions(categoryIds);
     }
 

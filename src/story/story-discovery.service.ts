@@ -724,6 +724,12 @@ export class StoryDiscoveryService {
             );
         }
 
+        if (categoryIds.length > 2) {
+            throw new BadRequestException(
+                'A maximum of 2 category IDs can be provided',
+            );
+        }
+
         const suggestions = await this.promptSuggestionRepo
             .createQueryBuilder('ps')
             .innerJoinAndSelect('ps.category', 'cat')
