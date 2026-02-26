@@ -21,6 +21,7 @@ import { ChapterViews } from './entities/chapter-views.entity';
 import { MediaService } from 'src/media/media.service';
 import { ImageGeneration } from './entities/image-generation.entity';
 import { ChapterUnlockService } from './chapter/chapter-unlock.service';
+import { PromptSuggestion } from './entities/prompt-suggestion.entity';
 
 @Module({
     imports: [
@@ -33,6 +34,7 @@ import { ChapterUnlockService } from './chapter/chapter-unlock.service';
             Category,
             StoryCategory,
             ImageGeneration,
+            PromptSuggestion,
         ]),
         AiModule,
         forwardRef(() => UserModule),

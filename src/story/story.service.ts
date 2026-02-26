@@ -103,4 +103,7 @@ export class StoryService {
     getTopTrendingKeywords = this.discovery.getTopTrendingKeywords.bind(
         this.discovery,
     );
+    getPromptSuggestions = this.discovery.getPromptSuggestions.bind(
+        this.discovery,
+    );
 }

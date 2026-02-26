@@ -65,6 +65,19 @@ export class StoryController {
         private readonly chapterUnlockService: ChapterUnlockService,
     ) {}
 
+    @Get('/prompt-suggestions')
+    async getPromptSuggestions(@Query('categories') categoriesQuery?: string) {
+        let categoryIds: string[] = [];
+
+        if (categoriesQuery) {
+            categoryIds = categoriesQuery.split(',').map((id) => id.trim());
+        }
+
+        console.log(categoriesQuery);
+
+        return this.storyService.getPromptSuggestions(categoryIds);
+    }
+
     @Get('trending/keywords')
     async getTrendingKeywords(): Promise<{ keyword: string; score: number }[]> {
         return this.storyService.getTopTrendingKeywords();
