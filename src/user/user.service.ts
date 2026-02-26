@@ -43,6 +43,7 @@ import { enrichStoriesToPreviewDto } from 'src/common/mappers/story-preview.mapp
 import { Chapter } from 'src/story/entities/chapter.entity';
 import { WalletDto } from './dto/wallet.dto';
 import {
+    AdInfoDto,
     RewardResponseDto,
     WatchAdsResponseDto,
     WatchAdsUnlockChapterResponseDto,
@@ -213,6 +214,151 @@ export class UserService extends BaseCrudService<User> {
             `Cannot determine subscription period from storeProductId: ${storeProductId}`,
         );
         return null;
+    }
+
+    private async checkAndResetSubscriptionCoins(
+        userId: string,
+        subscription: Transaction,
+    ): Promise<void> {
+        const now = new Date();
+
+        // Lấy thông tin cần thiết một lần
+        const lastReset =
+            subscription.lastCoinResetAt || subscription.createdAt;
+        const platform = subscription.store;
+
+        let shouldReset = false;
+        let resetPeriod: ResetPeriod | null = null;
+        let coinsToAdd = 0;
+
+        // Dispatch theo platform
+        if (platform === IapStore.ANDROID) {
+            ({ shouldReset, resetPeriod, coinsToAdd } =
+                await this.handleAndroidReset(subscription, lastReset, now));
+        } else if (platform === IapStore.IOS) {
+            ({ shouldReset, resetPeriod, coinsToAdd } =
+                await this.handleIosReset(subscription, lastReset, now));
+        } else {
+            this.logger.warn(`Unsupported platform for reset: ${platform}`);
+            return;
+        }
+
+        if (!shouldReset || !resetPeriod || coinsToAdd <= 0) {
+            return;
+        }
+
+        // Phần chung: thực hiện reset trong transaction
+        await this.dataSource.transaction(async (manager) => {
+            this.logger.log(
+                `Resetting ${coinsToAdd} coins for ${platform} subscription ` +
+                    `${subscription.id} (${resetPeriod}) user=${userId}`,
+            );
+
+            await this.addCoins({
+                manager,
+                userId,
+                amount: coinsToAdd,
+                coinType: CoinType.PERMANENT,
+                description: `${resetPeriod} subscription coin reset (${platform})`,
+                referenceType: CoinReferenceType.IAP,
+                referenceId: subscription.id,
+            });
+
+            await manager.getRepository(Transaction).update(subscription.id, {
+                lastCoinResetAt: now,
+            });
+
+            this.logger.log(
+                `Reset completed: ${coinsToAdd} coins → user ${userId}`,
+            );
+        });
+    }
+
+    // ─── Android logic ────────────────────────────────────────
+    private async handleAndroidReset(
+        sub: Transaction,
+        lastReset: Date,
+        now: Date,
+    ): Promise<{
+        shouldReset: boolean;
+        resetPeriod: ResetPeriod;
+        coinsToAdd: number;
+    }> {
+        const planId = sub.basePlanId || '';
+        let resetPeriod: ResetPeriod | null = null;
+        let shouldReset = false;
+
+        const isTest = this.enableTestSubscription;
+
+        if (isTest) {
+            const intervalMin = this.testSubscriptionIntervalMinutes || 5;
+            shouldReset = shouldResetByInterval(lastReset, now, intervalMin);
+        } else if (planId.includes('weekly')) {
+            resetPeriod = ResetPeriod.Weekly;
+            shouldReset = shouldResetWeekly(lastReset, now);
+        } else if (planId.includes('monthly')) {
+            resetPeriod = ResetPeriod.Monthly;
+            shouldReset = shouldResetMonthly(lastReset, now);
+        } else if (planId.includes('yearly')) {
+            resetPeriod = ResetPeriod.Yearly;
+            shouldReset = shouldResetYearly(lastReset, now);
+        }
+
+        let coinsToAdd = 0;
+        if (shouldReset && resetPeriod) {
+            const calc = await this.iapProductService.calculateCoinsForProduct({
+                storeProductId: sub.storeProductId,
+                basePlanId: sub.basePlanId,
+            });
+            coinsToAdd = calc.coinsToAdd;
+        }
+
+        return { shouldReset, resetPeriod, coinsToAdd };
+    }
+
+    // ─── iOS logic ────────────────────────────────────────────
+    private async handleIosReset(
+        sub: Transaction,
+        lastReset: Date,
+        now: Date,
+    ): Promise<{
+        shouldReset: boolean;
+        resetPeriod: ResetPeriod | null;
+        coinsToAdd: number;
+    }> {
+        const productId = sub.storeProductId || '';
+
+        const period = this.getIosSubscriptionPeriod(productId);
+
+        let shouldReset = false;
+        let resetPeriod: ResetPeriod | null = null;
+
+        const isTest = this.enableTestSubscription;
+
+        if (isTest) {
+            const intervalMin = this.testSubscriptionIntervalMinutes || 5;
+            shouldReset = shouldResetByInterval(lastReset, now, intervalMin);
+        } else if (period === ResetPeriod.Weekly) {
+            resetPeriod = ResetPeriod.Weekly;
+            shouldReset = shouldResetWeekly(lastReset, now);
+        } else if (period === ResetPeriod.Monthly) {
+            resetPeriod = ResetPeriod.Monthly;
+            shouldReset = shouldResetMonthly(lastReset, now);
+        } else if (period === ResetPeriod.Yearly) {
+            resetPeriod = ResetPeriod.Yearly;
+            shouldReset = shouldResetYearly(lastReset, now);
+        }
+
+        let coinsToAdd = 0;
+        if (shouldReset && resetPeriod) {
+            const calc = await this.iapProductService.calculateCoinsForProduct({
+                storeProductId: sub.storeProductId,
+                basePlanId: null,
+            });
+            coinsToAdd = calc.coinsToAdd;
+        }
+
+        return { shouldReset, resetPeriod, coinsToAdd };
     }
 
     async findByEmail(email: string): Promise<User> {
@@ -1196,148 +1342,43 @@ export class UserService extends BaseCrudService<User> {
         };
     }
 
-    private async checkAndResetSubscriptionCoins(
-        userId: string,
-        subscription: Transaction,
-    ): Promise<void> {
-        const now = new Date();
+    async getAdUnlockChapterStatus(userId: string): Promise<AdInfoDto> {
+        const today = new Date().toISOString().split('T')[0];
 
-        // Lấy thông tin cần thiết một lần
-        const lastReset =
-            subscription.lastCoinResetAt || subscription.createdAt;
-        const platform = subscription.store;
-
-        let shouldReset = false;
-        let resetPeriod: ResetPeriod | null = null;
-        let coinsToAdd = 0;
-
-        // Dispatch theo platform
-        if (platform === IapStore.ANDROID) {
-            ({ shouldReset, resetPeriod, coinsToAdd } =
-                await this.handleAndroidReset(subscription, lastReset, now));
-        } else if (platform === IapStore.IOS) {
-            ({ shouldReset, resetPeriod, coinsToAdd } =
-                await this.handleIosReset(subscription, lastReset, now));
-        } else {
-            this.logger.warn(`Unsupported platform for reset: ${platform}`);
-            return;
-        }
-
-        if (!shouldReset || !resetPeriod || coinsToAdd <= 0) {
-            return;
-        }
-
-        // Phần chung: thực hiện reset trong transaction
-        await this.dataSource.transaction(async (manager) => {
-            this.logger.log(
-                `Resetting ${coinsToAdd} coins for ${platform} subscription ` +
-                    `${subscription.id} (${resetPeriod}) user=${userId}`,
-            );
-
-            await this.addCoins({
-                manager,
+        const unlockAction = await this.userDailyActionRepo.findOne({
+            where: {
                 userId,
-                amount: coinsToAdd,
-                coinType: CoinType.PERMANENT,
-                description: `${resetPeriod} subscription coin reset (${platform})`,
-                referenceType: CoinReferenceType.IAP,
-                referenceId: subscription.id,
-            });
-
-            await manager.getRepository(Transaction).update(subscription.id, {
-                lastCoinResetAt: now,
-            });
-
-            this.logger.log(
-                `Reset completed: ${coinsToAdd} coins → user ${userId}`,
-            );
+                actionType: ActionType.WATCH_AD_UNLOCK,
+                actionDate: today,
+            },
         });
+
+        const currentViews = unlockAction?.count ?? 0;
+
+        return {
+            coinsGranted: 0,
+            currentViews,
+            maxViews: this.MAX_AD_VIEWS_UNLOCK_PER_DAY,
+        };
     }
 
-    // ─── Android logic ────────────────────────────────────────
-    private async handleAndroidReset(
-        sub: Transaction,
-        lastReset: Date,
-        now: Date,
-    ): Promise<{
-        shouldReset: boolean;
-        resetPeriod: ResetPeriod;
-        coinsToAdd: number;
-    }> {
-        const planId = sub.basePlanId || '';
-        let resetPeriod: ResetPeriod | null = null;
-        let shouldReset = false;
+    async getAdEarnCoinStatus(userId: string): Promise<AdInfoDto> {
+        const today = new Date().toISOString().split('T')[0];
 
-        const isTest = this.enableTestSubscription;
+        const coinAction = await this.userDailyActionRepo.findOne({
+            where: {
+                userId,
+                actionType: ActionType.WATCH_AD_COIN,
+                actionDate: today,
+            },
+        });
 
-        if (isTest) {
-            const intervalMin = this.testSubscriptionIntervalMinutes || 5;
-            shouldReset = shouldResetByInterval(lastReset, now, intervalMin);
-        } else if (planId.includes('weekly')) {
-            resetPeriod = ResetPeriod.Weekly;
-            shouldReset = shouldResetWeekly(lastReset, now);
-        } else if (planId.includes('monthly')) {
-            resetPeriod = ResetPeriod.Monthly;
-            shouldReset = shouldResetMonthly(lastReset, now);
-        } else if (planId.includes('yearly')) {
-            resetPeriod = ResetPeriod.Yearly;
-            shouldReset = shouldResetYearly(lastReset, now);
-        }
+        const currentViews = coinAction?.count ?? 0;
 
-        let coinsToAdd = 0;
-        if (shouldReset && resetPeriod) {
-            const calc = await this.iapProductService.calculateCoinsForProduct({
-                storeProductId: sub.storeProductId,
-                basePlanId: sub.basePlanId,
-            });
-            coinsToAdd = calc.coinsToAdd;
-        }
-
-        return { shouldReset, resetPeriod, coinsToAdd };
-    }
-
-    // ─── iOS logic ────────────────────────────────────────────
-    private async handleIosReset(
-        sub: Transaction,
-        lastReset: Date,
-        now: Date,
-    ): Promise<{
-        shouldReset: boolean;
-        resetPeriod: ResetPeriod | null;
-        coinsToAdd: number;
-    }> {
-        const productId = sub.storeProductId || '';
-
-        const period = this.getIosSubscriptionPeriod(productId);
-
-        let shouldReset = false;
-        let resetPeriod: ResetPeriod | null = null;
-
-        const isTest = this.enableTestSubscription;
-
-        if (isTest) {
-            const intervalMin = this.testSubscriptionIntervalMinutes || 5;
-            shouldReset = shouldResetByInterval(lastReset, now, intervalMin);
-        } else if (period === ResetPeriod.Weekly) {
-            resetPeriod = ResetPeriod.Weekly;
-            shouldReset = shouldResetWeekly(lastReset, now);
-        } else if (period === ResetPeriod.Monthly) {
-            resetPeriod = ResetPeriod.Monthly;
-            shouldReset = shouldResetMonthly(lastReset, now);
-        } else if (period === ResetPeriod.Yearly) {
-            resetPeriod = ResetPeriod.Yearly;
-            shouldReset = shouldResetYearly(lastReset, now);
-        }
-
-        let coinsToAdd = 0;
-        if (shouldReset && resetPeriod) {
-            const calc = await this.iapProductService.calculateCoinsForProduct({
-                storeProductId: sub.storeProductId,
-                basePlanId: null,
-            });
-            coinsToAdd = calc.coinsToAdd;
-        }
-
-        return { shouldReset, resetPeriod, coinsToAdd };
+        return {
+            coinsGranted: this.AD_REWARD_COINS,
+            currentViews,
+            maxViews: this.MAX_AD_VIEWS_COIN_PER_DAY,
+        };
     }
 }
