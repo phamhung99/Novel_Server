@@ -8,6 +8,8 @@
     "scripts": {
         "build": "nest build",
         "build:webpack": "webpack --config webpack.config.js",
+        "build:lambda": "nest build && cp -r dist app/ && cd app && zip -r ../app.zip . && cd ..",
+        "clean:lambda": "rm -rf app app.zip",
         "start:lambda": "sls offline start",
         "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
         "start": "nest start",
