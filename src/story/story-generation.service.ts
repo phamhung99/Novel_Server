@@ -238,7 +238,13 @@ export class StoryGenerationService {
         const exists = await this.storyGenerationRepository.findOne({
             where: { requestId },
         });
-        if (exists) throw new BadRequestException('Duplicate request');
+
+        if (exists) {
+            this.logger.warn(
+                `Duplicate initialization request with requestId ${requestId}`,
+            );
+            throw new BadRequestException('Duplicate request');
+        }
 
         const storyGeneration = this.storyGenerationRepository.create({
             requestId,
@@ -261,6 +267,7 @@ export class StoryGenerationService {
                 storyPrompt: dto.storyPrompt,
                 numberOfChapters: dto.numberOfChapters,
             },
+            attempts: 1,
         });
 
         this.logger.log(
@@ -270,7 +277,8 @@ export class StoryGenerationService {
         const savedStoryGeneration =
             await this.storyGenerationRepository.save(storyGeneration);
 
-        let response: any = null;
+        let rawResponse: any = null;
+        let outlineData: any = null;
         try {
             if (!userId) {
                 throw new Error('userId is required');
@@ -284,28 +292,98 @@ export class StoryGenerationService {
             if (dto.storyPrompt.trim().length === 0) {
                 throw new Error('Story prompt cannot be empty');
             }
+        } catch (error) {
+            console.error('Error initializing story:', error);
 
-            const sanitizedPrompt = this.sanitizePrompt(dto.storyPrompt || '');
-            this.ensurePromptAllowed(sanitizedPrompt);
+            await this.storyGenerationRepository.update(
+                { id: savedStoryGeneration.id },
+                {
+                    status: GenerationStatus.FAILED,
+                    errorMessage:
+                        error.message ||
+                        'Failed to initialize story after retries',
+                    response: rawResponse,
+                },
+            );
 
-            const outlineResponse =
-                await this.storyGenerationApiService.generateStoryOutline({
-                    storyPrompt: sanitizedPrompt,
-                    genres: dto.genres,
-                    numberOfChapters: dto.numberOfChapters,
-                    aiProvider: dto.aiProvider || DEFAULT_AI_PROVIDER,
-                });
+            throw new HttpException(
+                {
+                    statusCode: HttpStatus.BAD_REQUEST,
+                    message: error.message || 'Story initialization failed',
+                    error: 'Story initialization failed',
+                },
+                HttpStatus.BAD_REQUEST,
+            );
+        }
 
-            response = outlineResponse.outline;
+        const sanitizedPrompt = this.sanitizePrompt(dto.storyPrompt || '');
+        this.ensurePromptAllowed(sanitizedPrompt);
+
+        // retry logic
+        const MAX_ATTEMPTS = 2;
+        let attempt = 1;
+        let lastError: any = null;
+
+        while (attempt <= MAX_ATTEMPTS) {
+            try {
+                outlineData =
+                    await this.storyGenerationApiService.generateStoryOutline({
+                        storyPrompt: sanitizedPrompt,
+                        genres: dto.genres,
+                        numberOfChapters: dto.numberOfChapters,
+                        aiProvider: dto.aiProvider || DEFAULT_AI_PROVIDER,
+                    });
+
+                rawResponse = outlineData.outline;
+                break;
+            } catch (err: unknown) {
+                lastError = err;
+                const errMsg = err instanceof Error ? err.message : String(err);
+
+                this.logger.warn(
+                    `Attempt ${attempt}/${MAX_ATTEMPTS} failed: ${errMsg}`,
+                );
+
+                if (attempt < MAX_ATTEMPTS) {
+                    attempt++;
+                    await this.storyGenerationRepository.update(
+                        { id: savedStoryGeneration.id },
+                        {
+                            attempts: attempt,
+                            retryDetails: {
+                                ...(savedStoryGeneration.retryDetails || {}),
+                                [`attempt_${attempt}`]: {
+                                    timestamp: new Date().toISOString(),
+                                    error: errMsg,
+                                    rawResponse,
+                                },
+                            },
+                        },
+                    );
+
+                    continue;
+                } else {
+                    break;
+                }
+            }
+        }
+
+        try {
+            if (!outlineData) {
+                throw (
+                    lastError ||
+                    new Error('Failed to generate story outline after retries')
+                );
+            }
 
             const storyCategoryEntities = await this.buildStoryCategories(
-                outlineResponse.storyContext?.meta,
+                outlineData.storyContext?.meta,
                 dto.genres,
             );
 
             const story = this.storyRepository.create({
-                title: outlineResponse.title,
-                synopsis: outlineResponse.synopsis,
+                title: outlineData.title,
+                synopsis: outlineData.synopsis,
                 authorId: userId,
             });
 
@@ -324,13 +402,13 @@ export class StoryGenerationService {
                 { id: savedStoryGeneration.id },
                 {
                     storyId: savedStory.id,
-                    title: outlineResponse.title,
-                    synopsis: outlineResponse.synopsis,
+                    title: outlineData.title,
+                    synopsis: outlineData.synopsis,
                     metadata: {
-                        coverImage: outlineResponse.coverImage,
-                        storyContext: outlineResponse.storyContext,
+                        coverImage: outlineData.coverImage,
+                        storyContext: outlineData.storyContext,
                     } as any,
-                    response,
+                    response: rawResponse,
                     status: GenerationStatus.COMPLETED,
                 },
             );
@@ -349,8 +427,9 @@ export class StoryGenerationService {
                 { id: savedStoryGeneration.id },
                 {
                     status: GenerationStatus.FAILED,
-                    errorMessage: error.message || 'Failed to initialize story',
-                    response,
+                    errorMessage:
+                        error.message ||
+                        'Failed to initialize story after retries',
                 },
             );
 
