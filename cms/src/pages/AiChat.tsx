@@ -41,13 +41,53 @@ type AiProvider = 'grok' | 'gpt' | 'gemini';
 interface AiSettings {
     systemPrompt: string;
     aiProvider: AiProvider;
+    model: string;
     maxTokens: number;
 }
 
 const DEFAULT_SETTINGS: AiSettings = {
     systemPrompt: 'You are a helpful AI assistant.',
     aiProvider: 'gemini',
+    model: 'gemini-2.5-flash',
     maxTokens: 2048,
+};
+
+const MODEL_OPTIONS: Record<AiProvider, { value: string; label: string }[]> = {
+    gemini: [
+        {
+            value: 'gemini-3.1-pro-preview',
+            label: 'Gemini 3.1 Pro (latest flagship)',
+        },
+        {
+            value: 'gemini-3-flash-preview',
+            label: 'Gemini 3 Flash (previous gen fast)',
+        },
+        {
+            value: 'gemini-2.5-pro',
+            label: 'Gemini 2.5 Pro (older flagship)',
+        },
+        { value: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash (older stable)' },
+    ],
+    gpt: [
+        { value: 'gpt-5-nano', label: 'GPT-5 nano (fastest & cheapest)' },
+        {
+            value: 'gpt-5.2',
+            label: 'GPT-5.2 (latest frontier, best for coding & agentic)',
+        },
+        { value: 'gpt-5-mini', label: 'GPT-5 mini (faster, cost-efficient)' },
+    ],
+    grok: [
+        {
+            value: 'grok-4-1-fast-reasoning',
+            label: 'Grok 4.1 Fast (latest, reasoning + agentic)',
+        },
+        {
+            value: 'grok-4-1-fast-non-reasoning',
+            label: 'Grok 4.1 Fast Non-Reasoning (faster variant)',
+        },
+        { value: 'grok-4', label: 'Grok 4 (previous flagship)' },
+        { value: 'grok-4-fast', label: 'Grok 4 Fast (optimized speed)' },
+    ],
 };
 
 export default function AiChat() {
@@ -403,13 +443,19 @@ export default function AiChat() {
                             <Select
                                 value={settings.aiProvider}
                                 label="AI Provider"
-                                onChange={(e) =>
+                                onChange={(e) => {
+                                    const newProvider = e.target
+                                        .value as AiProvider;
+                                    // Reset model to a valid default when provider changes
+                                    const defaultModel =
+                                        MODEL_OPTIONS[newProvider][0]?.value ||
+                                        '';
                                     setSettings((prev) => ({
                                         ...prev,
-                                        aiProvider: e.target
-                                            .value as AiProvider,
-                                    }))
-                                }
+                                        aiProvider: newProvider,
+                                        model: defaultModel,
+                                    }));
+                                }}
                             >
                                 <MenuItem value="gemini">Gemini</MenuItem>
                                 <MenuItem value="gpt">
@@ -419,6 +465,36 @@ export default function AiChat() {
                             </Select>
                         </FormControl>
                     </ListItem>
+
+                    {/* Model – only shown if there are options */}
+                    {MODEL_OPTIONS[settings.aiProvider]?.length > 0 && (
+                        <ListItem disableGutters sx={{ mt: 3 }}>
+                            <FormControl fullWidth size="small">
+                                <InputLabel>Model</InputLabel>
+                                <Select
+                                    value={settings.model}
+                                    label="Model"
+                                    onChange={(e) =>
+                                        setSettings((prev) => ({
+                                            ...prev,
+                                            model: e.target.value as string,
+                                        }))
+                                    }
+                                >
+                                    {MODEL_OPTIONS[settings.aiProvider].map(
+                                        (opt) => (
+                                            <MenuItem
+                                                key={opt.value}
+                                                value={opt.value}
+                                            >
+                                                {opt.label}
+                                            </MenuItem>
+                                        ),
+                                    )}
+                                </Select>
+                            </FormControl>
+                        </ListItem>
+                    )}
 
                     {/* Max Tokens */}
                     <ListItem disableGutters sx={{ mt: 3 }}>
@@ -435,7 +511,7 @@ export default function AiChat() {
                                     }))
                                 }
                                 min={256}
-                                max={20000}
+                                max={32000} // ← you can increase depending on models
                                 step={256}
                                 marks
                                 valueLabelDisplay="auto"

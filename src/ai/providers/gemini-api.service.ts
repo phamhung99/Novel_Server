@@ -35,6 +35,8 @@ export class GeminiApiService implements IStoryGenerationProvider {
 
     async generateContent(dto: GenerateRawContentDto): Promise<string> {
         try {
+            let model = this.modelName;
+
             const requestBody: any = {
                 contents: [{ role: 'user', parts: [{ text: dto.prompt }] }],
                 generationConfig: {
@@ -56,9 +58,13 @@ export class GeminiApiService implements IStoryGenerationProvider {
                     dto.responseSchema;
             }
 
+            if (dto.model) {
+                model = dto.model;
+            }
+
             // URL đúng format
             const response = await this.client.post(
-                `/models/${this.modelName}:generateContent?key=${this.apiKey}`,
+                `/models/${model}:generateContent?key=${this.apiKey}`,
                 requestBody,
             );
 
