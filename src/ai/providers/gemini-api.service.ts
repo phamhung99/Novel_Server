@@ -19,6 +19,7 @@ export class GeminiApiService implements IStoryGenerationProvider {
     private readonly geminiImageModels = new Set([
         'gemini-2.5-flash-image',
         'gemini-3-pro-image-preview',
+        'gemini-3.1-flash-image-preview',
     ]);
     private readonly providerName = 'gemini';
 

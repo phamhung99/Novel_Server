@@ -755,7 +755,7 @@ export class StoryGenerationService {
             );
         }
 
-        if (!story.generation) {
+        if (!story.generation && !prompt) {
             throw new BadRequestException(
                 'This story has no generation record',
             );
