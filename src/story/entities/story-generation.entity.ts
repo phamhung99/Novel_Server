@@ -82,6 +82,9 @@ export class StoryGeneration {
     @Column({ name: 'retry_details', type: 'jsonb', nullable: true })
     retryDetails: Record<string, any>;
 
+    @Column({ name: 'last_attempt_at', type: 'timestamptz', nullable: true })
+    lastAttemptAt: Date;
+
     @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
     createdAt: Date;
 

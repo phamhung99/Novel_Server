@@ -345,7 +345,6 @@ export class StoryGenerationService {
                 );
 
                 if (attempt < MAX_ATTEMPTS) {
-                    attempt++;
                     await this.storyGenerationRepository.update(
                         { id: savedStoryGeneration.id },
                         {
@@ -358,9 +357,11 @@ export class StoryGenerationService {
                                     rawResponse,
                                 },
                             },
+                            lastAttemptAt: new Date(),
                         },
                     );
 
+                    attempt++;
                     continue;
                 } else {
                     break;
