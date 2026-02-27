@@ -292,84 +292,67 @@ export class StoryGenerationService {
             if (dto.storyPrompt.trim().length === 0) {
                 throw new Error('Story prompt cannot be empty');
             }
-        } catch (error) {
-            console.error('Error initializing story:', error);
 
-            await this.storyGenerationRepository.update(
-                { id: savedStoryGeneration.id },
-                {
-                    status: GenerationStatus.FAILED,
-                    errorMessage:
-                        error.message ||
-                        'Failed to initialize story after retries',
-                    response: rawResponse,
-                },
-            );
+            const sanitizedPrompt = this.sanitizePrompt(dto.storyPrompt || '');
+            this.ensurePromptAllowed(sanitizedPrompt);
 
-            throw new HttpException(
-                {
-                    statusCode: HttpStatus.BAD_REQUEST,
-                    message: error.message || 'Story initialization failed',
-                    error: 'Story initialization failed',
-                },
-                HttpStatus.BAD_REQUEST,
-            );
-        }
+            // retry logic
+            const MAX_ATTEMPTS = 2;
+            let attempt = 1;
+            let lastError: any = null;
 
-        const sanitizedPrompt = this.sanitizePrompt(dto.storyPrompt || '');
-        this.ensurePromptAllowed(sanitizedPrompt);
-
-        // retry logic
-        const MAX_ATTEMPTS = 2;
-        let attempt = 1;
-        let lastError: any = null;
-
-        while (attempt <= MAX_ATTEMPTS) {
-            try {
-                outlineData =
-                    await this.storyGenerationApiService.generateStoryOutline({
-                        storyPrompt: sanitizedPrompt,
-                        genres: dto.genres,
-                        numberOfChapters: dto.numberOfChapters,
-                        aiProvider: dto.aiProvider || DEFAULT_AI_PROVIDER,
-                    });
-
-                rawResponse = outlineData.outline;
-                break;
-            } catch (err: unknown) {
-                lastError = err;
-                const errMsg = err instanceof Error ? err.message : String(err);
-
-                this.logger.warn(
-                    `Attempt ${attempt}/${MAX_ATTEMPTS} failed: ${errMsg}`,
-                );
-
-                if (attempt < MAX_ATTEMPTS) {
-                    await this.storyGenerationRepository.update(
-                        { id: savedStoryGeneration.id },
-                        {
-                            attempts: attempt,
-                            retryDetails: {
-                                ...(savedStoryGeneration.retryDetails || {}),
-                                [`attempt_${attempt}`]: {
-                                    timestamp: new Date().toISOString(),
-                                    error: errMsg,
-                                    rawResponse,
-                                },
+            while (attempt <= MAX_ATTEMPTS) {
+                try {
+                    outlineData =
+                        await this.storyGenerationApiService.generateStoryOutline(
+                            {
+                                storyPrompt: sanitizedPrompt,
+                                genres: dto.genres,
+                                numberOfChapters: dto.numberOfChapters,
+                                aiProvider:
+                                    dto.aiProvider || DEFAULT_AI_PROVIDER,
                             },
-                            lastAttemptAt: new Date(),
-                        },
+                        );
+
+                    rawResponse = outlineData.outline;
+                    break;
+                } catch (err: unknown) {
+                    lastError = err;
+                    const errMsg =
+                        err instanceof Error ? err.message : String(err);
+
+                    this.logger.warn(
+                        `Attempt ${attempt}/${MAX_ATTEMPTS} failed: ${errMsg}`,
                     );
 
-                    attempt++;
-                    continue;
-                } else {
-                    break;
+                    if (attempt < MAX_ATTEMPTS) {
+                        await this.storyGenerationRepository.update(
+                            { id: savedStoryGeneration.id },
+                            {
+                                attempts: attempt,
+                                retryDetails: {
+                                    ...(savedStoryGeneration.retryDetails ||
+                                        {}),
+                                    [`attempt_${attempt}`]: {
+                                        timestamp: new Date().toISOString(),
+                                        error: errMsg,
+                                        rawResponse,
+                                    },
+                                },
+                                lastAttemptAt: new Date(),
+                            },
+                        );
+
+                        attempt++;
+                        continue;
+                    } else {
+                        throw (
+                            lastError || new Error('Failed after max retries')
+                        );
+                    }
                 }
             }
-        }
 
-        try {
             if (!outlineData) {
                 throw (
                     lastError ||
@@ -452,7 +435,7 @@ export class StoryGenerationService {
     ): Promise<GenerateChapterResponseDto | any> {
         let savedPreGen: any = null;
 
-        let response: any = null;
+        let rawResponse: any = null;
 
         try {
             this.logger.log(
@@ -519,7 +502,11 @@ export class StoryGenerationService {
             }
             const totalChapters = storyGeneration.prompt.numberOfChapters;
 
-            let chapterStructureResponse: any = null;
+            if (chapterNumber > totalChapters) {
+                throw new BadRequestException(
+                    'All chapters have already been generated.',
+                );
+            }
 
             const storyMetadata = JSON.stringify(
                 storyGeneration.metadata?.storyContext ?? '',
@@ -527,34 +514,75 @@ export class StoryGenerationService {
 
             const storyPrompt = storyGeneration.prompt.storyPrompt || '';
 
-            if (isFirstChapter) {
-                chapterStructureResponse =
-                    await this.storyGenerationApiService.generateFirstChapter({
-                        storyId,
-                        chapterNumber,
-                        aiProvider: storyGeneration.aiProvider,
-                        storyMetadata,
-                    });
-            } else if (chapterNumber > 1 && chapterNumber <= totalChapters) {
-                chapterStructureResponse =
-                    await this.storyGenerationApiService.generateRemainChapters(
-                        {
-                            storyId,
-                            chapterNumber,
-                            aiProvider: storyGeneration.aiProvider,
-                            direction: dto.direction || '',
-                            storyMetadata,
-                            previousChapterMetadata,
-                            storyPrompt: storyPrompt,
-                        },
-                    );
-            } else {
-                throw new BadRequestException(
-                    'All chapters have already been generated.',
-                );
-            }
+            // retry logic
+            const MAX_ATTEMPTS = 2;
+            let attempt = 1;
+            let lastError: any = null;
+            let chapterStructureResponse: any = null;
 
-            response = chapterStructureResponse.raw;
+            while (attempt <= MAX_ATTEMPTS) {
+                try {
+                    if (isFirstChapter) {
+                        chapterStructureResponse =
+                            await this.storyGenerationApiService.generateFirstChapter(
+                                {
+                                    storyId,
+                                    chapterNumber,
+                                    aiProvider: storyGeneration.aiProvider,
+                                    storyMetadata,
+                                },
+                            );
+                    } else {
+                        chapterStructureResponse =
+                            await this.storyGenerationApiService.generateRemainChapters(
+                                {
+                                    storyId,
+                                    chapterNumber,
+                                    aiProvider: storyGeneration.aiProvider,
+                                    direction: dto.direction || '',
+                                    storyMetadata,
+                                    previousChapterMetadata,
+                                    storyPrompt: storyPrompt,
+                                },
+                            );
+                    }
+
+                    rawResponse = chapterStructureResponse.raw;
+                    break;
+                } catch (err: unknown) {
+                    lastError = err;
+                    const errMsg =
+                        err instanceof Error ? err.message : String(err);
+
+                    this.logger.warn(
+                        `Chapter generation attempt ${attempt}/${MAX_ATTEMPTS} failed: ${errMsg}`,
+                    );
+
+                    if (attempt < MAX_ATTEMPTS) {
+                        attempt++;
+                        await this.chapterGenerationRepository.update(
+                            { id: savedPreGen.id },
+                            {
+                                attempts: attempt,
+                                retryDetails: {
+                                    ...(savedPreGen.retryDetails || {}),
+                                    [`attempt_${attempt}`]: {
+                                        timestamp: new Date().toISOString(),
+                                        error: errMsg,
+                                        rawResponse,
+                                    },
+                                },
+                            },
+                        );
+                        continue;
+                    } else {
+                        // hết retry vẫn fail
+                        throw (
+                            lastError || new Error('Failed after max retries')
+                        );
+                    }
+                }
+            }
 
             if (
                 !chapterStructureResponse ||
@@ -569,16 +597,22 @@ export class StoryGenerationService {
 
             // Generate chapter summary every 5 chapters
             if (chapterNumber % 5 === 0) {
-                chapterStructureResponse.structure.chapterSummary =
-                    await this.storyGenerationApiService.generateChapterSummary(
-                        {
-                            storyId,
-                            aiProvider: storyGeneration.aiProvider,
-                            chapterSummary:
-                                chapterStructureResponse.structure.summary,
-                            storyMetadata,
-                        },
+                try {
+                    chapterStructureResponse.structure.chapterSummary =
+                        await this.storyGenerationApiService.generateChapterSummary(
+                            {
+                                storyId,
+                                aiProvider: storyGeneration.aiProvider,
+                                chapterSummary:
+                                    chapterStructureResponse.structure.summary,
+                                storyMetadata,
+                            },
+                        );
+                } catch (summaryErr) {
+                    this.logger.warn(
+                        `Failed to generate chapter summary: ${summaryErr}.`,
                     );
+                }
             }
 
             const chapter = this.chapterRepository.create({
@@ -597,7 +631,7 @@ export class StoryGenerationService {
                     chapterId: savedChapter.id,
                     generatedContent: chapterStructureResponse.content,
                     structure: chapterStructureResponse.structure as any,
-                    response,
+                    response: rawResponse,
                     storyGenerationId: storyGeneration.id,
                     chapterNumber,
                     status: GenerationStatus.COMPLETED,
@@ -626,7 +660,7 @@ export class StoryGenerationService {
                                 ? error.message
                                 : 'Failed to generate chapter',
                         status: GenerationStatus.FAILED,
-                        response,
+                        response: rawResponse,
                     },
                 );
             }
@@ -974,16 +1008,51 @@ export class StoryGenerationService {
             }
 
             let tempImageUrl: string;
-            try {
-                tempImageUrl =
-                    await this.storyGenerationApiService.generateCoverImage(
-                        finalPrompt,
-                        model,
+
+            // retry logic
+            const MAX_ATTEMPTS = 2;
+            let attempt = 1;
+            let lastError: any = null;
+
+            while (attempt <= MAX_ATTEMPTS) {
+                try {
+                    tempImageUrl =
+                        await this.storyGenerationApiService.generateCoverImage(
+                            finalPrompt,
+                            model,
+                        );
+                    break;
+                } catch (err) {
+                    lastError = err;
+                    const errMsg =
+                        err instanceof Error ? err.message : String(err);
+
+                    this.logger.warn(
+                        `Cover image generation attempt ${attempt}/${MAX_ATTEMPTS} failed: ${errMsg}`,
                     );
-            } catch (err) {
-                throw new BadRequestException(
-                    `Failed to generate image: ${err.message}`,
-                );
+
+                    if (attempt < MAX_ATTEMPTS) {
+                        attempt++;
+                        await this.imageGenerationRepository.update(
+                            { id: imageGenRecord.id },
+                            {
+                                attempts: attempt,
+                                retryDetails: {
+                                    ...(imageGenRecord.retryDetails || {}),
+                                    [`attempt_${attempt}`]: {
+                                        timestamp: new Date().toISOString(),
+                                        error: errMsg,
+                                    },
+                                },
+                            },
+                        );
+                        continue;
+                    } else {
+                        throw (
+                            lastError || new Error('Failed after max retries')
+                        );
+                    }
+                }
             }
 
             let newCoverImageKey: string | null = null;
