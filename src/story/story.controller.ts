@@ -65,6 +65,17 @@ export class StoryController {
         private readonly chapterUnlockService: ChapterUnlockService,
     ) {}
 
+    @Get('/prompt-suggestions')
+    async getPromptSuggestions(@Query('categories') categoriesQuery?: string) {
+        let categoryIds: string[] = [];
+
+        if (categoriesQuery) {
+            categoryIds = categoriesQuery.split(',').map((id) => id.trim());
+        }
+
+        return this.storyService.getPromptSuggestions(categoryIds);
+    }
+
     @Get('trending/keywords')
     async getTrendingKeywords(): Promise<{ keyword: string; score: number }[]> {
         return this.storyService.getTopTrendingKeywords();
@@ -618,7 +629,7 @@ export class StoryController {
             throw new BadRequestException('Chapter index is required');
         }
 
-        return this.chapterUnlockService.unlockChapter({
+        return this.chapterUnlockService.unlockChapterWithCoin({
             userId,
             index,
             storyId,

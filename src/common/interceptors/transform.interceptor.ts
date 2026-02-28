@@ -25,13 +25,29 @@ export class TransformInterceptor<T> implements NestInterceptor<T, any> {
         }
 
         return next.handle().pipe(
-            map((data) => {
-                if (data && data.status && (data.data || data.message)) {
-                    return data;
+            map((responseData) => {
+                if (
+                    responseData &&
+                    typeof responseData === 'object' &&
+                    'success' in responseData
+                ) {
+                    return responseData;
                 }
 
+                const request = context.switchToHttp().getRequest();
+                const method = request.method;
+
+                let defaultMessage = 'Operation completed';
+                if (method === 'POST') defaultMessage = 'Created successfully';
+                if (method === 'PUT' || method === 'PATCH')
+                    defaultMessage = 'Updated successfully';
+                if (method === 'DELETE')
+                    defaultMessage = 'Deleted successfully';
+
                 return {
-                    data,
+                    success: true,
+                    message: defaultMessage,
+                    data: responseData ?? null,
                 };
             }),
         );

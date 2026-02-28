@@ -7,7 +7,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Chapter } from '../entities/chapter.entity';
-import { DataSource, Repository } from 'typeorm';
+import { DataSource, EntityManager, Repository } from 'typeorm';
 import { Story } from '../entities/story.entity';
 import { UserService } from 'src/user/user.service';
 import { StoryPreviewChapterDto } from '../dto/story-preview.dto';
@@ -310,7 +310,7 @@ export class ChapterUnlockService {
         });
     }
 
-    async unlockChapter({
+    async unlockChapterWithCoin({
         userId,
         storyId,
         index,
@@ -383,5 +383,72 @@ export class ChapterUnlockService {
                 },
             };
         });
+    }
+
+    async unlockChapterWithAds({
+        userId,
+        chapterId,
+        manager,
+    }: {
+        userId: string;
+        chapterId?: string;
+        storyId?: string;
+        index?: string | number;
+        manager?: EntityManager;
+    }): Promise<{
+        success: boolean;
+        message: string;
+        data?: Partial<StoryPreviewChapterDto>;
+    }> {
+        // Validate input
+        if (!chapterId) {
+            throw new BadRequestException('Chapter ID is required');
+        }
+
+        const execute = async (tx: EntityManager) => {
+            // Check access
+            const accessCheck = await this.canUserAccessChapter(
+                userId,
+                chapterId,
+            );
+
+            if (!accessCheck.chapter) {
+                return {
+                    success: false,
+                    message: accessCheck.reason || 'Chapter or story not found',
+                };
+            }
+
+            if (accessCheck.canAccess) {
+                return {
+                    success: false,
+                    message: 'Chapter is already accessible',
+                };
+            }
+
+            // Unlock chapter without spending coins
+            const chapter = accessCheck.chapter;
+
+            await tx.getRepository(ChapterState).save({
+                userId,
+                chapterId: chapter.id,
+                unlockedAt: new Date(),
+            });
+
+            return {
+                success: true,
+                message: `Chapter unlocked successfully by watching ad.`,
+                data: {
+                    id: chapter.id,
+                    index: chapter.index,
+                    title: chapter.title,
+                    isLock: false,
+                },
+            };
+        };
+
+        return manager
+            ? execute(manager)
+            : this.dataSource.transaction(execute);
     }
 }

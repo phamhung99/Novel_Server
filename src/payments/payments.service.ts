@@ -11,15 +11,21 @@ import {
     CoinType,
     IapProductType,
     IapStore,
-    NotificationType,
+    GoogleSubscriptionNotificationType,
     SUBSCRIPTION_STATUS,
     TransactionStatus,
+    AppleNotificationType,
+    AppleRenewalStatusSubtype,
 } from 'src/common/enums/app.enum';
 import { Transaction } from './entities/transaction.entity';
 import { IapProductService } from './iap-product.service';
 import { VerifyPurchaseResponseDto } from './dto/verify-purchase.response.dto';
 import { VerifyPurchaseParamsDto } from './dto/verify-purchase.dto';
-import { AppStoreService } from 'src/app-store/app-store.service';
+import {
+    AppStoreService,
+    ParsedTransactionData,
+} from 'src/app-store/app-store.service';
+import { toDate } from 'src/common/utils/date.utils';
 
 @Injectable()
 export class PaymentsService {
@@ -70,7 +76,13 @@ export class PaymentsService {
         }
 
         if (platform === IapStore.IOS) {
-            return this.verifyAppStorePurchase(userId, receipt, type, user);
+            return this.verifyAppStorePurchase(
+                userId,
+                receipt,
+                type,
+                user,
+                params.xcodeTest,
+            );
         }
 
         throw new BadRequestException(`Unsupported platform: ${platform}`);
@@ -159,17 +171,18 @@ export class PaymentsService {
 
     private async verifyAppStorePurchase(
         userId: string,
-        receipt: string, // BÂY GIỜ là signedTransaction JWS string (từ client gửi lên)
+        receipt: string,
         type: IapProductType,
         user: any,
+        isXcodeTest?: boolean,
     ): Promise<VerifyPurchaseResponseDto> {
         let appleData: any;
-        let parsed: any;
+        let parsed: ParsedTransactionData;
 
         try {
             const { decoded } = await this.appStoreService.verifyTransaction(
                 receipt,
-                type,
+                isXcodeTest,
             );
 
             appleData = decoded;
@@ -186,11 +199,12 @@ export class PaymentsService {
 
         const {
             storeProductId,
-            originalTransactionId,
+            orderId,
             purchaseTime,
             currency,
             expiryTime,
             amountPaid,
+            originalTransactionId,
         } = parsed;
 
         const purchaseTimeDate = purchaseTime ? new Date(purchaseTime) : null;
@@ -203,12 +217,13 @@ export class PaymentsService {
             platform: IapStore.IOS,
             storeProductId,
             basePlanId: null,
-            orderId: originalTransactionId || receipt.substring(0, 50), // hoặc dùng transactionId
+            orderId: orderId,
+            originalTransactionId: originalTransactionId,
             purchaseTime: purchaseTimeDate,
             currency,
             expiryTime: expiryTimeDate,
             amountPaid,
-            applePayload: appleData, // decoded JWSTransactionDecodedPayload
+            applePayload: appleData,
             type,
         });
     }
@@ -221,6 +236,7 @@ export class PaymentsService {
         storeProductId: string;
         basePlanId: string | null;
         orderId: string;
+        originalTransactionId?: string | null;
         purchaseTime: Date | null;
         currency: string;
         expiryTime?: Date | null;
@@ -236,6 +252,7 @@ export class PaymentsService {
             storeProductId,
             basePlanId,
             orderId,
+            originalTransactionId,
             purchaseTime,
             currency,
             expiryTime,
@@ -252,9 +269,28 @@ export class PaymentsService {
 
         try {
             // 1. Check trùng token
-            const existingTx = await queryRunner.manager.findOne(Transaction, {
-                where: { receipt },
-            });
+            let existingTx: Transaction;
+
+            if (platform === IapStore.IOS) {
+                existingTx = await queryRunner.manager.findOne(Transaction, {
+                    where: {
+                        originalTransactionId,
+                        storeProductId: storeProductId,
+                        orderId: orderId,
+                    },
+                });
+            } else if (platform === IapStore.ANDROID) {
+                existingTx = await queryRunner.manager.findOne(Transaction, {
+                    where: { receipt },
+                });
+            } else {
+                this.logger.error(
+                    `Unsupported platform for transaction check: ${platform}`,
+                );
+                throw new BadRequestException(
+                    'Unsupported platform for transaction check',
+                );
+            }
 
             if (existingTx) {
                 if (existingTx.userId !== userId) {
@@ -301,6 +337,7 @@ export class PaymentsService {
             const transaction = this.transactionRepository.create({
                 userId,
                 orderId,
+                originalTransactionId,
                 storeProductId,
                 basePlanId,
                 subscriptionState:
@@ -362,10 +399,8 @@ export class PaymentsService {
             };
         } catch (err: any) {
             await queryRunner.rollbackTransaction();
-            this.logger.error(
-                `Purchase processing failed: ${err.message}`,
-                err.stack,
-            );
+            console.log(err);
+            this.logger.error(`Purchase processing failed: ${err}`, err.stack);
             throw new BadRequestException(
                 `${ERROR_MESSAGES.SUBSCRIPTION_VERIFICATION_FAILED} - ${err.message}`,
             );
@@ -417,35 +452,35 @@ export class PaymentsService {
             let newStatus = txn.status;
 
             switch (notificationType) {
-                case NotificationType.RENEWED:
-                case NotificationType.RECOVERED:
-                case NotificationType.RESTARTED:
+                case GoogleSubscriptionNotificationType.RENEWED:
+                case GoogleSubscriptionNotificationType.RECOVERED:
+                case GoogleSubscriptionNotificationType.RESTARTED:
                     newSubscriptionState =
                         SUBSCRIPTION_STATUS.SUBSCRIPTION_STATE_ACTIVE;
                     newStatus = TransactionStatus.ACTIVE;
                     break;
-                case NotificationType.CANCELED:
+                case GoogleSubscriptionNotificationType.CANCELED:
                     newSubscriptionState =
                         SUBSCRIPTION_STATUS.SUBSCRIPTION_STATE_CANCELED;
                     break;
-                case NotificationType.EXPIRED:
+                case GoogleSubscriptionNotificationType.EXPIRED:
                     newSubscriptionState =
                         SUBSCRIPTION_STATUS.SUBSCRIPTION_STATE_EXPIRED;
                     newStatus = TransactionStatus.EXPIRED;
                     break;
 
-                case NotificationType.REVOKED:
+                case GoogleSubscriptionNotificationType.REVOKED:
                     newSubscriptionState =
                         SUBSCRIPTION_STATUS.SUBSCRIPTION_STATE_REVOKED;
                     newStatus = TransactionStatus.EXPIRED;
                     break;
 
-                case NotificationType.ON_HOLD:
+                case GoogleSubscriptionNotificationType.ON_HOLD:
                     newSubscriptionState =
                         SUBSCRIPTION_STATUS.SUBSCRIPTION_STATE_ON_HOLD;
                     break;
 
-                case NotificationType.IN_GRACE_PERIOD:
+                case GoogleSubscriptionNotificationType.IN_GRACE_PERIOD:
                     newSubscriptionState =
                         SUBSCRIPTION_STATUS.SUBSCRIPTION_STATE_IN_GRACE_PERIOD;
                     break;
@@ -479,6 +514,159 @@ export class PaymentsService {
             this.logger.error('RTDN processing failed', e);
             throw new BadRequestException(
                 `RTDN processing failed: ${e.message}`,
+            );
+        }
+    }
+
+    async handleAppStoreWebhook(body: any) {
+        try {
+            // App Store sends signedPayload in the request body
+            const { signedPayload } = body;
+
+            if (!signedPayload) {
+                this.logger.warn('No signedPayload in App Store notification');
+                return;
+            }
+
+            console.log(
+                'Received App Store notification with payload:',
+                signedPayload,
+            );
+
+            // Verify and decode the notification
+            const { decoded } =
+                await this.appStoreService.verifyNotification(signedPayload);
+
+            const { notificationType, subtype, data } = decoded;
+
+            this.logger.log(
+                `App Store notification: type=${notificationType}, subtype=${subtype}`,
+            );
+
+            // Extract transaction info from data.signedTransactionInfo
+            if (!data?.signedTransactionInfo) {
+                this.logger.warn('No transaction info in notification');
+                return;
+            }
+
+            const transactionDecoded =
+                await this.appStoreService.verifyTransaction(
+                    data.signedTransactionInfo,
+                );
+            const transactionData = transactionDecoded.decoded;
+
+            const {
+                expiryTime,
+                purchaseTime,
+                amountPaid,
+                orderId,
+                originalTransactionId,
+                storeProductId,
+            } = this.appStoreService.parseTransactionData(
+                transactionData,
+                IapProductType.SUBSCRIPTION,
+            );
+
+            const purchaseTimeDate = toDate(purchaseTime);
+            const expiryTimeDate = toDate(expiryTime);
+
+            // Find existing transaction
+            const txn = await this.transactionRepository.findOne({
+                where: {
+                    originalTransactionId: originalTransactionId,
+                    storeProductId: storeProductId,
+                    orderId: orderId,
+                },
+                order: { createdAt: 'DESC' },
+            });
+
+            if (!txn) {
+                this.logger.warn(
+                    `No transaction found for originalTransactionId: ${originalTransactionId}`,
+                );
+                return;
+            }
+
+            let newSubscriptionState: SUBSCRIPTION_STATUS | null = null;
+            let newStatus = txn.status;
+
+            // Handle different notification types
+            switch (notificationType) {
+                case AppleNotificationType.DID_RENEW:
+                case AppleNotificationType.SUBSCRIBED:
+                    newSubscriptionState =
+                        SUBSCRIPTION_STATUS.SUBSCRIPTION_STATE_ACTIVE;
+                    newStatus = TransactionStatus.ACTIVE;
+                    break;
+
+                case AppleNotificationType.DID_CHANGE_RENEWAL_STATUS:
+                    // Check if auto-renew is turned off
+                    if (
+                        subtype ===
+                        AppleRenewalStatusSubtype.AUTO_RENEW_DISABLED
+                    ) {
+                        newSubscriptionState =
+                            SUBSCRIPTION_STATUS.SUBSCRIPTION_STATE_CANCELED;
+                    }
+
+                    if (
+                        subtype === AppleRenewalStatusSubtype.AUTO_RENEW_ENABLED
+                    ) {
+                        newSubscriptionState =
+                            SUBSCRIPTION_STATUS.SUBSCRIPTION_STATE_ACTIVE;
+                        newStatus = TransactionStatus.ACTIVE;
+                    }
+                    break;
+
+                case AppleNotificationType.EXPIRED:
+                case AppleNotificationType.GRACE_PERIOD_EXPIRED:
+                    newSubscriptionState =
+                        SUBSCRIPTION_STATUS.SUBSCRIPTION_STATE_EXPIRED;
+                    newStatus = TransactionStatus.EXPIRED;
+                    break;
+
+                case AppleNotificationType.DID_FAIL_TO_RENEW:
+                    newSubscriptionState =
+                        SUBSCRIPTION_STATUS.SUBSCRIPTION_STATE_IN_GRACE_PERIOD;
+                    break;
+
+                case AppleNotificationType.REFUND:
+                    newSubscriptionState =
+                        SUBSCRIPTION_STATUS.SUBSCRIPTION_STATE_REVOKED;
+                    newStatus = TransactionStatus.REFUNDED;
+                    break;
+
+                case AppleNotificationType.REVOKE:
+                    newSubscriptionState =
+                        SUBSCRIPTION_STATUS.SUBSCRIPTION_STATE_REVOKED;
+                    newStatus = TransactionStatus.EXPIRED;
+                    break;
+
+                default:
+                    this.logger.log(
+                        `Unhandled notification type: ${notificationType}`,
+                    );
+                    return;
+            }
+
+            await this.transactionRepository.update(txn.id, {
+                purchaseTime: purchaseTimeDate,
+                expiryTime: expiryTimeDate,
+                amountPaid,
+                subscriptionState:
+                    newSubscriptionState ?? txn.subscriptionState,
+                status: newStatus,
+                storePayload: transactionData as any,
+                orderId: orderId,
+            });
+
+            this.logger.log(
+                `Processed App Store notification type=${notificationType} for user ${txn.userId}`,
+            );
+        } catch (e) {
+            this.logger.error('App Store notification processing failed', e);
+            throw new BadRequestException(
+                `App Store notification processing failed: ${e.message}`,
             );
         }
     }

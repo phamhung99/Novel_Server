@@ -143,3 +143,19 @@ export function shouldResetByInterval(
     );
     return minutesDiff >= intervalMinutes;
 }
+
+export function toDate(value: unknown): Date | null {
+    if (value instanceof Date) return value;
+    if (value == null) return null;
+
+    // Most common cases from Apple: milliseconds since epoch or ISO string
+    if (typeof value === 'number') {
+        return new Date(value);
+    }
+    if (typeof value === 'string') {
+        const dt = new Date(value);
+        return isNaN(dt.getTime()) ? null : dt;
+    }
+
+    return null;
+}

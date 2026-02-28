@@ -9,6 +9,7 @@ import {
 } from 'typeorm';
 import { UserCategoryPreference } from 'src/user/entities/user-category-preference.entity';
 import { StoryCategory } from './story-category.entity';
+import { PromptSuggestion } from './prompt-suggestion.entity';
 
 @Entity('categories')
 export class Category {
@@ -55,4 +56,10 @@ export class Category {
         (userCategoryPreference) => userCategoryPreference.category,
     )
     userCategoryPreferences: UserCategoryPreference[];
+
+    @OneToMany(
+        () => PromptSuggestion,
+        (PromptSuggestion) => PromptSuggestion.category,
+    )
+    promptTemplates: PromptSuggestion[];
 }

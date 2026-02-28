@@ -25,6 +25,9 @@ export class Transaction {
     @Column({ name: 'order_id', unique: true })
     orderId: string;
 
+    @Column({ name: 'original_transaction_id', nullable: true })
+    originalTransactionId: string | null;
+
     @Column()
     store: IapStore;
 

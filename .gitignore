@@ -64,3 +64,4 @@ report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 service_account.json
 
 /certs
+app.zip

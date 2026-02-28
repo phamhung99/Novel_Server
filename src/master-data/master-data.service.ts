@@ -24,11 +24,14 @@ export class MasterDataService {
             throw new BadRequestException(ERROR_MESSAGES.USER_ID_REQUIRED);
         }
 
-        const [user, categories, iapProducts] = await Promise.all([
-            this.userService.findById(userId, false),
-            this.storyService.getAllCategories(),
-            this.iapProductService.findAllWithDisplayOrder(platform),
-        ]);
+        const [user, categories, iapProducts, adUnlockChapter, adEarnCoin] =
+            await Promise.all([
+                this.userService.findById(userId, false),
+                this.storyService.getAllCategories(),
+                this.iapProductService.findAllWithDisplayOrder(platform),
+                this.userService.getAdUnlockChapterStatus(userId),
+                this.userService.getAdEarnCoinStatus(userId),
+            ]);
 
         await this.userService.recordDailyCheckInAndGrantBonus(user);
 
@@ -39,6 +42,8 @@ export class MasterDataService {
             chapterCreationFee: CHAPTER_CREATION_FEE,
             storyCreationFee: STORY_CREATION_FEE,
             imageCreationFee: IMAGE_CREATION_FEE,
+            adUnlockChapter,
+            adEarnCoin,
         };
     }
 }

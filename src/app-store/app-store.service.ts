@@ -5,11 +5,24 @@ import {
     Environment,
     SignedDataVerifier,
     JWSTransactionDecodedPayload,
-    JWSRenewalInfoDecodedPayload,
+    ResponseBodyV2DecodedPayload,
 } from '@apple/app-store-server-library';
 import { IapProductType } from 'src/common/enums/app.enum';
 import * as fs from 'fs';
 import * as path from 'path';
+import { v4 as uuidv4 } from 'uuid';
+
+import { JwtService } from '@nestjs/jwt';
+
+export interface ParsedTransactionData {
+    storeProductId: string;
+    orderId: string;
+    originalTransactionId: string;
+    purchaseTime: number;
+    currency: string;
+    expiryTime?: number;
+    amountPaid?: number;
+}
 
 @Injectable()
 export class AppStoreService {
@@ -20,8 +33,15 @@ export class AppStoreService {
 
     private readonly bundleId: string;
     private readonly isSandbox: boolean;
+    private readonly jwtService: JwtService;
+    private readonly enableOnlineChecks: boolean;
 
-    constructor(private configService: ConfigService) {
+    constructor(
+        private configService: ConfigService,
+        jwtService: JwtService,
+    ) {
+        this.jwtService = jwtService;
+
         const bundleId = this.configService.get<string>('apple.bundleId');
         const appAppleId = this.configService.get<number>('apple.appAppleId');
         const privateKey = this.configService.get<string>('apple.privateKey');
@@ -30,6 +50,11 @@ export class AppStoreService {
         const isSandbox = this.configService.get<boolean>(
             'apple.useSandbox',
             true,
+        );
+
+        this.enableOnlineChecks = this.configService.get<boolean>(
+            'apple.enableOnlineChecks',
+            false,
         );
 
         this.bundleId = bundleId;
@@ -80,7 +105,7 @@ export class AppStoreService {
         // SignedDataVerifier with loaded certificates
         this.verifier = new SignedDataVerifier(
             rootCerts.length > 0 ? rootCerts : [], // Use loaded certs or library defaults
-            true, // enableOnlineChecks: true for revocation checks
+            this.enableOnlineChecks, // enableOnlineChecks: true for revocation checks
             env,
             bundleId,
             appAppleId,
@@ -96,30 +121,32 @@ export class AppStoreService {
         );
     }
 
-    /**
-     * Verify signedTransaction (JWS) từ StoreKit 2 client
-     * @param signedTransaction - jwsRepresentation từ Transaction ở iOS
-     * @param type - SUBSCRIPTION hoặc ONETIME
-     */
     async verifyTransaction(
         signedTransaction: string,
-        type: IapProductType,
+        isXcodeTest?: boolean,
     ): Promise<{
         decoded: JWSTransactionDecodedPayload;
-        renewalInfo?: JWSRenewalInfoDecodedPayload;
     }> {
         try {
-            // Verify & decode local → nhanh, không gọi mạng
-            const decoded =
-                await this.verifier.verifyAndDecodeTransaction(
-                    signedTransaction,
-                );
+            let decoded: JWSTransactionDecodedPayload;
 
-            let renewalInfo: JWSRenewalInfoDecodedPayload | undefined;
-            if (type === IapProductType.SUBSCRIPTION) {
-                // Nếu có signedRenewalInfo → verify luôn
-                // Thường client gửi kèm nếu là subscription
-                // Nếu không có → có thể gọi API lấy sau
+            if (isXcodeTest) {
+                decoded = this.jwtService.decode(
+                    signedTransaction,
+                ) as JWSTransactionDecodedPayload;
+
+                if (!decoded) {
+                    throw new Error('Cannot decode transaction payload');
+                }
+
+                const fakeOriginalId = `xcode-${uuidv4()}`;
+                decoded.originalTransactionId = fakeOriginalId;
+            } else {
+                // Môi trường thật (sandbox/production) → verify đầy đủ
+                decoded =
+                    await this.verifier.verifyAndDecodeTransaction(
+                        signedTransaction,
+                    );
             }
 
             // Optional: check bundleId, productId khớp app của bạn
@@ -127,11 +154,34 @@ export class AppStoreService {
                 throw new Error('Bundle ID mismatch');
             }
 
-            return { decoded, renewalInfo };
+            return { decoded };
         } catch (err) {
             this.logger.error(`JWS verification failed: ${err.message}`);
             throw new BadRequestException(
                 `Invalid Apple transaction signature: ${err.message}`,
+            );
+        }
+    }
+
+    async verifyNotification(signedPayload: string): Promise<{
+        decoded: ResponseBodyV2DecodedPayload;
+    }> {
+        try {
+            const decoded =
+                await this.verifier.verifyAndDecodeNotification(signedPayload);
+
+            // Optional: check bundleId matches
+            if (decoded.data?.bundleId !== this.bundleId) {
+                throw new Error('Bundle ID mismatch in notification');
+            }
+
+            return { decoded };
+        } catch (err) {
+            this.logger.error(
+                `Notification verification failed: ${err.message}`,
+            );
+            throw new BadRequestException(
+                `Invalid Apple notification signature: ${err.message}`,
             );
         }
     }
@@ -142,16 +192,10 @@ export class AppStoreService {
     parseTransactionData(
         decoded: JWSTransactionDecodedPayload,
         type: IapProductType,
-    ): {
-        storeProductId: string;
-        originalTransactionId: string;
-        purchaseTime: number;
-        currency: string;
-        expiryTime?: number;
-        amountPaid?: number;
-    } {
+    ): ParsedTransactionData {
         return {
             storeProductId: decoded.productId,
+            orderId: decoded.transactionId,
             originalTransactionId: decoded.originalTransactionId,
             purchaseTime: decoded.purchaseDate, // milliseconds
             currency: decoded.currency || 'USD',

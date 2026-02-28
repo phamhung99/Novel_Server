@@ -66,6 +66,7 @@ const StoryOverviewPage = () => {
         'imagen-4.0-fast-generate-001',
         'gemini-2.5-flash-image',
         'gemini-3-pro-image-preview',
+        'gemini-3.1-flash-image-preview',
     ] as const;
 
     type ModelType = (typeof availableModels)[number];

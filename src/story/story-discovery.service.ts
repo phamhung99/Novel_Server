@@ -17,6 +17,7 @@ import { ChapterViews } from './entities/chapter-views.entity';
 import { MediaService } from 'src/media/media.service';
 import { PaginatedStoryPreviewResponse } from './dto/paginated-story-preview.response';
 import { enrichStoriesToPreviewDto } from 'src/common/mappers/story-preview.mapper';
+import { PromptSuggestion } from './entities/prompt-suggestion.entity';
 
 @Injectable()
 export class StoryDiscoveryService {
@@ -27,6 +28,8 @@ export class StoryDiscoveryService {
         private mediaService: MediaService,
         @InjectRepository(Story)
         private storyRepository: Repository<Story>,
+        @InjectRepository(PromptSuggestion)
+        private promptSuggestionRepo: Repository<PromptSuggestion>,
     ) {}
 
     async getUserLibrary(
@@ -371,35 +374,6 @@ export class StoryDiscoveryService {
         return { page, limit, total, items };
     }
 
-    async getAllCategories(): Promise<
-        Pick<
-            Category,
-            | 'id'
-            | 'name'
-            | 'displayOrder'
-            | 'iconUrl'
-            | 'backgroundImageUrl'
-            | 'description'
-        >[]
-    > {
-        return this.categoryRepository.find({
-            select: {
-                id: true,
-                name: true,
-                displayOrder: true,
-                iconUrl: true,
-                backgroundImageUrl: true,
-                description: true,
-            },
-            where: {
-                isActive: true,
-            },
-            order: {
-                displayOrder: 'ASC',
-            },
-        });
-    }
-
     async getDiscoverStories(
         userId: string | null,
         {
@@ -712,5 +686,110 @@ export class StoryDiscoveryService {
         return result.map((row) => ({
             keyword: (row.keyword || '').trim(),
         }));
+    }
+
+    async getAllCategories(): Promise<
+        Pick<
+            Category,
+            | 'id'
+            | 'name'
+            | 'displayOrder'
+            | 'iconUrl'
+            | 'backgroundImageUrl'
+            | 'description'
+        >[]
+    > {
+        return this.categoryRepository.find({
+            select: {
+                id: true,
+                name: true,
+                displayOrder: true,
+                iconUrl: true,
+                backgroundImageUrl: true,
+                description: true,
+            },
+            where: {
+                isActive: true,
+            },
+            order: {
+                displayOrder: 'ASC',
+            },
+        });
+    }
+
+    async getPromptSuggestions(categoryIds: string[]) {
+        if (categoryIds.length === 0) {
+            throw new BadRequestException(
+                'categoryIds is required and must contain at least one ID',
+            );
+        }
+
+        if (categoryIds.length > 2) {
+            throw new BadRequestException(
+                'A maximum of 2 category IDs can be provided',
+            );
+        }
+
+        const suggestions = await this.promptSuggestionRepo
+            .createQueryBuilder('ps')
+            .innerJoinAndSelect('ps.category', 'cat')
+            .select([
+                'ps.id',
+                'ps.prompt',
+                'ps.displayOrder',
+                'cat.id',
+                'cat.iconUrl',
+            ])
+            .where('cat.isActive = :isActive', { isActive: true })
+            .andWhere('ps.categoryId IN (:...categoryIds)', { categoryIds })
+            .orderBy('ps.displayOrder', 'ASC')
+            .getMany();
+
+        if (suggestions.length === 0) {
+            return [];
+        }
+
+        if (categoryIds.length === 1) {
+            return suggestions.map((s) => ({
+                id: s.id,
+                prompt: s.prompt,
+                iconUrl: s.category.iconUrl,
+            }));
+        }
+
+        const groupA: typeof suggestions = [];
+        const groupB: typeof suggestions = [];
+
+        const catAId = categoryIds[0];
+        const catBId = categoryIds[1];
+
+        for (const s of suggestions) {
+            if (s.category.id === catAId) groupA.push(s);
+            else if (s.category.id === catBId) groupB.push(s);
+        }
+
+        const result: any[] = [];
+        const maxLen = Math.max(groupA.length, groupB.length);
+
+        for (let i = 0; i < maxLen; i++) {
+            if (i < groupA.length) {
+                const item = groupA[i];
+                result.push({
+                    id: item.id,
+                    prompt: item.prompt,
+                    iconUrl: item.category.iconUrl,
+                });
+            }
+            if (i < groupB.length) {
+                const item = groupB[i];
+                result.push({
+                    id: item.id,
+                    prompt: item.prompt,
+                    iconUrl: item.category.iconUrl,
+                });
+            }
+        }
+
+        return result;
     }
 }

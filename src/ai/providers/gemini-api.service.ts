@@ -9,7 +9,7 @@ export class GeminiApiService implements IStoryGenerationProvider {
     private readonly logger = new Logger(GeminiApiService.name);
     private client: AxiosInstance;
     private readonly apiKey: string;
-    private readonly modelName = 'gemini-3-pro-preview';
+    private readonly modelName = 'gemini-3.1-pro-preview';
     private readonly imagenModels = new Set([
         'imagen-4.0-generate-001',
         'imagen-4.0-ultra-generate-001',
@@ -19,6 +19,7 @@ export class GeminiApiService implements IStoryGenerationProvider {
     private readonly geminiImageModels = new Set([
         'gemini-2.5-flash-image',
         'gemini-3-pro-image-preview',
+        'gemini-3.1-flash-image-preview',
     ]);
     private readonly providerName = 'gemini';
 
@@ -35,6 +36,8 @@ export class GeminiApiService implements IStoryGenerationProvider {
 
     async generateContent(dto: GenerateRawContentDto): Promise<string> {
         try {
+            let model = this.modelName;
+
             const requestBody: any = {
                 contents: [{ role: 'user', parts: [{ text: dto.prompt }] }],
                 generationConfig: {
@@ -56,9 +59,13 @@ export class GeminiApiService implements IStoryGenerationProvider {
                     dto.responseSchema;
             }
 
+            if (dto.model) {
+                model = dto.model;
+            }
+
             // URL đúng format
             const response = await this.client.post(
-                `/models/${this.modelName}:generateContent?key=${this.apiKey}`,
+                `/models/${model}:generateContent?key=${this.apiKey}`,
                 requestBody,
             );
 

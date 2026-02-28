@@ -29,6 +29,7 @@ export class PaymentsController {
             userId,
             receipt,
             type: dto.type,
+            xcodeTest: dto.isXcodeTest,
             platform,
         });
     }
@@ -36,6 +37,11 @@ export class PaymentsController {
     @Post('/webhooks/google-play')
     async handleWebhook(@Body() body: any) {
         return this.paymentsService.handleGooglePlayWebhook(body);
+    }
+
+    @Post('/webhooks/app-store')
+    async handleAppStoreWebhook(@Body() body: any) {
+        return this.paymentsService.handleAppStoreWebhook(body);
     }
 
     @Get('/plus-coin')
