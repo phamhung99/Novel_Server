@@ -1,6 +1,5 @@
 import {
     BadRequestException,
-    ConflictException,
     forwardRef,
     Inject,
     Injectable,
@@ -1400,22 +1399,22 @@ export class UserService extends BaseCrudService<User> {
             throw new NotFoundException(ERROR_MESSAGES.USER_NOT_FOUND);
         }
 
-        const exists = await this.appFeedbackRepo.findOne({
-            where: { userId, appVersion: createDto.appVersion },
+        let feedback = await this.appFeedbackRepo.findOne({
+            where: { userId },
         });
 
-        if (exists) {
-            throw new ConflictException(
-                'You have already submitted feedback for this app version',
-            );
+        if (feedback) {
+            feedback.platform = platform;
+            feedback.rating = createDto.rating;
+            feedback.comment = createDto.comment;
+            return await this.appFeedbackRepo.save(feedback);
         }
 
-        const feedback = this.appFeedbackRepo.create({
+        feedback = this.appFeedbackRepo.create({
             userId,
             platform,
             rating: createDto.rating,
             comment: createDto.comment,
-            appVersion: createDto.appVersion,
         });
 
         return await this.appFeedbackRepo.save(feedback);

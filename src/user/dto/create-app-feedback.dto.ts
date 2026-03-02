@@ -9,8 +9,4 @@ export class CreateAppFeedbackDto {
     @IsOptional()
     @IsString()
     comment?: string;
-
-    @IsOptional()
-    @IsString()
-    appVersion?: string;
 }
