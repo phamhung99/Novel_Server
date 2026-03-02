@@ -326,6 +326,7 @@ export class StoryGenerationService {
                                 timestamp: new Date().toISOString(),
                                 error: errMsg,
                                 rawResponse,
+                                aiModel: effectiveModel,
                             },
                         };
 
@@ -515,9 +516,13 @@ export class StoryGenerationService {
             let attempt = 1;
             let lastError: any = null;
             let chapterStructureResponse: any = null;
+            let effectiveModel: string;
+            let currentRetryDetails = savedPreGen.retryDetails || {};
 
             while (attempt <= MAX_ATTEMPTS) {
                 try {
+                    effectiveModel = getEffectiveAiModel(dto, attempt);
+
                     if (isFirstChapter) {
                         chapterStructureResponse =
                             await this.storyGenerationApiService.generateFirstChapter(
@@ -526,6 +531,7 @@ export class StoryGenerationService {
                                     chapterNumber,
                                     aiProvider: storyGeneration.aiProvider,
                                     storyMetadata,
+                                    aiModel: effectiveModel,
                                 },
                             );
                     } else {
@@ -539,6 +545,7 @@ export class StoryGenerationService {
                                     storyMetadata,
                                     previousChapterMetadata,
                                     storyPrompt: storyPrompt,
+                                    aiModel: effectiveModel,
                                 },
                             );
                     }
@@ -555,18 +562,22 @@ export class StoryGenerationService {
                     );
 
                     if (attempt <= MAX_ATTEMPTS) {
+                        currentRetryDetails = {
+                            ...currentRetryDetails,
+                            [`attempt_${attempt}`]: {
+                                timestamp: new Date().toISOString(),
+                                error: errMsg,
+                                rawResponse,
+                                aiModel: effectiveModel,
+                            },
+                        };
+
                         await this.chapterGenerationRepository.update(
                             { id: savedPreGen.id },
                             {
                                 attempts: attempt,
-                                retryDetails: {
-                                    ...(savedPreGen.retryDetails || {}),
-                                    [`attempt_${attempt}`]: {
-                                        timestamp: new Date().toISOString(),
-                                        error: errMsg,
-                                        rawResponse,
-                                    },
-                                },
+                                retryDetails: currentRetryDetails,
+                                lastAttemptAt: new Date(),
                             },
                         );
 

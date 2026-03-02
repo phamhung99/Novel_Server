@@ -102,6 +102,7 @@ You think in three dimensions simultaneously:
         chapterNumber: number;
         storyMetadata: string;
         aiProvider: string;
+        aiModel?: string;
     }): Promise<ChapterStructureResponse> {
         const providerName = dto.aiProvider || 'grok';
         const aiProvider =
@@ -218,6 +219,7 @@ Return ONLY the JSON object. No additional text.
                 prompt: userPrompt,
                 systemPrompt,
                 responseSchema: CHAPTER_STRUCTURE_SCHEMA,
+                model: dto.aiModel,
             });
             return this.parseChapterStructure(response, dto.chapterNumber);
         } catch (error) {
@@ -236,6 +238,7 @@ Return ONLY the JSON object. No additional text.
         storyPrompt: string;
         storyMetadata: string;
         previousChapterMetadata: string;
+        aiModel?: string;
     }): Promise<ChapterStructureResponse> {
         const providerName = dto.aiProvider || 'grok';
         const aiProvider =
@@ -332,6 +335,7 @@ Return ONLY the JSON object. No additional text or commentary.
                 prompt: userPrompt,
                 systemPrompt,
                 responseSchema: CHAPTER_STRUCTURE_SCHEMA,
+                model: dto.aiModel,
             });
             return this.parseChapterStructure(response, dto.chapterNumber);
         } catch (error) {
