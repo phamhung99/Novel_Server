@@ -559,7 +559,6 @@ export class StoryGenerationService {
                     );
 
                     if (attempt < MAX_ATTEMPTS) {
-                        attempt++;
                         await this.chapterGenerationRepository.update(
                             { id: savedPreGen.id },
                             {
@@ -574,6 +573,8 @@ export class StoryGenerationService {
                                 },
                             },
                         );
+
+                        attempt++;
                         continue;
                     } else {
                         // hết retry vẫn fail
@@ -1032,7 +1033,6 @@ export class StoryGenerationService {
                     );
 
                     if (attempt < MAX_ATTEMPTS) {
-                        attempt++;
                         await this.imageGenerationRepository.update(
                             { id: imageGenRecord.id },
                             {
@@ -1046,6 +1046,8 @@ export class StoryGenerationService {
                                 },
                             },
                         );
+
+                        attempt++;
                         continue;
                     } else {
                         throw (
