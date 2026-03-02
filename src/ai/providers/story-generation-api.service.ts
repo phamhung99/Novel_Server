@@ -49,6 +49,7 @@ export class StoryGenerationApiService {
         genres: string[];
         numberOfChapters: number;
         aiProvider: string;
+        aiModel?: string;
     }): Promise<StoryOutlineResponse> {
         const providerName = dto.aiProvider || 'grok';
         const aiProvider =
@@ -84,6 +85,7 @@ You think in three dimensions simultaneously:
                 prompt: userPrompt,
                 systemPrompt,
                 responseSchema: STORY_OUTLINE_SCHEMA,
+                model: dto.aiModel,
             });
 
             return this.parseStoryOutline(response, dto.numberOfChapters);

@@ -41,6 +41,7 @@ import { isEmptyObject } from 'src/ai/utils/object.utils';
 import { cleanNextOptions } from 'src/common/utils/chapter.utils';
 import { stripHtml } from 'src/common/utils/html.utils';
 import { ImageGeneration } from './entities/image-generation.entity';
+import { getEffectiveAiModel } from 'src/common/utils/aiModelSelector';
 
 @Injectable()
 export class StoryGenerationService {
@@ -251,18 +252,6 @@ export class StoryGenerationService {
             type: GenerationType.CHAPTER,
             status: GenerationStatus.PROCESSING,
             aiProvider: dto.aiProvider || DEFAULT_AI_PROVIDER,
-            aiModel: (() => {
-                switch (dto.aiProvider || DEFAULT_AI_PROVIDER) {
-                    case 'grok':
-                        return 'grok-4';
-                    case 'gpt':
-                        return 'gpt-4o-mini';
-                    case 'gemini':
-                        return 'gemini-3-pro-preview';
-                    default:
-                        return 'gemini-3-pro-preview';
-                }
-            })(),
             prompt: {
                 storyPrompt: dto.storyPrompt,
                 numberOfChapters: dto.numberOfChapters,
@@ -300,9 +289,13 @@ export class StoryGenerationService {
             const MAX_ATTEMPTS = 2;
             let attempt = 1;
             let lastError: any = null;
+            let currentRetryDetails = savedStoryGeneration.retryDetails || {};
+            let effectiveModel: string;
 
             while (attempt <= MAX_ATTEMPTS) {
                 try {
+                    effectiveModel = getEffectiveAiModel(dto, attempt);
+
                     outlineData =
                         await this.storyGenerationApiService.generateStoryOutline(
                             {
@@ -311,6 +304,7 @@ export class StoryGenerationService {
                                 numberOfChapters: dto.numberOfChapters,
                                 aiProvider:
                                     dto.aiProvider || DEFAULT_AI_PROVIDER,
+                                aiModel: effectiveModel,
                             },
                         );
 
@@ -325,20 +319,21 @@ export class StoryGenerationService {
                         `Attempt ${attempt}/${MAX_ATTEMPTS} failed: ${errMsg}`,
                     );
 
-                    if (attempt < MAX_ATTEMPTS) {
+                    if (attempt <= MAX_ATTEMPTS) {
+                        currentRetryDetails = {
+                            ...currentRetryDetails,
+                            [`attempt_${attempt}`]: {
+                                timestamp: new Date().toISOString(),
+                                error: errMsg,
+                                rawResponse,
+                            },
+                        };
+
                         await this.storyGenerationRepository.update(
                             { id: savedStoryGeneration.id },
                             {
                                 attempts: attempt,
-                                retryDetails: {
-                                    ...(savedStoryGeneration.retryDetails ||
-                                        {}),
-                                    [`attempt_${attempt}`]: {
-                                        timestamp: new Date().toISOString(),
-                                        error: errMsg,
-                                        rawResponse,
-                                    },
-                                },
+                                retryDetails: currentRetryDetails,
                                 lastAttemptAt: new Date(),
                             },
                         );
@@ -386,6 +381,7 @@ export class StoryGenerationService {
                 { id: savedStoryGeneration.id },
                 {
                     storyId: savedStory.id,
+                    aiModel: effectiveModel,
                     title: outlineData.title,
                     synopsis: outlineData.synopsis,
                     metadata: {
@@ -558,7 +554,7 @@ export class StoryGenerationService {
                         `Chapter generation attempt ${attempt}/${MAX_ATTEMPTS} failed: ${errMsg}`,
                     );
 
-                    if (attempt < MAX_ATTEMPTS) {
+                    if (attempt <= MAX_ATTEMPTS) {
                         await this.chapterGenerationRepository.update(
                             { id: savedPreGen.id },
                             {
@@ -1032,7 +1028,7 @@ export class StoryGenerationService {
                         `Cover image generation attempt ${attempt}/${MAX_ATTEMPTS} failed: ${errMsg}`,
                     );
 
-                    if (attempt < MAX_ATTEMPTS) {
+                    if (attempt <= MAX_ATTEMPTS) {
                         await this.imageGenerationRepository.update(
                             { id: imageGenRecord.id },
                             {

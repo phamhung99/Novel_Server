@@ -37,7 +37,7 @@ export class StoryGeneration {
     @Column({ name: 'ai_provider' })
     aiProvider: string;
 
-    @Column({ name: 'ai_model' })
+    @Column({ name: 'ai_model', nullable: true })
     aiModel: string;
 
     @Column({ type: 'jsonb' })
