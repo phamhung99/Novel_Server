@@ -32,6 +32,7 @@ import { CustomMaxFileSizeValidator } from 'src/common/validators/custom-max-fil
 import { MimeTypeValidator } from 'src/common/validators/mime-type.validator';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { PaginationDto } from 'src/story/dto/pagination.dto';
+import { CreateAppFeedbackDto } from './dto/create-app-feedback.dto';
 
 @Controller('users')
 export class UserController {
@@ -44,6 +45,19 @@ export class UserController {
         }
 
         return this.userService.getReward(userId);
+    }
+
+    @Post('feedback')
+    async submitFeedback(
+        @Headers('x-user-id') userId: string,
+        @Headers('x-platform') platform: string,
+        @Body() createDto: CreateAppFeedbackDto,
+    ) {
+        if (!userId) {
+            throw new BadRequestException(ERROR_MESSAGES.USER_ID_REQUIRED);
+        }
+
+        return this.userService.createAppFeedback(userId, platform, createDto);
     }
 
     @Get('me/coin-transactions')

@@ -1,5 +1,6 @@
 import {
     BadRequestException,
+    ConflictException,
     forwardRef,
     Inject,
     Injectable,
@@ -55,6 +56,8 @@ import { PaginationDto } from 'src/story/dto/pagination.dto';
 import { IapProductService } from 'src/payments/iap-product.service';
 import { ConfigService } from '@nestjs/config';
 import { ChapterUnlockService } from 'src/story/chapter/chapter-unlock.service';
+import { CreateAppFeedbackDto } from './dto/create-app-feedback.dto';
+import { AppFeedback } from './entities/app-feedback.entity';
 
 const coinTransactionTitles: Record<CoinReferenceType, string> = {
     [CoinReferenceType.IAP]: 'In-App Purchase',
@@ -107,6 +110,8 @@ export class UserService extends BaseCrudService<User> {
         private readonly configService: ConfigService,
         @Inject(forwardRef(() => ChapterUnlockService))
         private readonly chapterUnlockService: ChapterUnlockService,
+        @InjectRepository(AppFeedback)
+        private readonly appFeedbackRepo: Repository<AppFeedback>,
     ) {
         super(userRepo);
 
@@ -1380,5 +1385,39 @@ export class UserService extends BaseCrudService<User> {
             currentViews,
             maxViews: this.MAX_AD_VIEWS_COIN_PER_DAY,
         };
+    }
+
+    async createAppFeedback(
+        userId: string,
+        platform: string,
+        createDto: CreateAppFeedbackDto,
+    ): Promise<AppFeedback> {
+        const user = await this.repository.findOne({
+            where: { id: userId },
+        });
+
+        if (!user) {
+            throw new NotFoundException(ERROR_MESSAGES.USER_NOT_FOUND);
+        }
+
+        const exists = await this.appFeedbackRepo.findOne({
+            where: { userId, appVersion: createDto.appVersion },
+        });
+
+        if (exists) {
+            throw new ConflictException(
+                'You have already submitted feedback for this app version',
+            );
+        }
+
+        const feedback = this.appFeedbackRepo.create({
+            userId,
+            platform,
+            rating: createDto.rating,
+            comment: createDto.comment,
+            appVersion: createDto.appVersion,
+        });
+
+        return await this.appFeedbackRepo.save(feedback);
     }
 }

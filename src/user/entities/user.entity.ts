@@ -13,6 +13,7 @@ import { UserCategoryPreference } from './user-category-preference.entity';
 import { DEFAULT_PROFILE_IMAGE_URL } from 'src/common/constants/app.constant';
 import { UserDailyAction } from './user-daily-action.entity';
 import { CoinTransaction } from './coin-transaction.entity';
+import { AppFeedback } from './app-feedback.entity';
 
 @Entity('users')
 export class User {
@@ -79,4 +80,7 @@ export class User {
 
     @OneToMany(() => CoinTransaction, (tx) => tx.user)
     coinTransactions: CoinTransaction[];
+
+    @OneToMany(() => AppFeedback, (feedback) => feedback.user)
+    feedbacks: AppFeedback[];
 }

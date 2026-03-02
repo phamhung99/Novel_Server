@@ -15,6 +15,7 @@ import { CoinTransaction } from './entities/coin-transaction.entity';
 import { Transaction } from 'src/payments/entities/transaction.entity';
 import { PaymentsModule } from 'src/payments/payments.module';
 import { StoryModule } from 'src/story/story.module';
+import { AppFeedback } from './entities/app-feedback.entity';
 
 @Module({
     controllers: [UserController],
@@ -30,6 +31,7 @@ import { StoryModule } from 'src/story/story.module';
             UserDailyAction,
             CoinTransaction,
             Transaction,
+            AppFeedback,
         ]),
         forwardRef(() => PaymentsModule),
         forwardRef(() => StoryModule),
