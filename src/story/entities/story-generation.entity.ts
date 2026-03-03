@@ -9,10 +9,6 @@ import {
 import { ChapterGeneration } from './chapter-generation.entity';
 import { GenerationStatus } from 'src/common/enums/app.enum';
 
-export enum GenerationType {
-    CHAPTER = 'chapter',
-}
-
 @Entity('story_generation')
 export class StoryGeneration {
     @PrimaryGeneratedColumn('uuid')
@@ -20,12 +16,6 @@ export class StoryGeneration {
 
     @Column({ name: 'story_id', nullable: true })
     storyId: string;
-
-    @Column({
-        type: 'enum',
-        enum: GenerationType,
-    })
-    type: GenerationType;
 
     @Column({
         type: 'enum',
