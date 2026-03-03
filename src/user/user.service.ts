@@ -1440,21 +1440,6 @@ export class UserService extends BaseCrudService<User> {
 
         await this.storyCrudService.findStoryById(storyId);
 
-        // Check if user already reported this story
-        const existingReport = await this.reportRepo.findOne({
-            where: {
-                reporterId: userId,
-                entityId: storyId,
-            },
-            select: ['id'],
-        });
-
-        if (existingReport) {
-            throw new BadRequestException(
-                'You have already reported this story',
-            );
-        }
-
         if (createDto.reason === ReportReason.OTHER && !createDto.description) {
             throw new BadRequestException(
                 'Description is required when reason is OTHER',

@@ -292,6 +292,7 @@ export class StoryController {
     @Post(':storyId/generate/chapter')
     @SkipTransform()
     async generateChapterWithContext(
+        @Headers('x-user-id') userId: string,
         @Param('storyId') storyId: string,
         @Body() generateChapterDto: GenerateChapterDto,
         @Headers('x-request-id') headerRequestId?: string,
@@ -303,6 +304,7 @@ export class StoryController {
         }
 
         return await this.storyService.generateChapters(
+            userId,
             storyId,
             requestId,
             generateChapterDto,
