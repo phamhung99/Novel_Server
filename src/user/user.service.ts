@@ -57,6 +57,13 @@ import { ConfigService } from '@nestjs/config';
 import { ChapterUnlockService } from 'src/story/chapter/chapter-unlock.service';
 import { CreateAppFeedbackDto } from './dto/create-app-feedback.dto';
 import { AppFeedback } from './entities/app-feedback.entity';
+import { CreateReportDto } from '../story/dto/create-report.dto';
+import {
+    ReportEntityType,
+    Report,
+    ReportReason,
+} from './entities/report.entity';
+import { StoryCrudService } from 'src/story/story-crud.service';
 
 const coinTransactionTitles: Record<CoinReferenceType, string> = {
     [CoinReferenceType.IAP]: 'In-App Purchase',
@@ -111,6 +118,10 @@ export class UserService extends BaseCrudService<User> {
         private readonly chapterUnlockService: ChapterUnlockService,
         @InjectRepository(AppFeedback)
         private readonly appFeedbackRepo: Repository<AppFeedback>,
+        @InjectRepository(Report)
+        private readonly reportRepo: Repository<Report>,
+        @Inject(forwardRef(() => StoryCrudService))
+        private readonly storyCrudService: StoryCrudService,
     ) {
         super(userRepo);
 
@@ -1418,5 +1429,46 @@ export class UserService extends BaseCrudService<User> {
         });
 
         return await this.appFeedbackRepo.save(feedback);
+    }
+
+    async createStoryReport(
+        userId: string,
+        storyId: string,
+        createDto: CreateReportDto,
+    ) {
+        await this.findById(userId);
+
+        await this.storyCrudService.findStoryById(storyId);
+
+        // Check if user already reported this story
+        const existingReport = await this.reportRepo.findOne({
+            where: {
+                reporterId: userId,
+                entityId: storyId,
+            },
+            select: ['id'],
+        });
+
+        if (existingReport) {
+            throw new BadRequestException(
+                'You have already reported this story',
+            );
+        }
+
+        if (createDto.reason === ReportReason.OTHER && !createDto.description) {
+            throw new BadRequestException(
+                'Description is required when reason is OTHER',
+            );
+        }
+
+        const report = this.reportRepo.create({
+            reporterId: userId,
+            entityType: ReportEntityType.STORY,
+            entityId: storyId,
+            reason: createDto.reason,
+            description: createDto.description,
+        });
+
+        return await this.reportRepo.save(report);
     }
 }
