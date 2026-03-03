@@ -8,13 +8,10 @@ import {
     InternalServerErrorException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
 import { Story } from './entities/story.entity';
 import { Chapter } from './entities/chapter.entity';
-import {
-    StoryGeneration,
-    GenerationType,
-} from './entities/story-generation.entity';
+import { StoryGeneration } from './entities/story-generation.entity';
 import { GenerationStatus } from 'src/common/enums/app.enum';
 import { ChapterGeneration } from './entities/chapter-generation.entity';
 import {
@@ -30,6 +27,7 @@ import {
     DEFAULT_AI_PROVIDER,
     DEFAULT_COVER_IMAGE_URL,
     IMAGE_PREFIX,
+    STORY_CREATION_FEE,
 } from 'src/common/constants/app.constant';
 import { ChapterService } from './chapter/chapter.service';
 import { UserService } from 'src/user/user.service';
@@ -67,6 +65,7 @@ export class StoryGenerationService {
         private mediaService: MediaService,
         private chapterService: ChapterService,
         private userService: UserService,
+        private readonly dataSource: DataSource,
     ) {}
 
     private sanitizePrompt(input: string): string {
@@ -249,7 +248,6 @@ export class StoryGenerationService {
 
         const storyGeneration = this.storyGenerationRepository.create({
             requestId,
-            type: GenerationType.CHAPTER,
             status: GenerationStatus.PROCESSING,
             aiProvider: dto.aiProvider || DEFAULT_AI_PROVIDER,
             prompt: {
@@ -268,6 +266,11 @@ export class StoryGenerationService {
 
         let rawResponse: any = null;
         let outlineData: any = null;
+
+        const queryRunner = this.dataSource.createQueryRunner();
+        await queryRunner.connect();
+        await queryRunner.startTransaction();
+
         try {
             if (!userId) {
                 throw new Error('userId is required');
@@ -284,6 +287,15 @@ export class StoryGenerationService {
 
             const sanitizedPrompt = this.sanitizePrompt(dto.storyPrompt || '');
             this.ensurePromptAllowed(sanitizedPrompt);
+
+            await this.userService.spendCoins({
+                userId,
+                amount: STORY_CREATION_FEE,
+                referenceType: 'story_initialization',
+                referenceId: storyGeneration.id,
+                description: `Story outline initialization`,
+                manager: queryRunner.manager,
+            });
 
             // retry logic
             const MAX_ATTEMPTS = 2;
@@ -319,33 +331,27 @@ export class StoryGenerationService {
                         `Attempt ${attempt}/${MAX_ATTEMPTS} failed: ${errMsg}`,
                     );
 
-                    if (attempt <= MAX_ATTEMPTS) {
-                        currentRetryDetails = {
-                            ...currentRetryDetails,
-                            [`attempt_${attempt}`]: {
-                                timestamp: new Date().toISOString(),
-                                error: errMsg,
-                                rawResponse,
-                                aiModel: effectiveModel,
-                            },
-                        };
+                    currentRetryDetails = {
+                        ...currentRetryDetails,
+                        [`attempt_${attempt}`]: {
+                            timestamp: new Date().toISOString(),
+                            error: errMsg,
+                            rawResponse,
+                            aiModel: effectiveModel,
+                        },
+                    };
 
-                        await this.storyGenerationRepository.update(
-                            { id: savedStoryGeneration.id },
-                            {
-                                attempts: attempt,
-                                retryDetails: currentRetryDetails,
-                                lastAttemptAt: new Date(),
-                            },
-                        );
+                    await this.storyGenerationRepository.update(
+                        { id: savedStoryGeneration.id },
+                        {
+                            attempts: attempt,
+                            retryDetails: currentRetryDetails,
+                            lastAttemptAt: new Date(),
+                        },
+                    );
 
-                        attempt++;
-                        continue;
-                    } else {
-                        throw (
-                            lastError || new Error('Failed after max retries')
-                        );
-                    }
+                    attempt++;
+                    continue;
                 }
             }
 
@@ -356,29 +362,31 @@ export class StoryGenerationService {
                 );
             }
 
+            // ── Tạo categories ──
             const storyCategoryEntities = await this.buildStoryCategories(
                 outlineData.storyContext?.meta,
                 dto.genres,
             );
 
-            const story = this.storyRepository.create({
+            const story = queryRunner.manager.create(Story, {
                 title: outlineData.title,
                 synopsis: outlineData.synopsis,
                 authorId: userId,
             });
 
-            const savedStory = await this.storyRepository.save(story);
+            const savedStory = await queryRunner.manager.save(story);
 
             if (storyCategoryEntities.length > 0) {
                 storyCategoryEntities.forEach((sc) => {
                     sc.storyId = savedStory.id;
                 });
 
-                await this.storyCategoryRepository.save(storyCategoryEntities);
+                await queryRunner.manager.save(storyCategoryEntities);
             }
 
             // Update story generation record with story reference and attributes
-            await this.storyGenerationRepository.update(
+            await queryRunner.manager.update(
+                StoryGeneration,
                 { id: savedStoryGeneration.id },
                 {
                     storyId: savedStory.id,
@@ -396,13 +404,17 @@ export class StoryGenerationService {
 
             // Update story's generation reference
             savedStory.generation = savedStoryGeneration;
-            await this.storyRepository.save(savedStory);
+            await queryRunner.manager.save(savedStory);
+
+            await queryRunner.commitTransaction();
 
             return {
                 message: 'Story initialized successfully',
             };
         } catch (error) {
             console.error('Error initializing story:', error);
+
+            await queryRunner.rollbackTransaction();
 
             await this.storyGenerationRepository.update(
                 { id: savedStoryGeneration.id },
@@ -422,6 +434,8 @@ export class StoryGenerationService {
                 },
                 HttpStatus.BAD_REQUEST,
             );
+        } finally {
+            await queryRunner.release();
         }
     }
 
