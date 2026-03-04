@@ -27,6 +27,7 @@ import {
     CHAPTER_CREATION_FEE,
     DEFAULT_AI_PROVIDER,
     DEFAULT_COVER_IMAGE_URL,
+    IMAGE_CREATION_FEE,
     IMAGE_PREFIX,
     STORY_CREATION_FEE,
 } from 'src/common/constants/app.constant';
@@ -466,7 +467,7 @@ export class StoryGenerationService {
 
         try {
             // Tạo preGen trước, để luôn có record lưu lỗi
-            savedPreGen = queryRunner.manager.create(ChapterGeneration, {
+            savedPreGen = this.chapterGenerationRepository.create({
                 storyGenerationId: null, // tạm thời null, sẽ update sau nếu có storyGeneration
                 chapterNumber: 0, // tạm thời
                 requestId,
@@ -474,7 +475,8 @@ export class StoryGenerationService {
                 status: GenerationStatus.PROCESSING,
             });
 
-            savedPreGen = await queryRunner.manager.save(savedPreGen);
+            savedPreGen =
+                await this.chapterGenerationRepository.save(savedPreGen);
 
             if (!storyId) {
                 throw new BadRequestException('storyId is required');
@@ -530,6 +532,7 @@ export class StoryGenerationService {
 
             const storyPrompt = storyGeneration.prompt.storyPrompt || '';
 
+            // only need transaction for DB updates and coin deduction
             await this.userService.spendCoins({
                 userId,
                 amount: CHAPTER_CREATION_FEE,
@@ -685,7 +688,7 @@ export class StoryGenerationService {
                 message: 'Chapter generated successfully',
             };
         } catch (error) {
-            console.error('Error generating chapter:', error);
+            this.logger.error('Error generating chapter:', error);
 
             await queryRunner.rollbackTransaction();
 
@@ -992,14 +995,17 @@ export class StoryGenerationService {
         save?: boolean,
     ): Promise<{ coverImageUrl: string }> {
         let imageGenRecord;
+        const exists = await this.chapterGenerationRepository.findOne({
+            where: { requestId },
+        });
+
+        if (exists) throw new BadRequestException('Duplicate request');
+
+        const queryRunner = this.dataSource.createQueryRunner();
+        await queryRunner.connect();
+        await queryRunner.startTransaction();
 
         try {
-            const exists = await this.chapterGenerationRepository.findOne({
-                where: { requestId },
-            });
-
-            if (exists) throw new BadRequestException('Duplicate request');
-
             imageGenRecord = this.imageGenerationRepository.create({
                 requestId,
                 entityType: 'story',
@@ -1049,10 +1055,19 @@ export class StoryGenerationService {
 
             let tempImageUrl: string;
 
+            // only need transaction for DB updates and coin deduction
+            await this.userService.spendCoins({
+                userId,
+                amount: IMAGE_CREATION_FEE,
+                referenceType: 'story_cover_generation',
+                referenceId: imageGenRecord.id,
+                description: `Story Cover generation`,
+                manager: queryRunner.manager,
+            });
+
             // retry logic
             const MAX_ATTEMPTS = 2;
             let attempt = 1;
-            let lastError: any = null;
 
             while (attempt <= MAX_ATTEMPTS) {
                 try {
@@ -1063,7 +1078,6 @@ export class StoryGenerationService {
                         );
                     break;
                 } catch (err) {
-                    lastError = err;
                     const errMsg =
                         err instanceof Error ? err.message : String(err);
 
@@ -1071,29 +1085,26 @@ export class StoryGenerationService {
                         `Cover image generation attempt ${attempt}/${MAX_ATTEMPTS} failed: ${errMsg}`,
                     );
 
-                    if (attempt <= MAX_ATTEMPTS) {
-                        await this.imageGenerationRepository.update(
-                            { id: imageGenRecord.id },
-                            {
-                                attempts: attempt,
-                                retryDetails: {
-                                    ...(imageGenRecord.retryDetails || {}),
-                                    [`attempt_${attempt}`]: {
-                                        timestamp: new Date().toISOString(),
-                                        error: errMsg,
-                                    },
+                    await this.imageGenerationRepository.update(
+                        { id: imageGenRecord.id },
+                        {
+                            attempts: attempt,
+                            retryDetails: {
+                                ...(imageGenRecord.retryDetails || {}),
+                                [`attempt_${attempt}`]: {
+                                    timestamp: new Date().toISOString(),
+                                    error: errMsg,
                                 },
                             },
-                        );
+                        },
+                    );
 
-                        attempt++;
-                        continue;
-                    } else {
-                        throw (
-                            lastError || new Error('Failed after max retries')
-                        );
-                    }
+                    attempt++;
                 }
+            }
+
+            if (!tempImageUrl) {
+                throw new Error('Failed to generate cover image after retries');
             }
 
             let newCoverImageKey: string | null = null;
@@ -1111,7 +1122,8 @@ export class StoryGenerationService {
             const newCoverImageUrl =
                 await this.mediaService.getMediaUrl(newCoverImageKey);
 
-            await this.imageGenerationRepository.update(
+            await queryRunner.manager.update(
+                ImageGeneration,
                 { id: imageGenRecord.id },
                 {
                     imagePath: newCoverImageKey,
@@ -1123,11 +1135,14 @@ export class StoryGenerationService {
             const shouldSave = save !== undefined ? save : !prompt?.trim();
 
             if (shouldSave) {
-                await this.storyRepository.update(
+                await queryRunner.manager.update(
+                    Story,
                     { id: storyId },
                     { coverImage: newCoverImageKey },
                 );
             }
+
+            await queryRunner.commitTransaction();
 
             return {
                 coverImageUrl: newCoverImageUrl,
@@ -1143,14 +1158,20 @@ export class StoryGenerationService {
                 err instanceof Error ? err.stack : undefined,
             );
 
-            await this.imageGenerationRepository.update(
-                { id: imageGenRecord.id },
-                {
-                    status: GenerationStatus.FAILED,
-                    errorMessage: errorMsg,
-                    updatedAt: new Date(),
-                },
-            );
+            await queryRunner.rollbackTransaction();
+
+            if (imageGenRecord) {
+                await this.imageGenerationRepository.update(
+                    { id: imageGenRecord.id },
+                    {
+                        status: GenerationStatus.FAILED,
+                        errorMessage: errorMsg,
+                        updatedAt: new Date(),
+                    },
+                );
+            }
+        } finally {
+            await queryRunner.release();
         }
     }
 
