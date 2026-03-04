@@ -79,6 +79,7 @@ export class StoryDiscoveryService {
                 's.views_count AS "viewsCount"',
                 's.sourceType AS "sourceType"',
                 's.tags AS "hashtags"',
+                's.canEdit AS "canEdit"',
 
                 `json_agg(DISTINCT jsonb_build_object('id', cat.id, 'name', cat.name)) AS "categories"`,
 
@@ -138,7 +139,6 @@ export class StoryDiscoveryService {
         const items = await enrichStoriesToPreviewDto(
             stories,
             this.mediaService,
-            userId,
         );
 
         return { page, limit, total, items };
@@ -200,6 +200,7 @@ export class StoryDiscoveryService {
                 's.views_count AS "viewsCount"',
                 's.trendingScore AS "trendingScore"',
                 's.tags AS "hashtags"',
+                's.canEdit AS "canEdit"',
 
                 `json_agg(DISTINCT jsonb_build_object('id', cat.id, 'name', cat.name)) AS "categories"`,
 
@@ -248,7 +249,6 @@ export class StoryDiscoveryService {
         const items = await enrichStoriesToPreviewDto(
             stories,
             this.mediaService,
-            userId,
         );
 
         return { page, limit, total, items };
@@ -319,6 +319,7 @@ export class StoryDiscoveryService {
                 's.views_count AS "viewsCount"',
                 's.trendingScore AS "trendingScore"',
                 's.tags AS "hashtags"',
+                's.canEdit AS "canEdit"',
 
                 `json_agg(DISTINCT jsonb_build_object('id', cat.id, 'name', cat.name)) AS "categories"`,
 
@@ -368,7 +369,6 @@ export class StoryDiscoveryService {
         const items = await enrichStoriesToPreviewDto(
             stories,
             this.mediaService,
-            userId,
         );
 
         return { page, limit, total, items };
@@ -454,6 +454,7 @@ export class StoryDiscoveryService {
                 's.updatedAt AS "updatedAt"',
                 's.visibility AS "visibility"',
                 's.tags AS "hashtags"',
+                's.canEdit AS "canEdit"',
 
                 // All categories array
                 `json_agg(DISTINCT jsonb_build_object('id', cat.id, 'name', cat.name)) FILTER (WHERE cat.id IS NOT NULL) AS "categories"`,
@@ -635,7 +636,6 @@ export class StoryDiscoveryService {
         const items = await enrichStoriesToPreviewDto(
             stories,
             this.mediaService,
-            userId,
         );
 
         return {

@@ -401,6 +401,26 @@ export class UserService extends BaseCrudService<User> {
         return user.role;
     }
 
+    async isUserActive(userId: string): Promise<boolean> {
+        if (!userId) {
+            throw new BadRequestException('User ID is required');
+        }
+
+        const user = await this.repository.findOne({
+            where: { id: userId },
+        });
+
+        if (!user) {
+            throw new NotFoundException(ERROR_MESSAGES.USER_NOT_FOUND);
+        }
+
+        if (user.deletedAt) {
+            throw new NotFoundException(ERROR_MESSAGES.USER_IS_DELETED);
+        }
+
+        return true;
+    }
+
     async createOrUpdateUser({
         userId,
         language,
@@ -563,7 +583,6 @@ export class UserService extends BaseCrudService<User> {
             const items = await enrichStoriesToPreviewDto(
                 stories,
                 this.mediaService,
-                userId,
             );
 
             return { page, limit, total, items };

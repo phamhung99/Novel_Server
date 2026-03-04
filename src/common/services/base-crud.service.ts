@@ -40,6 +40,16 @@ export abstract class BaseCrudService<T> {
     }
 
     async findById(id: string, throwIfNotFound = true): Promise<T> {
+        if (!id) {
+            if (throwIfNotFound) {
+                throw new NotFoundException(
+                    `${this.getEntityName()} ID is required`,
+                );
+            } else {
+                return null;
+            }
+        }
+
         const entity = await this.repository.findOne({ where: { id } as any });
 
         if (!entity && throwIfNotFound) {

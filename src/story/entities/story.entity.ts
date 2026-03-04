@@ -146,6 +146,9 @@ export class Story {
     @OneToMany(() => StoryLikes, (storyLikes) => storyLikes.story)
     likes: StoryLikes[];
 
+    @Column({ type: 'boolean', default: false, name: 'can_edit' })
+    canEdit: boolean;
+
     @OneToMany(
         () => UserAudioPreference,
         (audioPreference) => audioPreference.story,
@@ -154,4 +157,7 @@ export class Story {
 
     @OneToMany(() => StoryCategory, (storyCategory) => storyCategory.story)
     storyCategories: StoryCategory[];
+
+    @OneToMany(() => StoryLikes, (storyLikes) => storyLikes.story)
+    storyLikes: StoryLikes[];
 }

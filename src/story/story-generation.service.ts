@@ -493,6 +493,21 @@ export class StoryGenerationService {
                 );
             }
 
+            await this.userService.isUserActive(userId);
+
+            const story = await this.storyRepository.findOne({
+                where: { id: storyId },
+            });
+
+            const canEdit =
+                story?.authorId === userId || story?.canEdit === true;
+
+            if (!canEdit) {
+                throw new BadRequestException(
+                    'You do not have permission to edit this story',
+                );
+            }
+
             const existingChapters =
                 await this.chapterService.findDetailChaptersByStory(storyId);
 
