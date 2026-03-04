@@ -44,10 +44,10 @@ export class Chapter {
     @Column({ type: 'text' })
     content: string;
 
-    @Column({ name: 'created_by', nullable: true })
+    @Column({ name: 'created_by', nullable: false })
     createdBy: string;
 
-    @ManyToOne(() => User, { nullable: true, onDelete: 'RESTRICT' })
+    @ManyToOne(() => User, { nullable: false, onDelete: 'RESTRICT' })
     @JoinColumn({ name: 'created_by' })
     createdByUser: User;
 

@@ -670,6 +670,7 @@ export class StoryGenerationService {
                 index: chapterNumber,
                 title: chapterStructureResponse.title,
                 content: chapterStructureResponse.content,
+                createdBy: userId,
             });
 
             const savedChapter = await queryRunner.manager.save(chapter);
@@ -869,6 +870,8 @@ export class StoryGenerationService {
             where: { requestId },
             relations: ['chapter'],
         });
+
+        console.log(generation);
 
         if (!generation) {
             throw new HttpException(
