@@ -401,7 +401,7 @@ export class UserService extends BaseCrudService<User> {
         return user.role;
     }
 
-    async isUserActive(userId: string): Promise<boolean> {
+    async getActiveUserOrFail(userId: string): Promise<User> {
         if (!userId) {
             throw new BadRequestException('User ID is required');
         }
@@ -418,7 +418,7 @@ export class UserService extends BaseCrudService<User> {
             throw new NotFoundException(ERROR_MESSAGES.USER_IS_DELETED);
         }
 
-        return true;
+        return user;
     }
 
     async createOrUpdateUser({

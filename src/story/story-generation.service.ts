@@ -12,7 +12,7 @@ import { DataSource, Repository } from 'typeorm';
 import { Story } from './entities/story.entity';
 import { Chapter } from './entities/chapter.entity';
 import { StoryGeneration } from './entities/story-generation.entity';
-import { GenerationStatus } from 'src/common/enums/app.enum';
+import { GenerationStatus, UserRole } from 'src/common/enums/app.enum';
 import { ChapterGeneration } from './entities/chapter-generation.entity';
 import {
     InitializeStoryDto,
@@ -493,7 +493,7 @@ export class StoryGenerationService {
                 );
             }
 
-            await this.userService.isUserActive(userId);
+            const user = await this.userService.getActiveUserOrFail(userId);
 
             const story = await this.storyRepository.findOne({
                 where: { id: storyId },
@@ -548,14 +548,17 @@ export class StoryGenerationService {
             const storyPrompt = storyGeneration.prompt.storyPrompt || '';
 
             // only need transaction for DB updates and coin deduction
-            await this.userService.spendCoins({
-                userId,
-                amount: CHAPTER_CREATION_FEE,
-                referenceType: 'chapter_generation',
-                referenceId: storyGeneration.id,
-                description: `Chapter generation`,
-                manager: queryRunner.manager,
-            });
+
+            if (user.role !== UserRole.ADMIN) {
+                await this.userService.spendCoins({
+                    userId,
+                    amount: CHAPTER_CREATION_FEE,
+                    referenceType: 'chapter_generation',
+                    referenceId: storyGeneration.id,
+                    description: `Chapter generation`,
+                    manager: queryRunner.manager,
+                });
+            }
 
             // retry logic
             const MAX_ATTEMPTS = 2;
@@ -870,8 +873,6 @@ export class StoryGenerationService {
             where: { requestId },
             relations: ['chapter'],
         });
-
-        console.log(generation);
 
         if (!generation) {
             throw new HttpException(
