@@ -438,7 +438,9 @@ export class UserService extends BaseCrudService<User> {
             ],
         });
 
-        if (!user) {
+        const isNewUser = !user;
+
+        if (isNewUser) {
             const randomUsername = this.generateRandomUsername();
 
             user = this.repository.create({
@@ -447,8 +449,11 @@ export class UserService extends BaseCrudService<User> {
                 country: language,
                 platform: platform,
             });
+
+            await this.repository.save(user);
+
+            await this.recordDailyCheckInAndGrantBonus(user.id);
         }
-        await this.repository.save(user);
         return user;
     }
 
