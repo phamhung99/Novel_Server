@@ -565,7 +565,7 @@ export class StoryDiscoveryService {
 
                         if (!isNaN(days) && days > 0) {
                             qb.andWhere(
-                                's.updatedAt >= NOW() - INTERVAL :days DAY',
+                                's.updatedAt >= NOW() - make_interval(days => :days)',
                                 {
                                     days,
                                 },
@@ -593,10 +593,8 @@ export class StoryDiscoveryService {
 
                         if (!isNaN(days) && days > 0) {
                             qb.andWhere(
-                                's.approvedAt >= NOW() - INTERVAL :days DAY',
-                                {
-                                    days,
-                                },
+                                's.approvedAt >= NOW() - make_interval(days => :days)',
+                                { days },
                             );
                         }
                     }
