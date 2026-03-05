@@ -551,18 +551,25 @@ export class StoryController {
     // Chapter endpoints
     @Post(':storyId/chapter')
     async createChapter(
+        @Headers('x-user-id') userId: string,
         @Param('storyId') storyId: string,
         @Body() createChapterDto: CreateChapterDto,
     ) {
-        return this.chapterService.createChapter(storyId, createChapterDto);
+        return this.chapterService.createChapter(
+            userId,
+            storyId,
+            createChapterDto,
+        );
     }
 
     @Post(':storyId/chapter/bulk')
     async createChaptersBulk(
+        @Headers('x-user-id') userId: string,
         @Param('storyId') storyId: string,
         @Body() createChaptersDto: CreateChapterDto[],
     ) {
         return this.chapterService.createChaptersBulk(
+            userId,
             storyId,
             createChaptersDto,
         );

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useLocation } from 'react-router-dom';
 import {
     Box,
@@ -83,6 +83,15 @@ const ChapterGeneratorPage: React.FC = () => {
         '',
     );
     const [customDirection, setCustomDirection] = useState<string>('');
+
+    const userId = useMemo(() => {
+        try {
+            const user = JSON.parse(localStorage.getItem('user') || '{}');
+            return user.id || '';
+        } catch {
+            return '';
+        }
+    }, []);
 
     const toggleChapter = (idx: number) => {
         setExpanded((prev) => {
@@ -205,7 +214,12 @@ const ChapterGeneratorPage: React.FC = () => {
             axios.post(
                 `${BASE_URL}/${storyId}/generate/chapter`,
                 { direction },
-                { headers: { 'x-request-id': requestId } },
+                {
+                    headers: {
+                        'x-user-id': userId,
+                        'x-request-id': requestId,
+                    },
+                },
             );
 
             const newChapter = await pollChapterResult(requestId);
