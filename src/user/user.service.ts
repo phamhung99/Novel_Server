@@ -655,12 +655,13 @@ export class UserService extends BaseCrudService<User> {
         };
     }
 
-    async recordDailyCheckInAndGrantBonus(user: User) {
-        const userId = user.id;
+    async recordDailyCheckInAndGrantBonus(userId: string) {
         const todayStr = new Date().toISOString().split('T')[0];
 
         return this.dataSource.transaction(async (manager) => {
             const repo = manager.getRepository(UserDailyAction);
+
+            await this.getActiveUserOrFail(userId);
 
             // 1. Tìm hoặc tạo record login hôm nay
             let todayLogin = await repo.findOne({
