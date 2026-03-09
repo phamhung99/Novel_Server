@@ -127,6 +127,9 @@ export class Story {
     })
     tags: string[];
 
+    @Column({ type: 'boolean', default: false, name: 'is_completed' })
+    isCompleted: boolean;
+
     @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
     createdAt: Date;
 

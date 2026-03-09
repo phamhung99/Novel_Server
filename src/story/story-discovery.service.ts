@@ -80,6 +80,7 @@ export class StoryDiscoveryService {
                 's.sourceType AS "sourceType"',
                 's.tags AS "hashtags"',
                 's.canEdit AS "canEdit"',
+                's.isCompleted AS "isCompleted"',
 
                 `json_agg(DISTINCT jsonb_build_object('id', cat.id, 'name', cat.name)) AS "categories"`,
 
@@ -96,11 +97,6 @@ export class StoryDiscoveryService {
                 'CASE WHEN likes.id IS NULL THEN false ELSE true END AS "isLike"',
 
                 'ss.chapter_count AS "chapterCount"',
-
-                `(
-                    COALESCE(ss.chapter_count, 0) >= 
-                    COALESCE((generation.prompt ->> 'numberOfChapters')::int, 0)
-                ) AS "isCompleted"`,
             ])
             .groupBy('s.id')
             .addGroupBy('a.id')
@@ -201,6 +197,7 @@ export class StoryDiscoveryService {
                 's.trendingScore AS "trendingScore"',
                 's.tags AS "hashtags"',
                 's.canEdit AS "canEdit"',
+                's.isCompleted AS "isCompleted"',
 
                 `json_agg(DISTINCT jsonb_build_object('id', cat.id, 'name', cat.name)) AS "categories"`,
 
@@ -217,11 +214,6 @@ export class StoryDiscoveryService {
                 'CASE WHEN likes.id IS NULL THEN false ELSE true END AS "isLike"',
 
                 'ss.chapter_count AS "chapterCount"',
-
-                `(
-                    COALESCE(ss.chapter_count, 0) >= 
-                    COALESCE((generation.prompt ->> 'numberOfChapters')::int, 0)
-                ) AS "isCompleted"`,
             ])
 
             .where('s.visibility = :visibility', {
@@ -320,6 +312,7 @@ export class StoryDiscoveryService {
                 's.trendingScore AS "trendingScore"',
                 's.tags AS "hashtags"',
                 's.canEdit AS "canEdit"',
+                's.isCompleted AS "isCompleted"',
 
                 `json_agg(DISTINCT jsonb_build_object('id', cat.id, 'name', cat.name)) AS "categories"`,
 
@@ -336,11 +329,6 @@ export class StoryDiscoveryService {
                 'CASE WHEN likes.id IS NULL THEN false ELSE true END AS "isLike"',
 
                 'ss.chapter_count AS "chapterCount"',
-
-                `(
-                    COALESCE(ss.chapter_count, 0) >= 
-                    COALESCE((generation.prompt ->> 'numberOfChapters')::int, 0)
-                ) AS "isCompleted"`,
             ])
             .where('s.visibility = :visibility', {
                 visibility: StoryVisibility.PUBLIC,
@@ -455,6 +443,7 @@ export class StoryDiscoveryService {
                 's.visibility AS "visibility"',
                 's.tags AS "hashtags"',
                 's.canEdit AS "canEdit"',
+                's.isCompleted AS "isCompleted"',
 
                 // All categories array
                 `json_agg(DISTINCT jsonb_build_object('id', cat.id, 'name', cat.name)) FILTER (WHERE cat.id IS NOT NULL) AS "categories"`,
@@ -475,11 +464,6 @@ export class StoryDiscoveryService {
                 's.views_count AS "viewsCount"',
 
                 'ss.chapter_count AS "chapterCount"',
-
-                `(
-                    COALESCE(ss.chapter_count, 0) >= 
-                    COALESCE((generation.prompt ->> 'numberOfChapters')::int, 0)
-                ) AS "isCompleted"`,
             ])
             .where('s.visibility = :visibility', {
                 visibility: StoryVisibility.PUBLIC,
@@ -533,13 +517,9 @@ export class StoryDiscoveryService {
 
         // === Status filter: completed / ongoing ===
         if (status === StoryStatusFilter.COMPLETED) {
-            qb.andWhere(
-                `COALESCE(ss.chapter_count, 0) = COALESCE((generation.prompt ->> 'numberOfChapters')::int, 0)`,
-            );
+            qb.andWhere(`s.isCompleted = true`);
         } else if (status === StoryStatusFilter.ONGOING) {
-            qb.andWhere(
-                `COALESCE(ss.chapter_count, 0) < COALESCE((generation.prompt ->> 'numberOfChapters')::int, 0)`,
-            );
+            qb.andWhere(`s.isCompleted = false`);
         }
 
         // === Sorting ===
@@ -618,7 +598,6 @@ export class StoryDiscoveryService {
             .addGroupBy('ss.chapter_count')
             .addGroupBy('main_cat.id')
             .addGroupBy('main_cat.name')
-            .addGroupBy('ss.chapter_count')
 
             .offset(offset)
             .limit(limit)

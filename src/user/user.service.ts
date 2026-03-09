@@ -546,6 +546,7 @@ export class UserService extends BaseCrudService<User> {
                     's.likes_count AS "likesCount"',
                     's.views_count AS "viewsCount"',
                     's.tags AS "hashtags"',
+                    's.isCompleted AS "isCompleted"',
 
                     's.createdAt AS "createdAt"',
                     's.updatedAt AS "updatedAt"',
@@ -559,11 +560,6 @@ export class UserService extends BaseCrudService<User> {
                     'CASE WHEN likes.id IS NULL THEN false ELSE true END AS "isLike"',
 
                     'ss.chapter_count AS "chapterCount"',
-
-                    `(
-                        COALESCE(ss.chapter_count, 0) >= 
-                        COALESCE((generation.prompt ->> 'numberOfChapters')::int, 0)
-                    ) AS "isCompleted"`,
                 ])
                 .where('rh.user_id = :userId', { userId })
                 .andWhere('s.status = :status', {

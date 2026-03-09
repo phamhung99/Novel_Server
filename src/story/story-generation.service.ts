@@ -701,6 +701,16 @@ export class StoryGenerationService {
                 },
             );
 
+            if (chapterNumber === totalChapters) {
+                await queryRunner.manager.update(
+                    Story,
+                    { id: storyGeneration.storyId },
+                    {
+                        isCompleted: true,
+                    },
+                );
+            }
+
             await queryRunner.commitTransaction();
 
             return {
