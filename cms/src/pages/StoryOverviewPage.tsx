@@ -35,6 +35,8 @@ import axios from '../api/axios';
 import type { StoryDto } from '../types/app';
 import { ROUTES } from '../constants/app.constants';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
+import ContentCopyIcon from '@mui/icons-material/ContentCopy';
+import Tooltip from '@mui/material/Tooltip';
 
 const StoryOverviewPage = () => {
     const userId = useMemo(
@@ -420,11 +422,40 @@ const StoryOverviewPage = () => {
                                     sx={{ mb: 3 }}
                                 />
                             ) : (
-                                <>
-                                    <Typography variant="h3" gutterBottom>
+                                <Box
+                                    sx={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: 1.5,
+                                    }}
+                                >
+                                    <Typography variant="h3" component="h1">
                                         {story.title}
                                     </Typography>
-                                </>
+
+                                    <Tooltip
+                                        title="Copy story ID"
+                                        arrow
+                                        placement="top"
+                                    >
+                                        <IconButton
+                                            size="small"
+                                            onClick={() => {
+                                                navigator.clipboard.writeText(
+                                                    storyId!,
+                                                );
+                                            }}
+                                            sx={{
+                                                color: 'text.secondary',
+                                                '&:hover': {
+                                                    color: 'primary.main',
+                                                },
+                                            }}
+                                        >
+                                            <ContentCopyIcon fontSize="small" />
+                                        </IconButton>
+                                    </Tooltip>
+                                </Box>
                             )}
 
                             <Typography variant="body1" gutterBottom>
