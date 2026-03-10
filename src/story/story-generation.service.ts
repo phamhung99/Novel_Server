@@ -268,6 +268,7 @@ export class StoryGenerationService {
 
         let rawResponse: any = null;
         let outlineData: any = null;
+        let totalTokenCount: number = 0;
 
         const queryRunner = this.dataSource.createQueryRunner();
         await queryRunner.connect();
@@ -310,7 +311,7 @@ export class StoryGenerationService {
                 try {
                     effectiveModel = getEffectiveAiModel(dto, attempt);
 
-                    outlineData =
+                    const { content, totalTokenCount: outlineTokenCount } =
                         await this.storyGenerationApiService.generateStoryOutline(
                             {
                                 storyPrompt: sanitizedPrompt,
@@ -322,7 +323,10 @@ export class StoryGenerationService {
                             },
                         );
 
+                    outlineData = content;
+
                     rawResponse = outlineData.outline;
+                    totalTokenCount += outlineTokenCount;
                     break;
                 } catch (err: unknown) {
                     lastError = err;
@@ -401,6 +405,7 @@ export class StoryGenerationService {
                     } as any,
                     response: rawResponse,
                     status: GenerationStatus.COMPLETED,
+                    tokensUsed: totalTokenCount,
                 },
             );
 
@@ -412,6 +417,7 @@ export class StoryGenerationService {
 
             return {
                 message: 'Story initialized successfully',
+                tokensUsed: totalTokenCount,
             };
         } catch (error) {
             console.error('Error initializing story:', error);
@@ -460,6 +466,7 @@ export class StoryGenerationService {
         let savedPreGen: any = null;
 
         let rawResponse: any = null;
+        let totalTokenCount: number = 0;
 
         const queryRunner = this.dataSource.createQueryRunner();
         await queryRunner.connect();
@@ -572,7 +579,10 @@ export class StoryGenerationService {
                     effectiveModel = getEffectiveAiModel(dto, attempt);
 
                     if (isFirstChapter) {
-                        chapterStructureResponse =
+                        const {
+                            content,
+                            totalTokenCount: firstChapterTokenCount,
+                        } =
                             await this.storyGenerationApiService.generateFirstChapter(
                                 {
                                     storyId,
@@ -582,8 +592,15 @@ export class StoryGenerationService {
                                     aiModel: effectiveModel,
                                 },
                             );
+
+                        chapterStructureResponse = content;
+
+                        totalTokenCount += firstChapterTokenCount;
                     } else {
-                        chapterStructureResponse =
+                        const {
+                            content,
+                            totalTokenCount: remainingChaptersTokenCount,
+                        } =
                             await this.storyGenerationApiService.generateRemainChapters(
                                 {
                                     storyId,
@@ -596,6 +613,9 @@ export class StoryGenerationService {
                                     aiModel: effectiveModel,
                                 },
                             );
+
+                        chapterStructureResponse = content;
+                        totalTokenCount += remainingChaptersTokenCount;
                     }
 
                     rawResponse = chapterStructureResponse.raw;
@@ -690,6 +710,7 @@ export class StoryGenerationService {
                     storyGenerationId: storyGeneration.id,
                     chapterNumber,
                     status: GenerationStatus.COMPLETED,
+                    tokensUsed: totalTokenCount,
                 },
             );
 

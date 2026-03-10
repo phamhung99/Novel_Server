@@ -1,5 +1,8 @@
 import { Injectable, BadRequestException, Logger } from '@nestjs/common';
-import { ChapterStructureResponse } from '../../story/dto/generate-chapter.dto';
+import {
+    ChapterStructureContent,
+    ChapterStructureResponse,
+} from '../../story/dto/generate-chapter.dto';
 import { StoryGenerationProviderFactory } from './story-generation-provider.factory';
 import {
     STORY_OUTLINE_SCHEMA,
@@ -7,8 +10,7 @@ import {
 } from './response-schemas';
 import { GenerateRawContentDto } from '../dto/generate-raw-content.dto';
 
-// Internal DTOs for 3-step flow
-export interface StoryOutlineResponse {
+export interface StoryContent {
     title: string;
     synopsis: string;
     coverImage: string;
@@ -17,11 +19,16 @@ export interface StoryOutlineResponse {
     outline: string;
 }
 
-/**
- * Story Generation API Service
- * Orchestrates chapter generation using story generation AI providers
- * Implements 3-step flow: Outline → Structure → Complete Chapter
- */
+export interface StoryOutlineResponse {
+    content: StoryContent;
+    totalTokenCount: number;
+}
+
+export interface rawContentResponse {
+    content: string;
+    totalTokenCount: number;
+}
+
 @Injectable()
 export class StoryGenerationApiService {
     private readonly logger = new Logger(StoryGenerationApiService.name);
@@ -81,14 +88,23 @@ You think in three dimensions simultaneously:
 `;
 
         try {
-            const response = await aiProvider.generateContent({
-                prompt: userPrompt,
-                systemPrompt,
-                responseSchema: STORY_OUTLINE_SCHEMA,
-                model: dto.aiModel,
-            });
+            const { content, totalTokenCount } =
+                await aiProvider.generateContent({
+                    prompt: userPrompt,
+                    systemPrompt,
+                    responseSchema: STORY_OUTLINE_SCHEMA,
+                    model: dto.aiModel,
+                });
 
-            return this.parseStoryOutline(response, dto.numberOfChapters);
+            const parsedOutline = this.parseStoryOutline(
+                content,
+                dto.numberOfChapters,
+            );
+
+            return {
+                content: parsedOutline,
+                totalTokenCount,
+            };
         } catch (error) {
             this.logger.error('Error generating story outline:', error);
             throw new BadRequestException(
@@ -215,13 +231,23 @@ Return ONLY the JSON object. No additional text.
 `;
 
         try {
-            const response = await aiProvider.generateContent({
-                prompt: userPrompt,
-                systemPrompt,
-                responseSchema: CHAPTER_STRUCTURE_SCHEMA,
-                model: dto.aiModel,
-            });
-            return this.parseChapterStructure(response, dto.chapterNumber);
+            const { content, totalTokenCount } =
+                await aiProvider.generateContent({
+                    prompt: userPrompt,
+                    systemPrompt,
+                    responseSchema: CHAPTER_STRUCTURE_SCHEMA,
+                    model: dto.aiModel,
+                });
+
+            const chapterStructure = await this.parseChapterStructure(
+                content,
+                dto.chapterNumber,
+            );
+
+            return {
+                content: chapterStructure,
+                totalTokenCount,
+            };
         } catch (error) {
             this.logger.error('Error generating chapter structure:', error);
             throw new BadRequestException(
@@ -331,13 +357,23 @@ Return ONLY the JSON object. No additional text or commentary.
 `;
 
         try {
-            const response = await aiProvider.generateContent({
-                prompt: userPrompt,
-                systemPrompt,
-                responseSchema: CHAPTER_STRUCTURE_SCHEMA,
-                model: dto.aiModel,
-            });
-            return this.parseChapterStructure(response, dto.chapterNumber);
+            const { content, totalTokenCount } =
+                await aiProvider.generateContent({
+                    prompt: userPrompt,
+                    systemPrompt,
+                    responseSchema: CHAPTER_STRUCTURE_SCHEMA,
+                    model: dto.aiModel,
+                });
+
+            const chapterStructure = await this.parseChapterStructure(
+                content,
+                dto.chapterNumber,
+            );
+
+            return {
+                content: chapterStructure,
+                totalTokenCount,
+            };
         } catch (error) {
             this.logger.error('Error generating chapter structure:', error);
             throw new BadRequestException(
@@ -351,7 +387,7 @@ Return ONLY the JSON object. No additional text or commentary.
         aiProvider: string;
         chapterSummary: string;
         storyMetadata: string;
-    }): Promise<string> {
+    }): Promise<rawContentResponse> {
         const providerName = dto.aiProvider || 'grok';
         const aiProvider =
             this.storyGenerationProviderFactory.getProvider(providerName);
@@ -416,12 +452,16 @@ Architecture Alignment: Verify events serve story's core objectives from origina
 `;
 
         try {
-            const response = await aiProvider.generateContent({
-                prompt: userPrompt,
-                systemPrompt,
-            });
+            const { content, totalTokenCount } =
+                await aiProvider.generateContent({
+                    prompt: userPrompt,
+                    systemPrompt,
+                });
 
-            return response;
+            return {
+                content,
+                totalTokenCount,
+            };
         } catch (error) {
             this.logger.error('Error generating chapter structure:', error);
             throw new BadRequestException(
@@ -441,25 +481,10 @@ Architecture Alignment: Verify events serve story's core objectives from origina
         return match ? match[2].trim() : '';
     }
 
-    private extractArraySection(
-        content: string,
-        sectionName: string,
-    ): string[] {
-        const section = this.extractSection(content, sectionName);
-        return section
-            .split(/[,\n]/)
-            .map((item) => item.trim())
-            .filter((item) => item.length > 0);
-    }
-
-    /**
-     * Parse story outline response from AI
-     * Expects structured JSON response from AI with all 9 attributes
-     */
     private parseStoryOutline(
         content: string,
         numberOfChapters: number,
-    ): StoryOutlineResponse {
+    ): StoryContent {
         try {
             const parsed = JSON.parse(content);
 
@@ -511,7 +536,7 @@ Architecture Alignment: Verify events serve story's core objectives from origina
     private parseChapterStructure(
         content: string,
         chapterNumber: number,
-    ): ChapterStructureResponse {
+    ): ChapterStructureContent {
         try {
             const parsed = JSON.parse(content);
 
@@ -558,7 +583,7 @@ Architecture Alignment: Verify events serve story's core objectives from origina
         }
     }
 
-    async generateRawContent(dto: GenerateRawContentDto): Promise<string> {
+    async generateRawContent(dto: GenerateRawContentDto) {
         const providerName = dto.aiProvider || 'grok';
         const aiProvider =
             this.storyGenerationProviderFactory.getProvider(providerName);
@@ -572,12 +597,12 @@ Keep your answer focused, high-quality and well-structured.
 `.trim();
 
         try {
-            const response = await aiProvider.generateContent({
+            const { content } = await aiProvider.generateContent({
                 prompt: dto.prompt,
                 systemPrompt: effectiveSystemPrompt,
             });
 
-            return response;
+            return content;
         } catch (error) {
             this.logger.error('Error in generateRawContent:', error);
             throw new BadRequestException(
