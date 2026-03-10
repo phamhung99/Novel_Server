@@ -23,12 +23,17 @@ export class GenerateChapterDto {
     direction: string; // Additional direction for chapter generation
 }
 
-export interface ChapterStructureResponse {
+export interface ChapterStructureContent {
     chapterNumber: number;
     title: string;
     content: string;
     structure: any;
     raw: string;
+}
+
+export interface ChapterStructureResponse {
+    content: ChapterStructureContent;
+    totalTokenCount: number;
 }
 
 export interface NextOption {

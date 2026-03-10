@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { StoryService } from 'src/story/story.service';
 import {
     CHAPTER_CREATION_FEE,
@@ -13,6 +13,7 @@ import { IapStore } from 'src/common/enums/app.enum';
 
 @Injectable()
 export class MasterDataService {
+    private readonly logger = new Logger(MasterDataService.name);
     constructor(
         private readonly storyService: StoryService,
         private readonly userService: UserService,
@@ -24,16 +25,22 @@ export class MasterDataService {
             throw new BadRequestException(ERROR_MESSAGES.USER_ID_REQUIRED);
         }
 
-        const [user, categories, iapProducts, adUnlockChapter, adEarnCoin] =
+        const [categories, iapProducts, adUnlockChapter, adEarnCoin] =
             await Promise.all([
-                this.userService.findById(userId, false),
                 this.storyService.getAllCategories(),
                 this.iapProductService.findAllWithDisplayOrder(platform),
                 this.userService.getAdUnlockChapterStatus(userId),
                 this.userService.getAdEarnCoinStatus(userId),
             ]);
 
-        await this.userService.recordDailyCheckInAndGrantBonus(user);
+        try {
+            await this.userService.recordDailyCheckInAndGrantBonus(userId);
+        } catch (error) {
+            this.logger.warn(
+                `Failed to record daily check-in for user ${userId}: ${error.message}`,
+                error.stack,
+            );
+        }
 
         return {
             categories,

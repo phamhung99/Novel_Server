@@ -16,17 +16,20 @@ export class ChapterService {
     ) {}
 
     async createChapter(
+        userId: string,
         storyId: string,
         createChapterDto: CreateChapterDto,
     ): Promise<Chapter> {
         const chapter = this.chapterRepository.create({
             ...createChapterDto,
             storyId,
+            createdBy: userId,
         });
         return this.chapterRepository.save(chapter);
     }
 
     async createChaptersBulk(
+        userId: string,
         storyId: string,
         createChaptersDto: CreateChapterDto[],
     ): Promise<Chapter[]> {
@@ -34,6 +37,7 @@ export class ChapterService {
             this.chapterRepository.create({
                 ...dto,
                 storyId,
+                createdBy: userId,
             }),
         );
         return this.chapterRepository.save(chapters);

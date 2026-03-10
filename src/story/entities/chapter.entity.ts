@@ -7,13 +7,16 @@ import {
     ManyToOne,
     JoinColumn,
     OneToMany,
+    Index,
 } from 'typeorm';
 import { Story } from './story.entity';
 import { ChapterGeneration } from './chapter-generation.entity';
 import { ChapterState } from './chapter-states.entity';
 import { ChapterAudio } from './chapter-audio.entity';
+import { User } from 'src/user/entities/user.entity';
 
 @Entity('chapter')
+@Index('unique_chapter_per_story', ['storyId', 'index'], { unique: true })
 export class Chapter {
     @PrimaryGeneratedColumn('uuid')
     id: string;
@@ -40,6 +43,13 @@ export class Chapter {
 
     @Column({ type: 'text' })
     content: string;
+
+    @Column({ name: 'created_by', nullable: false })
+    createdBy: string;
+
+    @ManyToOne(() => User, { nullable: false, onDelete: 'RESTRICT' })
+    @JoinColumn({ name: 'created_by' })
+    createdByUser: User;
 
     @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
     createdAt: Date;

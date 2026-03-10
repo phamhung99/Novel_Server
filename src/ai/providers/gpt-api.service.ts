@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import axios, { AxiosInstance } from 'axios';
 import { IStoryGenerationProvider } from './story-generation-provider.interface';
 import { GenerateRawContentDto } from '../dto/generate-raw-content.dto';
+import { GenerateContentResult } from '../dto/generate-content-result.dto';
 
 /**
  * GPT API Service for Story Generation
@@ -29,7 +30,9 @@ export class GptApiService implements IStoryGenerationProvider {
         });
     }
 
-    async generateContent(dto: GenerateRawContentDto): Promise<string> {
+    async generateContent(
+        dto: GenerateRawContentDto,
+    ): Promise<GenerateContentResult> {
         try {
             const requestBody: any = {
                 model: this.modelName,
@@ -62,9 +65,32 @@ export class GptApiService implements IStoryGenerationProvider {
                 requestBody,
             );
 
-            return response.data.choices[0].message.content;
+            const data = response.data;
+            if (!data.choices || data.choices.length === 0) {
+                throw new Error('No choices returned from OpenAI API');
+            }
+
+            const message = data.choices[0].message;
+            const content = message.content || '';
+
+            const usage = data.usage || {};
+            const totalTokenCount = usage.total_tokens;
+
+            return {
+                content,
+                totalTokenCount,
+            };
         } catch (error) {
-            this.logger.error('Error calling OpenAI API:', error);
+            const errorDetail = error.response?.data
+                ? JSON.stringify(error.response.data, null, 2)
+                : error.message;
+
+            this.logger.error('Error calling OpenAI API:', {
+                message: errorDetail,
+                status: error.response?.status,
+                model: dto.model || this.modelName,
+            });
+
             throw error;
         }
     }

@@ -39,6 +39,7 @@ export interface StoryDto {
     categories: any[];
     chapters: ChapterDto[];
     generation?: any;
+    isCompleted: boolean;
 }
 
 export interface Message {

@@ -8,14 +8,11 @@ import {
     InternalServerErrorException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
 import { Story } from './entities/story.entity';
 import { Chapter } from './entities/chapter.entity';
-import {
-    StoryGeneration,
-    GenerationType,
-} from './entities/story-generation.entity';
-import { GenerationStatus } from 'src/common/enums/app.enum';
+import { StoryGeneration } from './entities/story-generation.entity';
+import { GenerationStatus, UserRole } from 'src/common/enums/app.enum';
 import { ChapterGeneration } from './entities/chapter-generation.entity';
 import {
     InitializeStoryDto,
@@ -27,9 +24,12 @@ import {
 } from './dto/generate-chapter.dto';
 import { StoryGenerationApiService } from '../ai/providers/story-generation-api.service';
 import {
+    CHAPTER_CREATION_FEE,
     DEFAULT_AI_PROVIDER,
     DEFAULT_COVER_IMAGE_URL,
+    IMAGE_CREATION_FEE,
     IMAGE_PREFIX,
+    STORY_CREATION_FEE,
 } from 'src/common/constants/app.constant';
 import { ChapterService } from './chapter/chapter.service';
 import { UserService } from 'src/user/user.service';
@@ -41,6 +41,7 @@ import { isEmptyObject } from 'src/ai/utils/object.utils';
 import { cleanNextOptions } from 'src/common/utils/chapter.utils';
 import { stripHtml } from 'src/common/utils/html.utils';
 import { ImageGeneration } from './entities/image-generation.entity';
+import { getEffectiveAiModel } from 'src/common/utils/aiModelSelector';
 
 @Injectable()
 export class StoryGenerationService {
@@ -66,6 +67,7 @@ export class StoryGenerationService {
         private mediaService: MediaService,
         private chapterService: ChapterService,
         private userService: UserService,
+        private readonly dataSource: DataSource,
     ) {}
 
     private sanitizePrompt(input: string): string {
@@ -102,12 +104,6 @@ export class StoryGenerationService {
         meta: any | undefined | null,
         dtoGenres: string[] | undefined | null,
     ): Promise<StoryCategory[]> {
-        if (!meta) {
-            throw new BadRequestException(
-                'Missing storyContext.meta in outline response',
-            );
-        }
-
         const primaryGenreWords = meta.primaryGenre
             ? meta.primaryGenre
                   .trim()
@@ -248,21 +244,8 @@ export class StoryGenerationService {
 
         const storyGeneration = this.storyGenerationRepository.create({
             requestId,
-            type: GenerationType.CHAPTER,
             status: GenerationStatus.PROCESSING,
             aiProvider: dto.aiProvider || DEFAULT_AI_PROVIDER,
-            aiModel: (() => {
-                switch (dto.aiProvider || DEFAULT_AI_PROVIDER) {
-                    case 'grok':
-                        return 'grok-4';
-                    case 'gpt':
-                        return 'gpt-4o-mini';
-                    case 'gemini':
-                        return 'gemini-3-pro-preview';
-                    default:
-                        return 'gemini-3-pro-preview';
-                }
-            })(),
             prompt: {
                 storyPrompt: dto.storyPrompt,
                 numberOfChapters: dto.numberOfChapters,
@@ -279,6 +262,12 @@ export class StoryGenerationService {
 
         let rawResponse: any = null;
         let outlineData: any = null;
+        let totalTokenCount: number = 0;
+
+        const queryRunner = this.dataSource.createQueryRunner();
+        await queryRunner.connect();
+        await queryRunner.startTransaction();
+
         try {
             if (!userId) {
                 throw new Error('userId is required');
@@ -296,14 +285,27 @@ export class StoryGenerationService {
             const sanitizedPrompt = this.sanitizePrompt(dto.storyPrompt || '');
             this.ensurePromptAllowed(sanitizedPrompt);
 
+            await this.userService.spendCoins({
+                userId,
+                amount: STORY_CREATION_FEE,
+                referenceType: 'story_initialization',
+                referenceId: storyGeneration.id,
+                description: `Story outline initialization`,
+                manager: queryRunner.manager,
+            });
+
             // retry logic
             const MAX_ATTEMPTS = 2;
             let attempt = 1;
             let lastError: any = null;
+            let currentRetryDetails = savedStoryGeneration.retryDetails || {};
+            let effectiveModel: string;
 
             while (attempt <= MAX_ATTEMPTS) {
                 try {
-                    outlineData =
+                    effectiveModel = getEffectiveAiModel(dto, attempt);
+
+                    const { content, totalTokenCount: outlineTokenCount } =
                         await this.storyGenerationApiService.generateStoryOutline(
                             {
                                 storyPrompt: sanitizedPrompt,
@@ -311,10 +313,14 @@ export class StoryGenerationService {
                                 numberOfChapters: dto.numberOfChapters,
                                 aiProvider:
                                     dto.aiProvider || DEFAULT_AI_PROVIDER,
+                                aiModel: effectiveModel,
                             },
                         );
 
+                    outlineData = content;
+
                     rawResponse = outlineData.outline;
+                    totalTokenCount += outlineTokenCount;
                     break;
                 } catch (err: unknown) {
                     lastError = err;
@@ -325,31 +331,27 @@ export class StoryGenerationService {
                         `Attempt ${attempt}/${MAX_ATTEMPTS} failed: ${errMsg}`,
                     );
 
-                    if (attempt < MAX_ATTEMPTS) {
-                        await this.storyGenerationRepository.update(
-                            { id: savedStoryGeneration.id },
-                            {
-                                attempts: attempt,
-                                retryDetails: {
-                                    ...(savedStoryGeneration.retryDetails ||
-                                        {}),
-                                    [`attempt_${attempt}`]: {
-                                        timestamp: new Date().toISOString(),
-                                        error: errMsg,
-                                        rawResponse,
-                                    },
-                                },
-                                lastAttemptAt: new Date(),
-                            },
-                        );
+                    currentRetryDetails = {
+                        ...currentRetryDetails,
+                        [`attempt_${attempt}`]: {
+                            timestamp: new Date().toISOString(),
+                            error: errMsg,
+                            rawResponse,
+                            aiModel: effectiveModel,
+                        },
+                    };
 
-                        attempt++;
-                        continue;
-                    } else {
-                        throw (
-                            lastError || new Error('Failed after max retries')
-                        );
-                    }
+                    await this.storyGenerationRepository.update(
+                        { id: savedStoryGeneration.id },
+                        {
+                            attempts: attempt,
+                            retryDetails: currentRetryDetails,
+                            lastAttemptAt: new Date(),
+                        },
+                    );
+
+                    attempt++;
+                    continue;
                 }
             }
 
@@ -360,32 +362,35 @@ export class StoryGenerationService {
                 );
             }
 
+            // ── Tạo categories ──
             const storyCategoryEntities = await this.buildStoryCategories(
                 outlineData.storyContext?.meta,
                 dto.genres,
             );
 
-            const story = this.storyRepository.create({
+            const story = queryRunner.manager.create(Story, {
                 title: outlineData.title,
                 synopsis: outlineData.synopsis,
                 authorId: userId,
             });
 
-            const savedStory = await this.storyRepository.save(story);
+            const savedStory = await queryRunner.manager.save(story);
 
             if (storyCategoryEntities.length > 0) {
                 storyCategoryEntities.forEach((sc) => {
                     sc.storyId = savedStory.id;
                 });
 
-                await this.storyCategoryRepository.save(storyCategoryEntities);
+                await queryRunner.manager.save(storyCategoryEntities);
             }
 
             // Update story generation record with story reference and attributes
-            await this.storyGenerationRepository.update(
+            await queryRunner.manager.update(
+                StoryGeneration,
                 { id: savedStoryGeneration.id },
                 {
                     storyId: savedStory.id,
+                    aiModel: effectiveModel,
                     title: outlineData.title,
                     synopsis: outlineData.synopsis,
                     metadata: {
@@ -394,18 +399,24 @@ export class StoryGenerationService {
                     } as any,
                     response: rawResponse,
                     status: GenerationStatus.COMPLETED,
+                    tokensUsed: totalTokenCount,
                 },
             );
 
             // Update story's generation reference
             savedStory.generation = savedStoryGeneration;
-            await this.storyRepository.save(savedStory);
+            await queryRunner.manager.save(savedStory);
+
+            await queryRunner.commitTransaction();
 
             return {
                 message: 'Story initialized successfully',
+                tokensUsed: totalTokenCount,
             };
         } catch (error) {
             console.error('Error initializing story:', error);
+
+            await queryRunner.rollbackTransaction();
 
             await this.storyGenerationRepository.update(
                 { id: savedStoryGeneration.id },
@@ -425,29 +436,37 @@ export class StoryGenerationService {
                 },
                 HttpStatus.BAD_REQUEST,
             );
+        } finally {
+            await queryRunner.release();
         }
     }
 
     async generateChapters(
+        userId: string,
         storyId: string,
         requestId: string,
         dto: GenerateChapterDto,
     ): Promise<GenerateChapterResponseDto | any> {
+        this.logger.log(
+            `Initializing chapter generation for requestId: ${requestId}`,
+        );
+
+        const exists = await this.chapterGenerationRepository.findOne({
+            where: { requestId },
+        });
+
+        if (exists) throw new BadRequestException('Duplicate request');
+
         let savedPreGen: any = null;
 
         let rawResponse: any = null;
+        let totalTokenCount: number = 0;
+
+        const queryRunner = this.dataSource.createQueryRunner();
+        await queryRunner.connect();
+        await queryRunner.startTransaction();
 
         try {
-            this.logger.log(
-                `Initializing chapter generation for requestId: ${requestId}`,
-            );
-
-            const exists = await this.chapterGenerationRepository.findOne({
-                where: { requestId },
-            });
-
-            if (exists) throw new BadRequestException('Duplicate request');
-
             // Tạo preGen trước, để luôn có record lưu lỗi
             savedPreGen = this.chapterGenerationRepository.create({
                 storyGenerationId: null, // tạm thời null, sẽ update sau nếu có storyGeneration
@@ -472,6 +491,21 @@ export class StoryGenerationService {
             if (!storyGeneration) {
                 throw new BadRequestException(
                     'Story generation record not found. Initialize story first.',
+                );
+            }
+
+            const user = await this.userService.getActiveUserOrFail(userId);
+
+            const story = await this.storyRepository.findOne({
+                where: { id: storyId },
+            });
+
+            const canEdit =
+                story?.authorId === userId || story?.canEdit === true;
+
+            if (!canEdit) {
+                throw new BadRequestException(
+                    'You do not have permission to edit this story',
                 );
             }
 
@@ -514,26 +548,53 @@ export class StoryGenerationService {
 
             const storyPrompt = storyGeneration.prompt.storyPrompt || '';
 
+            // only need transaction for DB updates and coin deduction
+
+            if (user.role !== UserRole.ADMIN) {
+                await this.userService.spendCoins({
+                    userId,
+                    amount: CHAPTER_CREATION_FEE,
+                    referenceType: 'chapter_generation',
+                    referenceId: storyGeneration.id,
+                    description: `Chapter generation`,
+                    manager: queryRunner.manager,
+                });
+            }
+
             // retry logic
             const MAX_ATTEMPTS = 2;
             let attempt = 1;
-            let lastError: any = null;
             let chapterStructureResponse: any = null;
+            let effectiveModel: string;
+            let currentRetryDetails = savedPreGen.retryDetails || {};
 
             while (attempt <= MAX_ATTEMPTS) {
                 try {
+                    effectiveModel = getEffectiveAiModel(dto, attempt);
+
                     if (isFirstChapter) {
-                        chapterStructureResponse =
+                        const {
+                            content,
+                            totalTokenCount: firstChapterTokenCount,
+                        } =
                             await this.storyGenerationApiService.generateFirstChapter(
                                 {
                                     storyId,
                                     chapterNumber,
                                     aiProvider: storyGeneration.aiProvider,
                                     storyMetadata,
+                                    aiModel: effectiveModel,
                                 },
                             );
+
+                        chapterStructureResponse = content;
+
+                        totalTokenCount += firstChapterTokenCount;
                     } else {
-                        chapterStructureResponse =
+                        const {
+                            content,
+                            totalTokenCount: remainingChaptersTokenCount,
+                        } =
                             await this.storyGenerationApiService.generateRemainChapters(
                                 {
                                     storyId,
@@ -543,14 +604,17 @@ export class StoryGenerationService {
                                     storyMetadata,
                                     previousChapterMetadata,
                                     storyPrompt: storyPrompt,
+                                    aiModel: effectiveModel,
                                 },
                             );
+
+                        chapterStructureResponse = content;
+                        totalTokenCount += remainingChaptersTokenCount;
                     }
 
                     rawResponse = chapterStructureResponse.raw;
                     break;
                 } catch (err: unknown) {
-                    lastError = err;
                     const errMsg =
                         err instanceof Error ? err.message : String(err);
 
@@ -558,30 +622,33 @@ export class StoryGenerationService {
                         `Chapter generation attempt ${attempt}/${MAX_ATTEMPTS} failed: ${errMsg}`,
                     );
 
-                    if (attempt < MAX_ATTEMPTS) {
-                        attempt++;
-                        await this.chapterGenerationRepository.update(
-                            { id: savedPreGen.id },
-                            {
-                                attempts: attempt,
-                                retryDetails: {
-                                    ...(savedPreGen.retryDetails || {}),
-                                    [`attempt_${attempt}`]: {
-                                        timestamp: new Date().toISOString(),
-                                        error: errMsg,
-                                        rawResponse,
-                                    },
-                                },
-                            },
-                        );
-                        continue;
-                    } else {
-                        // hết retry vẫn fail
-                        throw (
-                            lastError || new Error('Failed after max retries')
-                        );
-                    }
+                    currentRetryDetails = {
+                        ...currentRetryDetails,
+                        [`attempt_${attempt}`]: {
+                            timestamp: new Date().toISOString(),
+                            error: errMsg,
+                            rawResponse,
+                            aiModel: effectiveModel,
+                        },
+                    };
+
+                    await this.chapterGenerationRepository.update(
+                        { id: savedPreGen.id },
+                        {
+                            attempts: attempt,
+                            retryDetails: currentRetryDetails,
+                            lastAttemptAt: new Date(),
+                        },
+                    );
+
+                    attempt++;
                 }
+            }
+
+            if (!chapterStructureResponse) {
+                throw new Error(
+                    'Failed to generate chapter structure after retries',
+                );
             }
 
             if (
@@ -615,17 +682,19 @@ export class StoryGenerationService {
                 }
             }
 
-            const chapter = this.chapterRepository.create({
+            const chapter = queryRunner.manager.create(Chapter, {
                 storyId,
                 index: chapterNumber,
                 title: chapterStructureResponse.title,
                 content: chapterStructureResponse.content,
+                createdBy: userId,
             });
 
-            const savedChapter = await this.chapterRepository.save(chapter);
+            const savedChapter = await queryRunner.manager.save(chapter);
 
             // Update record đã lưu requestId lúc đầu
-            await this.chapterGenerationRepository.update(
+            await queryRunner.manager.update(
+                ChapterGeneration,
                 { id: savedPreGen.id },
                 {
                     chapterId: savedChapter.id,
@@ -635,21 +704,37 @@ export class StoryGenerationService {
                     storyGenerationId: storyGeneration.id,
                     chapterNumber,
                     status: GenerationStatus.COMPLETED,
+                    tokensUsed: totalTokenCount,
                 },
             );
 
-            await this.storyGenerationRepository.update(
+            await queryRunner.manager.update(
+                StoryGeneration,
                 { id: storyGeneration.id },
                 {
                     updatedAt: new Date(),
                 },
             );
 
+            if (chapterNumber === totalChapters) {
+                await queryRunner.manager.update(
+                    Story,
+                    { id: storyGeneration.storyId },
+                    {
+                        isCompleted: true,
+                    },
+                );
+            }
+
+            await queryRunner.commitTransaction();
+
             return {
                 message: 'Chapter generated successfully',
             };
         } catch (error) {
-            console.error('Error generating chapter:', error);
+            this.logger.error('Error generating chapter:', error);
+
+            await queryRunner.rollbackTransaction();
 
             if (savedPreGen) {
                 await this.chapterGenerationRepository.update(
@@ -673,6 +758,8 @@ export class StoryGenerationService {
                 },
                 HttpStatus.BAD_REQUEST,
             );
+        } finally {
+            await queryRunner.release();
         }
     }
 
@@ -952,14 +1039,17 @@ export class StoryGenerationService {
         save?: boolean,
     ): Promise<{ coverImageUrl: string }> {
         let imageGenRecord;
+        const exists = await this.chapterGenerationRepository.findOne({
+            where: { requestId },
+        });
+
+        if (exists) throw new BadRequestException('Duplicate request');
+
+        const queryRunner = this.dataSource.createQueryRunner();
+        await queryRunner.connect();
+        await queryRunner.startTransaction();
 
         try {
-            const exists = await this.chapterGenerationRepository.findOne({
-                where: { requestId },
-            });
-
-            if (exists) throw new BadRequestException('Duplicate request');
-
             imageGenRecord = this.imageGenerationRepository.create({
                 requestId,
                 entityType: 'story',
@@ -1009,10 +1099,19 @@ export class StoryGenerationService {
 
             let tempImageUrl: string;
 
+            // only need transaction for DB updates and coin deduction
+            await this.userService.spendCoins({
+                userId,
+                amount: IMAGE_CREATION_FEE,
+                referenceType: 'story_cover_generation',
+                referenceId: imageGenRecord.id,
+                description: `Story Cover generation`,
+                manager: queryRunner.manager,
+            });
+
             // retry logic
             const MAX_ATTEMPTS = 2;
             let attempt = 1;
-            let lastError: any = null;
 
             while (attempt <= MAX_ATTEMPTS) {
                 try {
@@ -1023,7 +1122,6 @@ export class StoryGenerationService {
                         );
                     break;
                 } catch (err) {
-                    lastError = err;
                     const errMsg =
                         err instanceof Error ? err.message : String(err);
 
@@ -1031,28 +1129,26 @@ export class StoryGenerationService {
                         `Cover image generation attempt ${attempt}/${MAX_ATTEMPTS} failed: ${errMsg}`,
                     );
 
-                    if (attempt < MAX_ATTEMPTS) {
-                        attempt++;
-                        await this.imageGenerationRepository.update(
-                            { id: imageGenRecord.id },
-                            {
-                                attempts: attempt,
-                                retryDetails: {
-                                    ...(imageGenRecord.retryDetails || {}),
-                                    [`attempt_${attempt}`]: {
-                                        timestamp: new Date().toISOString(),
-                                        error: errMsg,
-                                    },
+                    await this.imageGenerationRepository.update(
+                        { id: imageGenRecord.id },
+                        {
+                            attempts: attempt,
+                            retryDetails: {
+                                ...(imageGenRecord.retryDetails || {}),
+                                [`attempt_${attempt}`]: {
+                                    timestamp: new Date().toISOString(),
+                                    error: errMsg,
                                 },
                             },
-                        );
-                        continue;
-                    } else {
-                        throw (
-                            lastError || new Error('Failed after max retries')
-                        );
-                    }
+                        },
+                    );
+
+                    attempt++;
                 }
+            }
+
+            if (!tempImageUrl) {
+                throw new Error('Failed to generate cover image after retries');
             }
 
             let newCoverImageKey: string | null = null;
@@ -1070,7 +1166,8 @@ export class StoryGenerationService {
             const newCoverImageUrl =
                 await this.mediaService.getMediaUrl(newCoverImageKey);
 
-            await this.imageGenerationRepository.update(
+            await queryRunner.manager.update(
+                ImageGeneration,
                 { id: imageGenRecord.id },
                 {
                     imagePath: newCoverImageKey,
@@ -1082,11 +1179,14 @@ export class StoryGenerationService {
             const shouldSave = save !== undefined ? save : !prompt?.trim();
 
             if (shouldSave) {
-                await this.storyRepository.update(
+                await queryRunner.manager.update(
+                    Story,
                     { id: storyId },
                     { coverImage: newCoverImageKey },
                 );
             }
+
+            await queryRunner.commitTransaction();
 
             return {
                 coverImageUrl: newCoverImageUrl,
@@ -1102,14 +1202,20 @@ export class StoryGenerationService {
                 err instanceof Error ? err.stack : undefined,
             );
 
-            await this.imageGenerationRepository.update(
-                { id: imageGenRecord.id },
-                {
-                    status: GenerationStatus.FAILED,
-                    errorMessage: errorMsg,
-                    updatedAt: new Date(),
-                },
-            );
+            await queryRunner.rollbackTransaction();
+
+            if (imageGenRecord) {
+                await this.imageGenerationRepository.update(
+                    { id: imageGenRecord.id },
+                    {
+                        status: GenerationStatus.FAILED,
+                        errorMessage: errorMsg,
+                        updatedAt: new Date(),
+                    },
+                );
+            }
+        } finally {
+            await queryRunner.release();
         }
     }
 

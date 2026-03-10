@@ -55,6 +55,7 @@ import { Roles } from 'src/common/decorators/roles.decorator';
 import { RolesGuard } from 'src/common/guards/roles.guard';
 import { SkipTransform } from 'src/common/decorators/skip-transform.decorator';
 import { ChapterUnlockService } from './chapter/chapter-unlock.service';
+import { CreateReportDto } from './dto/create-report.dto';
 
 @Controller('story')
 export class StoryController {
@@ -74,6 +75,23 @@ export class StoryController {
         }
 
         return this.storyService.getPromptSuggestions(categoryIds);
+    }
+
+    @Post(':storyId/reports')
+    async reportStory(
+        @Headers('x-user-id') userId: string,
+        @Param('storyId') storyId: string,
+        @Body() createDto: CreateReportDto,
+    ) {
+        if (!userId) {
+            throw new BadRequestException(ERROR_MESSAGES.USER_ID_REQUIRED);
+        }
+
+        if (!storyId) {
+            throw new BadRequestException(ERROR_MESSAGES.STORY_ID_REQUIRED);
+        }
+
+        return this.userService.createStoryReport(userId, storyId, createDto);
     }
 
     @Get('trending/keywords')
@@ -274,6 +292,7 @@ export class StoryController {
     @Post(':storyId/generate/chapter')
     @SkipTransform()
     async generateChapterWithContext(
+        @Headers('x-user-id') userId: string,
         @Param('storyId') storyId: string,
         @Body() generateChapterDto: GenerateChapterDto,
         @Headers('x-request-id') headerRequestId?: string,
@@ -285,6 +304,7 @@ export class StoryController {
         }
 
         return await this.storyService.generateChapters(
+            userId,
             storyId,
             requestId,
             generateChapterDto,
@@ -531,18 +551,25 @@ export class StoryController {
     // Chapter endpoints
     @Post(':storyId/chapter')
     async createChapter(
+        @Headers('x-user-id') userId: string,
         @Param('storyId') storyId: string,
         @Body() createChapterDto: CreateChapterDto,
     ) {
-        return this.chapterService.createChapter(storyId, createChapterDto);
+        return this.chapterService.createChapter(
+            userId,
+            storyId,
+            createChapterDto,
+        );
     }
 
     @Post(':storyId/chapter/bulk')
     async createChaptersBulk(
+        @Headers('x-user-id') userId: string,
         @Param('storyId') storyId: string,
         @Body() createChaptersDto: CreateChapterDto[],
     ) {
         return this.chapterService.createChaptersBulk(
+            userId,
             storyId,
             createChaptersDto,
         );

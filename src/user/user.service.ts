@@ -55,6 +55,15 @@ import { PaginationDto } from 'src/story/dto/pagination.dto';
 import { IapProductService } from 'src/payments/iap-product.service';
 import { ConfigService } from '@nestjs/config';
 import { ChapterUnlockService } from 'src/story/chapter/chapter-unlock.service';
+import { CreateAppFeedbackDto } from './dto/create-app-feedback.dto';
+import { AppFeedback } from './entities/app-feedback.entity';
+import { CreateReportDto } from '../story/dto/create-report.dto';
+import {
+    ReportEntityType,
+    Report,
+    ReportReason,
+} from './entities/report.entity';
+import { StoryCrudService } from 'src/story/story-crud.service';
 
 const coinTransactionTitles: Record<CoinReferenceType, string> = {
     [CoinReferenceType.IAP]: 'In-App Purchase',
@@ -107,6 +116,12 @@ export class UserService extends BaseCrudService<User> {
         private readonly configService: ConfigService,
         @Inject(forwardRef(() => ChapterUnlockService))
         private readonly chapterUnlockService: ChapterUnlockService,
+        @InjectRepository(AppFeedback)
+        private readonly appFeedbackRepo: Repository<AppFeedback>,
+        @InjectRepository(Report)
+        private readonly reportRepo: Repository<Report>,
+        @Inject(forwardRef(() => StoryCrudService))
+        private readonly storyCrudService: StoryCrudService,
     ) {
         super(userRepo);
 
@@ -386,6 +401,26 @@ export class UserService extends BaseCrudService<User> {
         return user.role;
     }
 
+    async getActiveUserOrFail(userId: string): Promise<User> {
+        if (!userId) {
+            throw new BadRequestException('User ID is required');
+        }
+
+        const user = await this.repository.findOne({
+            where: { id: userId },
+        });
+
+        if (!user) {
+            throw new NotFoundException(ERROR_MESSAGES.USER_NOT_FOUND);
+        }
+
+        if (user.deletedAt) {
+            throw new NotFoundException(ERROR_MESSAGES.USER_IS_DELETED);
+        }
+
+        return user;
+    }
+
     async createOrUpdateUser({
         userId,
         language,
@@ -403,7 +438,9 @@ export class UserService extends BaseCrudService<User> {
             ],
         });
 
-        if (!user) {
+        const isNewUser = !user;
+
+        if (isNewUser) {
             const randomUsername = this.generateRandomUsername();
 
             user = this.repository.create({
@@ -412,8 +449,11 @@ export class UserService extends BaseCrudService<User> {
                 country: language,
                 platform: platform,
             });
+
+            await this.repository.save(user);
+
+            await this.recordDailyCheckInAndGrantBonus(user.id);
         }
-        await this.repository.save(user);
         return user;
     }
 
@@ -506,6 +546,8 @@ export class UserService extends BaseCrudService<User> {
                     's.likes_count AS "likesCount"',
                     's.views_count AS "viewsCount"',
                     's.tags AS "hashtags"',
+                    's.canEdit AS "canEdit"',
+                    's.isCompleted AS "isCompleted"',
 
                     's.createdAt AS "createdAt"',
                     's.updatedAt AS "updatedAt"',
@@ -519,11 +561,6 @@ export class UserService extends BaseCrudService<User> {
                     'CASE WHEN likes.id IS NULL THEN false ELSE true END AS "isLike"',
 
                     'ss.chapter_count AS "chapterCount"',
-
-                    `(
-                        COALESCE(ss.chapter_count, 0) >= 
-                        COALESCE((generation.prompt ->> 'numberOfChapters')::int, 0)
-                    ) AS "isCompleted"`,
                 ])
                 .where('rh.user_id = :userId', { userId })
                 .andWhere('s.status = :status', {
@@ -548,7 +585,6 @@ export class UserService extends BaseCrudService<User> {
             const items = await enrichStoriesToPreviewDto(
                 stories,
                 this.mediaService,
-                userId,
             );
 
             return { page, limit, total, items };
@@ -621,12 +657,13 @@ export class UserService extends BaseCrudService<User> {
         };
     }
 
-    async recordDailyCheckInAndGrantBonus(user: User) {
-        const userId = user.id;
+    async recordDailyCheckInAndGrantBonus(userId: string) {
         const todayStr = new Date().toISOString().split('T')[0];
 
         return this.dataSource.transaction(async (manager) => {
             const repo = manager.getRepository(UserDailyAction);
+
+            await this.getActiveUserOrFail(userId);
 
             // 1. Tìm hoặc tạo record login hôm nay
             let todayLogin = await repo.findOne({
@@ -1380,5 +1417,65 @@ export class UserService extends BaseCrudService<User> {
             currentViews,
             maxViews: this.MAX_AD_VIEWS_COIN_PER_DAY,
         };
+    }
+
+    async createAppFeedback(
+        userId: string,
+        platform: string,
+        createDto: CreateAppFeedbackDto,
+    ): Promise<AppFeedback> {
+        const user = await this.repository.findOne({
+            where: { id: userId },
+        });
+
+        if (!user) {
+            throw new NotFoundException(ERROR_MESSAGES.USER_NOT_FOUND);
+        }
+
+        let feedback = await this.appFeedbackRepo.findOne({
+            where: { userId },
+        });
+
+        if (feedback) {
+            feedback.platform = platform;
+            feedback.rating = createDto.rating;
+            feedback.comment = createDto.comment;
+            return await this.appFeedbackRepo.save(feedback);
+        }
+
+        feedback = this.appFeedbackRepo.create({
+            userId,
+            platform,
+            rating: createDto.rating,
+            comment: createDto.comment,
+        });
+
+        return await this.appFeedbackRepo.save(feedback);
+    }
+
+    async createStoryReport(
+        userId: string,
+        storyId: string,
+        createDto: CreateReportDto,
+    ) {
+        await this.findById(userId);
+
+        await this.storyCrudService.findStoryById(storyId);
+
+        if (createDto.reason === ReportReason.OTHER && !createDto.description) {
+            throw new BadRequestException(
+                'Description is required when reason is OTHER',
+            );
+        }
+
+        const report = this.reportRepo.create({
+            reporterId: userId,
+            entityType: ReportEntityType.STORY,
+            entityId: storyId,
+            reason: createDto.reason,
+            description: createDto.description,
+        });
+
+        return await this.reportRepo.save(report);
     }
 }

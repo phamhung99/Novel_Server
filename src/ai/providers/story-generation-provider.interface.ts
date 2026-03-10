@@ -1,4 +1,5 @@
-import { GenerateRawContentDto } from "../dto/generate-raw-content.dto";
+import { GenerateContentResult } from '../dto/generate-content-result.dto';
+import { GenerateRawContentDto } from '../dto/generate-raw-content.dto';
 
 /**
  * Story Generation Provider Interface
@@ -18,7 +19,7 @@ export interface IStoryGenerationProvider {
      * @param dto - Configuration object for content generation
      * @returns Generated content as string
      */
-    generateContent(dto: GenerateRawContentDto): Promise<string>;
+    generateContent(dto: GenerateRawContentDto): Promise<GenerateContentResult>;
 
     generateImage(prompt: string, model?: string): Promise<string>;
 

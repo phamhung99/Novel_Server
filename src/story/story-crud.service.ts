@@ -319,6 +319,7 @@ export class StoryCrudService {
                 visibility: true,
                 sourceType: true,
                 isFullyFree: true,
+                isCompleted: true,
                 freeChaptersCount: true,
                 likesCount: true,
                 viewsCount: true,
@@ -394,10 +395,7 @@ export class StoryCrudService {
         };
     }
 
-    async findPreviewStoryById(
-        id: string,
-        currentUserId?: string,
-    ): Promise<StoryPreviewDto> {
+    async findPreviewStoryById(id: string): Promise<StoryPreviewDto> {
         const story = await this.storyRepository.findOne({
             where: { id },
             relations: [
@@ -406,6 +404,7 @@ export class StoryCrudService {
                 'generation',
                 'storyCategories',
                 'storyCategories.category',
+                'storyLikes',
             ],
             order: {
                 chapters: {
@@ -419,26 +418,12 @@ export class StoryCrudService {
         }
 
         const previewInput = {
-            storyId: story.id,
-            title: story.title,
-            synopsis: story.synopsis,
-            rating: story.rating,
-            type: story.type,
-            status: story.status,
-            createdAt: story.createdAt,
-            updatedAt: story.updatedAt,
-            visibility: story.visibility,
-            likesCount: story.likesCount ?? 0,
-            viewsCount: story.viewsCount ?? 0,
-            sourceType: story.sourceType,
+            ...story,
             chapterCount: story.chapters?.length ?? 0,
             hashtags: story.tags ?? [],
-
             authorId: story.author?.id,
             authorUsername: story.author?.username,
             profileImage: story.author?.profileImage,
-            coverImage: story.coverImage,
-
             categories:
                 story.storyCategories
                     ?.filter((sc) => sc.category)
@@ -457,18 +442,15 @@ export class StoryCrudService {
                       )!.category.name,
                   }
                 : null,
+            isLike: story.storyLikes?.length > 0 ? true : false,
+            isCompleted: story.isCompleted,
 
+            // fix cứng tạm thời, sẽ update sau
             lastReadAt: null,
             lastReadChapter: null,
-            isLike: false,
-            isCompleted: false,
         };
 
-        return enrichStoryToPreviewDto(
-            previewInput,
-            this.mediaService,
-            currentUserId,
-        );
+        return enrichStoryToPreviewDto(previewInput, this.mediaService);
     }
 
     async updateStory(
@@ -492,8 +474,6 @@ export class StoryCrudService {
                 '',
             );
         }
-
-        console.log(updateStoryDto);
 
         Object.assign(story, updateStoryDto);
         await this.storyRepository.save(story);

@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import axios, { AxiosInstance } from 'axios';
 import { IStoryGenerationProvider } from './story-generation-provider.interface';
 import { GenerateRawContentDto } from '../dto/generate-raw-content.dto';
+import { GenerateContentResult } from '../dto/generate-content-result.dto';
 
 @Injectable()
 export class GeminiApiService implements IStoryGenerationProvider {
@@ -34,7 +35,9 @@ export class GeminiApiService implements IStoryGenerationProvider {
         });
     }
 
-    async generateContent(dto: GenerateRawContentDto): Promise<string> {
+    async generateContent(
+        dto: GenerateRawContentDto,
+    ): Promise<GenerateContentResult> {
         try {
             let model = this.modelName;
 
@@ -70,14 +73,21 @@ export class GeminiApiService implements IStoryGenerationProvider {
             );
 
             // Kiểm tra an toàn hơn
-            const candidates = response.data.candidates;
+            const data = response.data;
+            const candidates = data.candidates;
             if (!candidates || candidates.length === 0) {
                 throw new Error('No candidates returned from Gemini API');
             }
 
             console.log('Gemini API response data:', response.data);
 
-            return candidates[0].content.parts[0].text;
+            const content = candidates[0].content.parts[0].text;
+            const usage = data.usageMetadata || {};
+
+            return {
+                content,
+                totalTokenCount: usage.totalTokenCount,
+            };
         } catch (error) {
             this.logger.error(
                 'Error calling Gemini API:',

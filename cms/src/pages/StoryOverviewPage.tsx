@@ -35,6 +35,8 @@ import axios from '../api/axios';
 import type { StoryDto } from '../types/app';
 import { ROUTES } from '../constants/app.constants';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
+import ContentCopyIcon from '@mui/icons-material/ContentCopy';
+import Tooltip from '@mui/material/Tooltip';
 
 const StoryOverviewPage = () => {
     const userId = useMemo(
@@ -243,6 +245,7 @@ const StoryOverviewPage = () => {
                     freeChaptersCount: story.freeChaptersCount,
                     isFullyFree: story.isFullyFree,
                     tags: tempTags,
+                    isCompleted: story.isCompleted,
                 },
                 {
                     headers: { 'x-user-id': userId },
@@ -419,22 +422,40 @@ const StoryOverviewPage = () => {
                                     sx={{ mb: 3 }}
                                 />
                             ) : (
-                                <>
-                                    <Typography variant="h3" gutterBottom>
+                                <Box
+                                    sx={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: 1.5,
+                                    }}
+                                >
+                                    <Typography variant="h3" component="h1">
                                         {story.title}
                                     </Typography>
-                                    <Typography
-                                        variant="caption"
-                                        color="text.secondary"
-                                        sx={{
-                                            display: 'block',
-                                            mb: 2,
-                                            fontFamily: 'monospace',
-                                        }}
+
+                                    <Tooltip
+                                        title="Copy story ID"
+                                        arrow
+                                        placement="top"
                                     >
-                                        ID: {storyId}
-                                    </Typography>
-                                </>
+                                        <IconButton
+                                            size="small"
+                                            onClick={() => {
+                                                navigator.clipboard.writeText(
+                                                    storyId!,
+                                                );
+                                            }}
+                                            sx={{
+                                                color: 'text.secondary',
+                                                '&:hover': {
+                                                    color: 'primary.main',
+                                                },
+                                            }}
+                                        >
+                                            <ContentCopyIcon fontSize="small" />
+                                        </IconButton>
+                                    </Tooltip>
+                                </Box>
                             )}
 
                             <Typography variant="body1" gutterBottom>
@@ -525,6 +546,41 @@ const StoryOverviewPage = () => {
                                             </FormHelperText>
                                         </FormControl>
                                     </Grid>
+
+                                    <Grid size={{ xs: 12, sm: 6 }}>
+                                        <FormControl fullWidth>
+                                            <InputLabel>
+                                                Completion Status
+                                            </InputLabel>
+                                            <Select
+                                                value={
+                                                    story.isCompleted
+                                                        ? 'completed'
+                                                        : 'ongoing'
+                                                }
+                                                label="Completion Status"
+                                                onChange={(e) =>
+                                                    handleChange(
+                                                        'isCompleted',
+                                                        e.target.value ===
+                                                            'completed',
+                                                    )
+                                                }
+                                            >
+                                                <MenuItem value="ongoing">
+                                                    Ongoing
+                                                </MenuItem>
+                                                <MenuItem value="completed">
+                                                    Completed
+                                                </MenuItem>
+                                            </Select>
+                                            <FormHelperText>
+                                                {story.isCompleted
+                                                    ? 'All chapters have been published — story is finished'
+                                                    : 'New chapters may still be added in the future'}
+                                            </FormHelperText>
+                                        </FormControl>
+                                    </Grid>
                                 </Grid>
                             ) : (
                                 // ── Display mode ─────────────────────────────────────────────
@@ -554,6 +610,26 @@ const StoryOverviewPage = () => {
                                             variant="outlined"
                                         />
                                     )}
+
+                                    <Chip
+                                        label={
+                                            story.isCompleted
+                                                ? 'Completed'
+                                                : 'Ongoing'
+                                        }
+                                        color={
+                                            story.isCompleted
+                                                ? 'success'
+                                                : 'warning'
+                                        }
+                                        variant="filled"
+                                        size="medium"
+                                        sx={{
+                                            fontWeight: 'medium',
+                                            marginLeft: 1,
+                                            minWidth: 110,
+                                        }}
+                                    />
                                 </Box>
                             )}
 

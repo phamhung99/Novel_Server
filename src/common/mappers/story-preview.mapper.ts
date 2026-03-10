@@ -4,7 +4,6 @@ import { StoryPreviewDto } from 'src/story/dto/story-preview.dto';
 export async function enrichStoryToPreviewDto(
     story: any,
     mediaService: MediaService,
-    userId?: string,
 ): Promise<StoryPreviewDto> {
     return {
         storyId: story.storyId,
@@ -41,18 +40,15 @@ export async function enrichStoryToPreviewDto(
             ? await mediaService.getMediaUrl(story.coverImage)
             : null,
 
-        canEdit: false,
+        canEdit: story.canEdit || false,
     };
 }
 
 export async function enrichStoriesToPreviewDto(
     rawStories: any[],
     mediaService: MediaService,
-    userId?: string,
 ): Promise<StoryPreviewDto[]> {
     return Promise.all(
-        rawStories.map((story) =>
-            enrichStoryToPreviewDto(story, mediaService, userId),
-        ),
+        rawStories.map((story) => enrichStoryToPreviewDto(story, mediaService)),
     );
 }

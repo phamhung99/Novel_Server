@@ -52,6 +52,11 @@ import { PromptSuggestion } from './entities/prompt-suggestion.entity';
         ChapterService,
         ChapterUnlockService,
     ],
-    exports: [StoryService, ChapterService, ChapterUnlockService],
+    exports: [
+        StoryService,
+        ChapterService,
+        ChapterUnlockService,
+        StoryCrudService,
+    ],
 })
 export class StoryModule {}
