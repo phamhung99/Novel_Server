@@ -546,6 +546,7 @@ export class UserService extends BaseCrudService<User> {
                     's.likes_count AS "likesCount"',
                     's.views_count AS "viewsCount"',
                     's.tags AS "hashtags"',
+                    's.canEdit AS "canEdit"',
                     's.isCompleted AS "isCompleted"',
 
                     's.createdAt AS "createdAt"',
