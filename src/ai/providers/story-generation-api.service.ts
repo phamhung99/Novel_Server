@@ -488,6 +488,12 @@ Architecture Alignment: Verify events serve story's core objectives from origina
         try {
             const parsed = JSON.parse(content);
 
+            if (!parsed.storyContext?.meta) {
+                throw new BadRequestException(
+                    'AI response is missing required storyContext.meta field in outline response',
+                );
+            }
+
             return {
                 title: parsed.uiDisplay?.storyTitle || 'Untitled',
                 synopsis: parsed.uiDisplay?.storyCoverBlurb || '',
@@ -501,35 +507,6 @@ Architecture Alignment: Verify events serve story's core objectives from origina
                 'Failed to parse JSON response, falling back to text parsing',
                 error,
             );
-
-            try {
-                return {
-                    title:
-                        this.extractSection(
-                            content,
-                            'Tên truyện|Tiêu đề|Title',
-                        ) || 'Untitled',
-                    synopsis:
-                        this.extractSection(content, 'Tóm tắt|Synopsis') || '',
-                    coverImage: '', // fallback không parse được từ text
-                    storyContext: { rawContent: content },
-                    numberOfChapters,
-                    outline: content,
-                };
-            } catch (fallbackError) {
-                this.logger.error(
-                    'Error parsing story outline:',
-                    fallbackError,
-                );
-                return {
-                    title: 'Untitled',
-                    synopsis: '',
-                    coverImage: '',
-                    storyContext: { rawContent: content },
-                    numberOfChapters,
-                    outline: content,
-                };
-            }
         }
     }
 
@@ -539,6 +516,12 @@ Architecture Alignment: Verify events serve story's core objectives from origina
     ): ChapterStructureContent {
         try {
             const parsed = JSON.parse(content);
+
+            if (!parsed.continuitySnapshot?.nextOptions) {
+                throw new BadRequestException(
+                    'AI response is missing required continuitySnapshot.nextOptions field in chapter structure response',
+                );
+            }
 
             return {
                 chapterNumber,

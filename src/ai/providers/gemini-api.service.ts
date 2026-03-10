@@ -10,7 +10,7 @@ export class GeminiApiService implements IStoryGenerationProvider {
     private readonly logger = new Logger(GeminiApiService.name);
     private client: AxiosInstance;
     private readonly apiKey: string;
-    private readonly modelName = 'gemini-3-pro-preview';
+    private readonly modelName = 'gemini-3.1-pro-preview';
     private readonly imagenModels = new Set([
         'imagen-4.0-generate-001',
         'imagen-4.0-ultra-generate-001',

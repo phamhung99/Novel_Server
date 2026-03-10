@@ -16,7 +16,9 @@ export function getEffectiveAiModel(
     switch (provider) {
         case 'gemini': {
             const isFirstAttempt = attempt === 1;
-            return isFirstAttempt ? 'gemini-3-pro-preview' : 'gemini-2.5-flash';
+            return isFirstAttempt
+                ? 'gemini-3.1-pro-preview'
+                : 'gemini-2.5-flash';
         }
 
         case 'grok':

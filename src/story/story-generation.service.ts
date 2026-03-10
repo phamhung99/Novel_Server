@@ -104,12 +104,6 @@ export class StoryGenerationService {
         meta: any | undefined | null,
         dtoGenres: string[] | undefined | null,
     ): Promise<StoryCategory[]> {
-        if (!meta) {
-            throw new BadRequestException(
-                'Missing storyContext.meta in outline response',
-            );
-        }
-
         const primaryGenreWords = meta.primaryGenre
             ? meta.primaryGenre
                   .trim()
