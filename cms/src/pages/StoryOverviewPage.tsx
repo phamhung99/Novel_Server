@@ -243,6 +243,7 @@ const StoryOverviewPage = () => {
                     freeChaptersCount: story.freeChaptersCount,
                     isFullyFree: story.isFullyFree,
                     tags: tempTags,
+                    isCompleted: story.isCompleted,
                 },
                 {
                     headers: { 'x-user-id': userId },
@@ -423,17 +424,6 @@ const StoryOverviewPage = () => {
                                     <Typography variant="h3" gutterBottom>
                                         {story.title}
                                     </Typography>
-                                    <Typography
-                                        variant="caption"
-                                        color="text.secondary"
-                                        sx={{
-                                            display: 'block',
-                                            mb: 2,
-                                            fontFamily: 'monospace',
-                                        }}
-                                    >
-                                        ID: {storyId}
-                                    </Typography>
                                 </>
                             )}
 
@@ -525,6 +515,41 @@ const StoryOverviewPage = () => {
                                             </FormHelperText>
                                         </FormControl>
                                     </Grid>
+
+                                    <Grid size={{ xs: 12, sm: 6 }}>
+                                        <FormControl fullWidth>
+                                            <InputLabel>
+                                                Completion Status
+                                            </InputLabel>
+                                            <Select
+                                                value={
+                                                    story.isCompleted
+                                                        ? 'completed'
+                                                        : 'ongoing'
+                                                }
+                                                label="Completion Status"
+                                                onChange={(e) =>
+                                                    handleChange(
+                                                        'isCompleted',
+                                                        e.target.value ===
+                                                            'completed',
+                                                    )
+                                                }
+                                            >
+                                                <MenuItem value="ongoing">
+                                                    Ongoing
+                                                </MenuItem>
+                                                <MenuItem value="completed">
+                                                    Completed
+                                                </MenuItem>
+                                            </Select>
+                                            <FormHelperText>
+                                                {story.isCompleted
+                                                    ? 'All chapters have been published — story is finished'
+                                                    : 'New chapters may still be added in the future'}
+                                            </FormHelperText>
+                                        </FormControl>
+                                    </Grid>
                                 </Grid>
                             ) : (
                                 // ── Display mode ─────────────────────────────────────────────
@@ -554,6 +579,26 @@ const StoryOverviewPage = () => {
                                             variant="outlined"
                                         />
                                     )}
+
+                                    <Chip
+                                        label={
+                                            story.isCompleted
+                                                ? 'Completed'
+                                                : 'Ongoing'
+                                        }
+                                        color={
+                                            story.isCompleted
+                                                ? 'success'
+                                                : 'warning'
+                                        }
+                                        variant="filled"
+                                        size="medium"
+                                        sx={{
+                                            fontWeight: 'medium',
+                                            marginLeft: 1,
+                                            minWidth: 110,
+                                        }}
+                                    />
                                 </Box>
                             )}
 

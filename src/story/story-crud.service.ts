@@ -319,6 +319,7 @@ export class StoryCrudService {
                 visibility: true,
                 sourceType: true,
                 isFullyFree: true,
+                isCompleted: true,
                 freeChaptersCount: true,
                 likesCount: true,
                 viewsCount: true,
@@ -442,11 +443,11 @@ export class StoryCrudService {
                   }
                 : null,
             isLike: story.storyLikes?.length > 0 ? true : false,
+            isCompleted: story.isCompleted,
 
             // fix cứng tạm thời, sẽ update sau
             lastReadAt: null,
             lastReadChapter: null,
-            isCompleted: false,
         };
 
         return enrichStoryToPreviewDto(previewInput, this.mediaService);
