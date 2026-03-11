@@ -1,12 +1,12 @@
 services:
   comickey-postgres:
-    image: postgres:15-alpine
+    image: postgres:17-alpine
     ports:
       - 5432:5432
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: comickey
+      POSTGRES_DB: nova
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
