@@ -46,26 +46,39 @@ export default function UsersPage() {
     }, [page, pageSize]);
 
     const columns: GridColDef[] = [
-        { field: 'id', headerName: 'ID', flex: 1 },
-        { field: 'username', headerName: 'Username', flex: 1 },
-        { field: 'country', headerName: 'Country', flex: 1 },
         {
             field: 'profileImage',
             headerName: 'Avatar',
-            flex: 1,
+            width: 80,
             renderCell: (params) => (
-                <img
-                    src={params.value || '/default-avatar.png'}
-                    alt="avatar"
-                    style={{
-                        width: 32,
-                        height: 32,
-                        borderRadius: '50%',
-                        objectFit: 'cover',
+                <Box
+                    sx={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        width: '100%',
+                        height: '100%',
                     }}
-                />
+                >
+                    <img
+                        src={params.value || '/default-avatar.png'}
+                        alt="avatar"
+                        style={{
+                            width: 36,
+                            height: 36,
+                            borderRadius: '50%',
+                            objectFit: 'cover',
+                            border: '2px solid #e0e0e0',
+                            boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+                        }}
+                    />
+                </Box>
             ),
         },
+        { field: 'id', headerName: 'ID', flex: 1 },
+        { field: 'username', headerName: 'Username', flex: 1 },
+        { field: 'country', headerName: 'Country', flex: 1 },
+
         {
             field: 'createdAt',
             headerName: 'Created At',
@@ -96,11 +109,11 @@ export default function UsersPage() {
         );
 
     return (
-        <Box p={2} sx={{ maxWidth: '1200px', overflowX: 'auto' }}>
+        <Box p={2} sx={{ maxWidth: '100%', overflowX: 'auto' }}>
             <Typography variant="h5" mb={2} fontWeight={600}>
                 Users
             </Typography>
-            <Box sx={{ height: 600, minWidth: 800 }}>
+            <Box sx={{ height: 600, width: '100%' }}>
                 <DataGrid
                     rows={users}
                     getRowId={(row) => row.id}
@@ -114,10 +127,6 @@ export default function UsersPage() {
                     onSortModelChange={(sortModel) => {
                         if (sortModel.length) {
                             const { field, sort } = sortModel[0];
-                            console.log({
-                                field,
-                                sort,
-                            });
 
                             loadUsers({
                                 page,
