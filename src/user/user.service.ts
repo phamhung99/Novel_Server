@@ -504,19 +504,13 @@ export class UserService extends BaseCrudService<User> {
         const { data, total } = await this.findAndCount(queryOptions);
 
         const transformedUsers = data.map((user) => {
-            const { id, country, ipCountryCode, username, createdAt } = user;
-
             const profileImage = this.mediaService.getMediaUrl(
                 user.profileImage,
             );
 
             return {
-                id,
-                country,
-                ipCountryCode,
-                username,
+                ...user,
                 profileImage,
-                createdAt,
             };
         });
 
