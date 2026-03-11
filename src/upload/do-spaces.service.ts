@@ -83,7 +83,7 @@ export class DoSpacesService implements OnModuleInit {
         );
     }
 
-    async getImageUrl(key: string): Promise<string> {
+    getImageUrl(key: string): string {
         return `https://${this.bucket}.${this.region}.cdn.digitaloceanspaces.com/${key}`;
     }
 

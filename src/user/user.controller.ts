@@ -17,7 +17,6 @@ import {
 } from '@nestjs/common';
 import { UserService } from './user.service';
 import { User } from './entities/user.entity';
-import { parseQueryOptions } from 'src/common/utils/parse-query-options.util';
 import {
     ERROR_MESSAGES,
     MAX_FILE_SIZE_UPLOAD,
@@ -201,26 +200,17 @@ export class UserController {
         @Query('searchField') searchField?: string,
         @Query('searchValue') searchValue?: string,
     ) {
-        const validKeys: (keyof User)[] = [
-            'id',
-            'country',
-            'ipCountryCode',
-            'username',
-            'email',
-            'profileImage',
-            'deletedAt',
-            'createdAt',
-            'updatedAt',
-        ];
+        const result = await this.userService.findAllWithPagination({
+            page,
+            limit,
+            filter,
+            sort,
+            fields,
+            searchField,
+            searchValue,
+        });
 
-        const options = parseQueryOptions<User>(
-            { filter, sort, fields, page, limit, searchField, searchValue },
-            validKeys,
-        );
-
-        const { data, total } = await this.userService.findAndCount(options);
-
-        return { users: data, total };
+        return result;
     }
 
     @Get(':id')

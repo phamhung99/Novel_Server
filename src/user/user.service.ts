@@ -64,6 +64,22 @@ import {
     ReportReason,
 } from './entities/report.entity';
 import { StoryCrudService } from 'src/story/story-crud.service';
+import { parseQueryOptions } from 'src/common/utils/parse-query-options.util';
+
+export interface FindAllOptions {
+    page: number;
+    limit: number;
+    filter?: string;
+    sort?: string;
+    fields?: string;
+    searchField?: string;
+    searchValue?: string;
+}
+
+export interface PaginatedUsersResult {
+    users: any[];
+    total: number;
+}
 
 const coinTransactionTitles: Record<CoinReferenceType, string> = {
     [CoinReferenceType.IAP]: 'In-App Purchase',
@@ -455,6 +471,59 @@ export class UserService extends BaseCrudService<User> {
             await this.recordDailyCheckInAndGrantBonus(user.id);
         }
         return user;
+    }
+
+    async findAllWithPagination(
+        options: FindAllOptions,
+    ): Promise<PaginatedUsersResult> {
+        const validKeys: (keyof User)[] = [
+            'id',
+            'country',
+            'ipCountryCode',
+            'username',
+            'email',
+            'profileImage',
+            'deletedAt',
+            'createdAt',
+            'updatedAt',
+        ];
+
+        const queryOptions = parseQueryOptions<User>(
+            {
+                filter: options.filter,
+                sort: options.sort,
+                fields: options.fields,
+                page: options.page,
+                limit: options.limit,
+                searchField: options.searchField,
+                searchValue: options.searchValue,
+            },
+            validKeys,
+        );
+
+        const { data, total } = await this.findAndCount(queryOptions);
+
+        const transformedUsers = data.map((user) => {
+            const { id, country, ipCountryCode, username, createdAt } = user;
+
+            const profileImage = this.mediaService.getMediaUrl(
+                user.profileImage,
+            );
+
+            return {
+                id,
+                country,
+                ipCountryCode,
+                username,
+                profileImage,
+                createdAt,
+            };
+        });
+
+        return {
+            users: transformedUsers,
+            total,
+        };
     }
 
     async getSelectedCategories(userId: string) {
