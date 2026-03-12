@@ -50,6 +50,7 @@ export class UserRewardService {
         private readonly userSubscriptionService: UserSubscriptionService,
         @Inject(forwardRef(() => ChapterUnlockService))
         private readonly chapterUnlockService: ChapterUnlockService,
+        @Inject(forwardRef(() => UserService))
         private readonly userService: UserService,
     ) {}
 
