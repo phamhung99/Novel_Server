@@ -6,6 +6,8 @@ import {
     NotFoundException,
     Logger,
     InternalServerErrorException,
+    forwardRef,
+    Inject,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
@@ -42,6 +44,7 @@ import { cleanNextOptions } from 'src/common/utils/chapter.utils';
 import { stripHtml } from 'src/common/utils/html.utils';
 import { ImageGeneration } from './entities/image-generation.entity';
 import { getEffectiveAiModel } from 'src/common/utils/aiModelSelector';
+import { UserCoinService } from 'src/user/user-coin.service';
 
 @Injectable()
 export class StoryGenerationService {
@@ -68,6 +71,8 @@ export class StoryGenerationService {
         private chapterService: ChapterService,
         private userService: UserService,
         private readonly dataSource: DataSource,
+        @Inject(forwardRef(() => UserCoinService))
+        private readonly userCoinService: UserCoinService,
     ) {}
 
     private sanitizePrompt(input: string): string {
@@ -285,7 +290,7 @@ export class StoryGenerationService {
             const sanitizedPrompt = this.sanitizePrompt(dto.storyPrompt || '');
             this.ensurePromptAllowed(sanitizedPrompt);
 
-            await this.userService.spendCoins({
+            await this.userCoinService.spendCoins({
                 userId,
                 amount: STORY_CREATION_FEE,
                 referenceType: 'story_initialization',
@@ -551,7 +556,7 @@ export class StoryGenerationService {
             // only need transaction for DB updates and coin deduction
 
             if (user.role !== UserRole.ADMIN) {
-                await this.userService.spendCoins({
+                await this.userCoinService.spendCoins({
                     userId,
                     amount: CHAPTER_CREATION_FEE,
                     referenceType: 'chapter_generation',
@@ -1100,7 +1105,7 @@ export class StoryGenerationService {
             let tempImageUrl: string;
 
             // only need transaction for DB updates and coin deduction
-            await this.userService.spendCoins({
+            await this.userCoinService.spendCoins({
                 userId,
                 amount: IMAGE_CREATION_FEE,
                 referenceType: 'story_cover_generation',

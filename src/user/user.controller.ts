@@ -32,10 +32,18 @@ import { MimeTypeValidator } from 'src/common/validators/mime-type.validator';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { PaginationDto } from 'src/story/dto/pagination.dto';
 import { CreateAppFeedbackDto } from './dto/create-app-feedback.dto';
+import { UserRewardService } from './user-reward.service';
+import { UserReportService } from './user-report.service';
+import { UserCoinService } from './user-coin.service';
 
 @Controller('users')
 export class UserController {
-    constructor(private readonly userService: UserService) {}
+    constructor(
+        private readonly userService: UserService,
+        private readonly userRewardService: UserRewardService,
+        private readonly userReportService: UserReportService,
+        private readonly userCoinService: UserCoinService,
+    ) {}
 
     @Get('reward')
     async getReward(@Headers('x-user-id') userId: string) {
@@ -43,7 +51,7 @@ export class UserController {
             throw new BadRequestException(ERROR_MESSAGES.USER_ID_REQUIRED);
         }
 
-        return this.userService.getReward(userId);
+        return this.userRewardService.getReward(userId);
     }
 
     @Post('feedback')
@@ -56,7 +64,11 @@ export class UserController {
             throw new BadRequestException(ERROR_MESSAGES.USER_ID_REQUIRED);
         }
 
-        return this.userService.createAppFeedback(userId, platform, createDto);
+        return this.userReportService.createAppFeedback(
+            userId,
+            platform,
+            createDto,
+        );
     }
 
     @Get('me/coin-transactions')
@@ -68,7 +80,7 @@ export class UserController {
             throw new BadRequestException(ERROR_MESSAGES.USER_ID_REQUIRED);
         }
 
-        return this.userService.getCoinTransactions(userId, paginationDto);
+        return this.userCoinService.getCoinTransactions(userId, paginationDto);
     }
 
     @Post('ads/watch/coin')
@@ -78,7 +90,8 @@ export class UserController {
             throw new BadRequestException(ERROR_MESSAGES.USER_ID_REQUIRED);
         }
 
-        const result = await this.userService.watchAdsAndGrantBonus(userId);
+        const result =
+            await this.userRewardService.watchAdsAndGrantBonus(userId);
         return result;
     }
 
@@ -92,7 +105,10 @@ export class UserController {
             throw new BadRequestException(ERROR_MESSAGES.USER_ID_REQUIRED);
         }
 
-        return this.userService.watchAdsAndUnlockChapter(userId, chapterId);
+        return this.userRewardService.watchAdsAndUnlockChapter(
+            userId,
+            chapterId,
+        );
     }
 
     @Patch('me')
