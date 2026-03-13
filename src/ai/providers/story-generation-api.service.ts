@@ -9,6 +9,7 @@ import {
     CHAPTER_STRUCTURE_SCHEMA,
 } from './response-schemas';
 import { GenerateRawContentDto } from '../dto/generate-raw-content.dto';
+import { isEmptyObject } from '../utils/object.utils';
 
 export interface StoryContent {
     title: string;
@@ -517,9 +518,15 @@ Architecture Alignment: Verify events serve story's core objectives from origina
         try {
             const parsed = JSON.parse(content);
 
-            if (!parsed.continuitySnapshot?.nextOptions) {
+            if (
+                !parsed ||
+                !parsed.display?.chapterTitle ||
+                !parsed.display?.content ||
+                isEmptyObject(parsed.continuitySnapshot) ||
+                !parsed.continuitySnapshot?.nextOptions
+            ) {
                 throw new BadRequestException(
-                    'AI response is missing required continuitySnapshot.nextOptions field in chapter structure response',
+                    'AI response is missing required fields in chapter structure response',
                 );
             }
 

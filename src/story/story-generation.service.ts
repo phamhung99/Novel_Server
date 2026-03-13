@@ -650,12 +650,6 @@ export class StoryGenerationService {
                 }
             }
 
-            if (!chapterStructureResponse) {
-                throw new Error(
-                    'Failed to generate chapter structure after retries',
-                );
-            }
-
             if (
                 !chapterStructureResponse ||
                 !chapterStructureResponse.content ||
@@ -663,7 +657,7 @@ export class StoryGenerationService {
                 isEmptyObject(chapterStructureResponse.structure)
             ) {
                 throw new BadRequestException(
-                    'Generated chapter missing content or structure, please try again.',
+                    'Failed to generate chapter structure after retries',
                 );
             }
 
