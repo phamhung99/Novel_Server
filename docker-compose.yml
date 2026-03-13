@@ -1,5 +1,5 @@
 services:
-  comickey-postgres:
+  novel-postgres:
     image: postgres:17-alpine
     ports:
       - 5432:5432
@@ -9,6 +9,21 @@ services:
       POSTGRES_DB: nova
     volumes:
       - postgres_data:/var/lib/postgresql/data
+
+  novel-lambda:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: novel-lambda
+    ports:
+      - "9000:8080"                 # Local: 9000 → Container: 8080
+    env_file:
+      - .env.development
+    environment:
+      NODE_ENV: development
+    depends_on:
+      novel-postgres:
+        condition: service_healthy
 
 volumes:
   postgres_data:
