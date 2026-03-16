@@ -108,7 +108,7 @@ export class MediaService {
         await this.storage.deleteImage(key);
     }
 
-    async getMediaUrl(key: string): Promise<string> {
+    getMediaUrl(key: string): string {
         return this.storage.getImageUrl(key);
     }
 }

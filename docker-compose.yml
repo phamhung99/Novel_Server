@@ -1,14 +1,35 @@
 services:
-  comickey-postgres:
-    image: postgres:15-alpine
+  novel-postgres:
+    image: postgres:17-alpine
     ports:
       - 5432:5432
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: comickey
+      POSTGRES_DB: nova
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s         
+      timeout: 5s           
+      retries: 5           
+      start_period: 10s    
+
+  novel-lambda:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: novel-lambda
+    ports:
+      - "9000:8080"                 # Local: 9000 → Container: 8080
+    env_file:
+      - .env.development
+    environment:
+      NODE_ENV: development
+    depends_on:
+      novel-postgres:
+        condition: service_healthy
 
 volumes:
   postgres_data:

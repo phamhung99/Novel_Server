@@ -56,6 +56,7 @@ import { RolesGuard } from 'src/common/guards/roles.guard';
 import { SkipTransform } from 'src/common/decorators/skip-transform.decorator';
 import { ChapterUnlockService } from './chapter/chapter-unlock.service';
 import { CreateReportDto } from './dto/create-report.dto';
+import { UserReportService } from 'src/user/user-report.service';
 
 @Controller('story')
 export class StoryController {
@@ -64,6 +65,7 @@ export class StoryController {
         private readonly userService: UserService,
         private readonly chapterService: ChapterService,
         private readonly chapterUnlockService: ChapterUnlockService,
+        private readonly userReportService: UserReportService,
     ) {}
 
     @Get('/prompt-suggestions')
@@ -91,7 +93,11 @@ export class StoryController {
             throw new BadRequestException(ERROR_MESSAGES.STORY_ID_REQUIRED);
         }
 
-        return this.userService.createStoryReport(userId, storyId, createDto);
+        return this.userReportService.createStoryReport(
+            userId,
+            storyId,
+            createDto,
+        );
     }
 
     @Get('trending/keywords')

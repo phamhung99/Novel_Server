@@ -14,6 +14,7 @@ import { StoryPreviewChapterDto } from '../dto/story-preview.dto';
 import { CoinReferenceType, UserRole } from 'src/common/enums/app.enum';
 import { CHAPTER_UNLOCK_FEE } from 'src/common/constants/app.constant';
 import { ChapterState } from '../entities/chapter-states.entity';
+import { UserCoinService } from 'src/user/user-coin.service';
 
 interface ChaptersWithLockParams {
     storyId: string;
@@ -30,6 +31,8 @@ export class ChapterUnlockService {
         private dataSource: DataSource,
         @Inject(forwardRef(() => UserService))
         private readonly userService: UserService,
+        @Inject(forwardRef(() => UserCoinService))
+        private readonly userCoinService: UserCoinService,
     ) {}
 
     async canUserAccessChapter(
@@ -357,7 +360,7 @@ export class ChapterUnlockService {
         return this.dataSource.transaction(async (manager) => {
             const chapter = accessCheck.chapter!;
 
-            const { newBalance } = await this.userService.spendCoins({
+            const { newBalance } = await this.userCoinService.spendCoins({
                 userId,
                 amount: CHAPTER_UNLOCK_FEE,
                 referenceType: CoinReferenceType.CHAPTER_UNLOCK,

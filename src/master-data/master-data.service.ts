@@ -10,6 +10,7 @@ import {
 import { UserService } from 'src/user/user.service';
 import { IapProductService } from 'src/payments/iap-product.service';
 import { IapStore } from 'src/common/enums/app.enum';
+import { UserRewardService } from 'src/user/user-reward.service';
 
 @Injectable()
 export class MasterDataService {
@@ -17,6 +18,7 @@ export class MasterDataService {
     constructor(
         private readonly storyService: StoryService,
         private readonly userService: UserService,
+        private readonly userRewardService: UserRewardService,
         private readonly iapProductService: IapProductService,
     ) {}
 
@@ -29,12 +31,12 @@ export class MasterDataService {
             await Promise.all([
                 this.storyService.getAllCategories(),
                 this.iapProductService.findAllWithDisplayOrder(platform),
-                this.userService.getAdUnlockChapterStatus(userId),
-                this.userService.getAdEarnCoinStatus(userId),
+                this.userRewardService.getAdUnlockChapterStatus(userId),
+                this.userRewardService.getAdEarnCoinStatus(userId),
             ]);
 
         try {
-            await this.userService.recordDailyCheckInAndGrantBonus(userId);
+            await this.userRewardService.recordDailyCheckInAndGrantBonus(userId);
         } catch (error) {
             this.logger.warn(
                 `Failed to record daily check-in for user ${userId}: ${error.message}`,

@@ -26,6 +26,7 @@ import {
     ParsedTransactionData,
 } from 'src/app-store/app-store.service';
 import { toDate } from 'src/common/utils/date.utils';
+import { UserCoinService } from 'src/user/user-coin.service';
 
 @Injectable()
 export class PaymentsService {
@@ -42,6 +43,7 @@ export class PaymentsService {
         private readonly dataSource: DataSource,
         private readonly iapProductService: IapProductService,
         private readonly appStoreService: AppStoreService,
+        private readonly userCoinService: UserCoinService,
     ) {
         this.testUserIds =
             this.configService.get<string[]>('testUserIds') || [];
@@ -363,7 +365,7 @@ export class PaymentsService {
             await queryRunner.manager.save(transaction);
 
             // 4. Cấp coin
-            await this.userService.addCoins({
+            await this.userCoinService.addCoins({
                 manager: queryRunner.manager,
                 userId,
                 amount: coinsToAdd,

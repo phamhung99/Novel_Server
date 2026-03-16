@@ -269,10 +269,21 @@ const StoryOverviewPage = () => {
     // Add new tag
     const handleAddTag = () => {
         if (!newTagInput.trim()) return;
-        const tag = newTagInput.trim().toLowerCase();
-        if (tag && !tempTags.includes(tag)) {
-            setTempTags((prev) => [...prev, tag]);
-        }
+
+        const newTags = newTagInput
+            .trim()
+            .split(/\s+/)
+            .map((t) => t.trim().toLowerCase())
+            .filter((t) => t.length > 0);
+
+        if (newTags.length === 0) return;
+
+        setTempTags((prev) => {
+            const existing = new Set(prev.map((t) => t.toLowerCase()));
+            const toAdd = newTags.filter((t) => !existing.has(t));
+            return [...prev, ...toAdd];
+        });
+
         setNewTagInput('');
     };
 
@@ -834,11 +845,18 @@ const StoryOverviewPage = () => {
                                                 size="small"
                                                 label="Add tag (press Enter)"
                                                 value={newTagInput}
-                                                onChange={(e) =>
-                                                    setNewTagInput(
-                                                        e.target.value,
-                                                    )
-                                                }
+                                                onChange={(e) => {
+                                                    const value =
+                                                        e.target.value;
+                                                    setNewTagInput(value);
+
+                                                    if (
+                                                        value.endsWith(' ') &&
+                                                        value.trim()
+                                                    ) {
+                                                        handleAddTag();
+                                                    }
+                                                }}
                                                 onKeyDown={(e) => {
                                                     if (e.key === 'Enter') {
                                                         e.preventDefault();

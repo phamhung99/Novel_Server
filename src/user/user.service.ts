@@ -1,136 +1,60 @@
 import {
     BadRequestException,
-    forwardRef,
-    Inject,
     Injectable,
     Logger,
     NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, EntityManager, MoreThan, Repository } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
 import { User } from './entities/user.entity';
 import { BaseCrudService } from 'src/common/services/base-crud.service';
 import { UserCategoryPreference } from './entities/user-category-preference.entity';
 import {
     DEFAULT_PROFILE_IMAGE_URL,
     ERROR_MESSAGES,
-    MS_PER_DAY,
-    TEMPORARY_COIN_DAYS,
 } from 'src/common/constants/app.constant';
 import { ReadingHistory } from './entities/reading-history.entity';
 import { StoryStatus } from 'src/common/enums/story-status.enum';
-import { UserCoins } from './entities/user-coins.entity';
-import {
-    ActionType,
-    CoinReferenceType,
-    CoinTransactionType,
-    CoinType,
-    IapStore,
-    TransactionStatus,
-} from 'src/common/enums/app.enum';
 import { MediaService } from 'src/media/media.service';
-import { UserDailyAction } from './entities/user-daily-action.entity';
-import {
-    addDays,
-    shouldResetByInterval,
-    shouldResetMonthly,
-    shouldResetWeekly,
-    shouldResetYearly,
-} from 'src/common/utils/date.utils';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { PaginatedStoryPreviewResponse } from 'src/story/dto/paginated-story-preview.response';
 import { enrichStoriesToPreviewDto } from 'src/common/mappers/story-preview.mapper';
 import { Chapter } from 'src/story/entities/chapter.entity';
-import { WalletDto } from './dto/wallet.dto';
-import {
-    AdInfoDto,
-    RewardResponseDto,
-    WatchAdsResponseDto,
-    WatchAdsUnlockChapterResponseDto,
-    WeekDayDto,
-} from './dto/weekly-checkin.dto';
-import { CoinTransaction } from './entities/coin-transaction.entity';
-import { Transaction } from 'src/payments/entities/transaction.entity';
-import { PaginationDto } from 'src/story/dto/pagination.dto';
-import { IapProductService } from 'src/payments/iap-product.service';
-import { ConfigService } from '@nestjs/config';
-import { ChapterUnlockService } from 'src/story/chapter/chapter-unlock.service';
-import { CreateAppFeedbackDto } from './dto/create-app-feedback.dto';
-import { AppFeedback } from './entities/app-feedback.entity';
-import { CreateReportDto } from '../story/dto/create-report.dto';
-import {
-    ReportEntityType,
-    Report,
-    ReportReason,
-} from './entities/report.entity';
-import { StoryCrudService } from 'src/story/story-crud.service';
+import { UserCoinService } from './user-coin.service';
+import { UserSubscriptionService } from './user-subscription.service';
+import { UserRewardService } from './user-reward.service';
+import { parseQueryOptions } from 'src/common/utils/parse-query-options.util';
 
-const coinTransactionTitles: Record<CoinReferenceType, string> = {
-    [CoinReferenceType.IAP]: 'In-App Purchase',
-    [CoinReferenceType.LOGIN]: 'Daily Login Bonus',
-    [CoinReferenceType.WATCH_AD_COIN]: 'Ad Watch Coin Reward',
-    [CoinReferenceType.CHAPTER_UNLOCK]: 'Chapter Unlock',
-    [CoinReferenceType.ADMIN_ADJUST]: 'Admin Adjustment',
-    [CoinReferenceType.REFUND]: 'Refund',
-    [CoinReferenceType.GIFT_CODE]: 'Gift Code Reward',
-};
+export interface FindAllOptions {
+    page: number;
+    limit: number;
+    filter?: string;
+    sort?: string;
+    fields?: string;
+    searchField?: string;
+    searchValue?: string;
+}
 
-enum ResetPeriod {
-    Weekly = 'weekly',
-    Monthly = 'monthly',
-    Yearly = 'yearly',
+export interface PaginatedUsersResult {
+    users: any[];
+    total: number;
 }
 
 @Injectable()
 export class UserService extends BaseCrudService<User> {
     private readonly logger = new Logger(UserService.name);
 
-    private readonly STREAK_REWARDS = [10, 15, 40, 10, 15, 15, 30] as const;
-
-    private readonly PREMIUM_STREAK_REWARDS = [
-        100, 100, 100, 100, 100, 100, 100,
-    ] as const;
-
-    private readonly AD_REWARD_COINS = 10;
-    private readonly MAX_AD_VIEWS_COIN_PER_DAY = 5;
-    private readonly MAX_AD_VIEWS_UNLOCK_PER_DAY = 5;
-
-    private readonly enableTestSubscription: boolean;
-    private readonly testSubscriptionIntervalMinutes: number;
-
     constructor(
         @InjectRepository(User) userRepo: Repository<User>,
         @InjectRepository(UserCategoryPreference)
         private readonly userCategoryPreferenceRepo: Repository<UserCategoryPreference>,
         private readonly dataSource: DataSource,
-        @InjectRepository(UserCoins)
-        private readonly userCoinsRepository: Repository<UserCoins>,
-        private mediaService: MediaService,
-        @InjectRepository(UserDailyAction)
-        private readonly userDailyActionRepo: Repository<UserDailyAction>,
-        @InjectRepository(CoinTransaction)
-        private readonly coinTransactionRepo: Repository<CoinTransaction>,
-        @InjectRepository(Transaction)
-        private readonly transactionRepo: Repository<Transaction>,
-        private readonly iapProductService: IapProductService,
-        private readonly configService: ConfigService,
-        @Inject(forwardRef(() => ChapterUnlockService))
-        private readonly chapterUnlockService: ChapterUnlockService,
-        @InjectRepository(AppFeedback)
-        private readonly appFeedbackRepo: Repository<AppFeedback>,
-        @InjectRepository(Report)
-        private readonly reportRepo: Repository<Report>,
-        @Inject(forwardRef(() => StoryCrudService))
-        private readonly storyCrudService: StoryCrudService,
+        private readonly mediaService: MediaService,
+        private readonly userCoinService: UserCoinService,
+        private readonly userSubscriptionService: UserSubscriptionService,
+        private readonly userRewardService: UserRewardService,
     ) {
         super(userRepo);
-
-        this.enableTestSubscription = this.configService.get<boolean>(
-            'ENABLE_TEST_SUBSCRIPTION',
-        );
-        this.testSubscriptionIntervalMinutes = this.configService.get<number>(
-            'TEST_SUBSCRIPTION_INTERVAL_MINUTES',
-        );
     }
 
     protected getEntityName(): string {
@@ -139,10 +63,6 @@ export class UserService extends BaseCrudService<User> {
 
     protected getUniqueField(): keyof User {
         return;
-    }
-
-    private getTransactionTitle(referenceType: CoinReferenceType): string {
-        return coinTransactionTitles[referenceType] ?? 'Coin Transaction';
     }
 
     private generateRandomUsername(): string {
@@ -185,195 +105,9 @@ export class UserService extends BaseCrudService<User> {
         const adjective =
             adjectives[Math.floor(Math.random() * adjectives.length)];
         const noun = nouns[Math.floor(Math.random() * nouns.length)];
-        const number = Math.floor(Math.random() * 9000) + 1000; // 1000-9999
+        const number = Math.floor(Math.random() * 9000) + 1000;
 
         return `${adjective}${noun}_${number}`;
-    }
-
-    private getIosSubscriptionPeriod(
-        storeProductId: string | null | undefined,
-    ): ResetPeriod | null {
-        if (!storeProductId) return null;
-
-        const id = storeProductId.toLowerCase().trim();
-
-        if (
-            id.includes('week') ||
-            id.includes('7day') ||
-            id.includes('weekly') ||
-            id.endsWith('.weekly')
-        ) {
-            return ResetPeriod.Weekly;
-        }
-
-        if (
-            id.includes('month') ||
-            id.includes('30day') ||
-            id.includes('monthly') ||
-            id.endsWith('.monthly')
-        ) {
-            return ResetPeriod.Monthly;
-        }
-
-        if (
-            id.includes('year') ||
-            id.includes('annual') ||
-            id.includes('365') ||
-            id.includes('yearly') ||
-            id.endsWith('.yearly')
-        ) {
-            return ResetPeriod.Yearly;
-        }
-
-        this.logger.warn(
-            `Cannot determine subscription period from storeProductId: ${storeProductId}`,
-        );
-        return null;
-    }
-
-    private async checkAndResetSubscriptionCoins(
-        userId: string,
-        subscription: Transaction,
-    ): Promise<void> {
-        const now = new Date();
-
-        // Lấy thông tin cần thiết một lần
-        const lastReset =
-            subscription.lastCoinResetAt || subscription.createdAt;
-        const platform = subscription.store;
-
-        let shouldReset = false;
-        let resetPeriod: ResetPeriod | null = null;
-        let coinsToAdd = 0;
-
-        // Dispatch theo platform
-        if (platform === IapStore.ANDROID) {
-            ({ shouldReset, resetPeriod, coinsToAdd } =
-                await this.handleAndroidReset(subscription, lastReset, now));
-        } else if (platform === IapStore.IOS) {
-            ({ shouldReset, resetPeriod, coinsToAdd } =
-                await this.handleIosReset(subscription, lastReset, now));
-        } else {
-            this.logger.warn(`Unsupported platform for reset: ${platform}`);
-            return;
-        }
-
-        if (!shouldReset || !resetPeriod || coinsToAdd <= 0) {
-            return;
-        }
-
-        // Phần chung: thực hiện reset trong transaction
-        await this.dataSource.transaction(async (manager) => {
-            this.logger.log(
-                `Resetting ${coinsToAdd} coins for ${platform} subscription ` +
-                    `${subscription.id} (${resetPeriod}) user=${userId}`,
-            );
-
-            await this.addCoins({
-                manager,
-                userId,
-                amount: coinsToAdd,
-                coinType: CoinType.PERMANENT,
-                description: `${resetPeriod} subscription coin reset (${platform})`,
-                referenceType: CoinReferenceType.IAP,
-                referenceId: subscription.id,
-            });
-
-            await manager.getRepository(Transaction).update(subscription.id, {
-                lastCoinResetAt: now,
-            });
-
-            this.logger.log(
-                `Reset completed: ${coinsToAdd} coins → user ${userId}`,
-            );
-        });
-    }
-
-    // ─── Android logic ────────────────────────────────────────
-    private async handleAndroidReset(
-        sub: Transaction,
-        lastReset: Date,
-        now: Date,
-    ): Promise<{
-        shouldReset: boolean;
-        resetPeriod: ResetPeriod;
-        coinsToAdd: number;
-    }> {
-        const planId = sub.basePlanId || '';
-        let resetPeriod: ResetPeriod | null = null;
-        let shouldReset = false;
-
-        const isTest = this.enableTestSubscription;
-
-        if (isTest) {
-            const intervalMin = this.testSubscriptionIntervalMinutes || 5;
-            shouldReset = shouldResetByInterval(lastReset, now, intervalMin);
-        } else if (planId.includes('weekly')) {
-            resetPeriod = ResetPeriod.Weekly;
-            shouldReset = shouldResetWeekly(lastReset, now);
-        } else if (planId.includes('monthly')) {
-            resetPeriod = ResetPeriod.Monthly;
-            shouldReset = shouldResetMonthly(lastReset, now);
-        } else if (planId.includes('yearly')) {
-            resetPeriod = ResetPeriod.Yearly;
-            shouldReset = shouldResetYearly(lastReset, now);
-        }
-
-        let coinsToAdd = 0;
-        if (shouldReset && resetPeriod) {
-            const calc = await this.iapProductService.calculateCoinsForProduct({
-                storeProductId: sub.storeProductId,
-                basePlanId: sub.basePlanId,
-            });
-            coinsToAdd = calc.coinsToAdd;
-        }
-
-        return { shouldReset, resetPeriod, coinsToAdd };
-    }
-
-    // ─── iOS logic ────────────────────────────────────────────
-    private async handleIosReset(
-        sub: Transaction,
-        lastReset: Date,
-        now: Date,
-    ): Promise<{
-        shouldReset: boolean;
-        resetPeriod: ResetPeriod | null;
-        coinsToAdd: number;
-    }> {
-        const productId = sub.storeProductId || '';
-
-        const period = this.getIosSubscriptionPeriod(productId);
-
-        let shouldReset = false;
-        let resetPeriod: ResetPeriod | null = null;
-
-        const isTest = this.enableTestSubscription;
-
-        if (isTest) {
-            const intervalMin = this.testSubscriptionIntervalMinutes || 5;
-            shouldReset = shouldResetByInterval(lastReset, now, intervalMin);
-        } else if (period === ResetPeriod.Weekly) {
-            resetPeriod = ResetPeriod.Weekly;
-            shouldReset = shouldResetWeekly(lastReset, now);
-        } else if (period === ResetPeriod.Monthly) {
-            resetPeriod = ResetPeriod.Monthly;
-            shouldReset = shouldResetMonthly(lastReset, now);
-        } else if (period === ResetPeriod.Yearly) {
-            resetPeriod = ResetPeriod.Yearly;
-            shouldReset = shouldResetYearly(lastReset, now);
-        }
-
-        let coinsToAdd = 0;
-        if (shouldReset && resetPeriod) {
-            const calc = await this.iapProductService.calculateCoinsForProduct({
-                storeProductId: sub.storeProductId,
-                basePlanId: null,
-            });
-            coinsToAdd = calc.coinsToAdd;
-        }
-
-        return { shouldReset, resetPeriod, coinsToAdd };
     }
 
     async findByEmail(email: string): Promise<User> {
@@ -452,9 +186,52 @@ export class UserService extends BaseCrudService<User> {
 
             await this.repository.save(user);
 
-            await this.recordDailyCheckInAndGrantBonus(user.id);
+            await this.userRewardService.recordDailyCheckInAndGrantBonus(
+                user.id,
+            );
         }
         return user;
+    }
+
+    async findAllWithPagination(
+        options: FindAllOptions,
+    ): Promise<PaginatedUsersResult> {
+        const validKeys: (keyof User)[] = [
+            'id',
+            'country',
+            'ipCountryCode',
+            'username',
+            'email',
+            'profileImage',
+            'deletedAt',
+            'createdAt',
+            'updatedAt',
+        ];
+
+        const queryOptions = parseQueryOptions<User>(
+            {
+                filter: options.filter,
+                sort: options.sort,
+                fields: options.fields,
+                page: options.page,
+                limit: options.limit,
+                searchField: options.searchField,
+                searchValue: options.searchValue,
+            },
+            validKeys,
+        );
+
+        const { data, total } = await this.findAndCount(queryOptions);
+
+        const transformedUsers = data.map((user) => {
+            const profileImage = this.mediaService.getMediaUrl(
+                user.profileImage,
+            );
+
+            return { ...user, profileImage };
+        });
+
+        return { users: transformedUsers, total };
     }
 
     async getSelectedCategories(userId: string) {
@@ -467,11 +244,7 @@ export class UserService extends BaseCrudService<User> {
             await this.userCategoryPreferenceRepo.find({
                 where: { userId },
                 select: {
-                    category: {
-                        id: true,
-                        name: true,
-                        displayOrder: true,
-                    },
+                    category: { id: true, name: true, displayOrder: true },
                 },
                 relations: ['category'],
             });
@@ -488,7 +261,6 @@ export class UserService extends BaseCrudService<User> {
         }
 
         await this.dataSource.transaction(async (manager) => {
-            // Xóa tất cả category cũ của user
             await manager.delete(UserCategoryPreference, { userId });
 
             if (categoryIds.length) {
@@ -501,8 +273,6 @@ export class UserService extends BaseCrudService<User> {
                 await manager.save(userCategoryPreferences);
             }
         });
-
-        return;
     }
 
     async getRecentStories(
@@ -512,7 +282,6 @@ export class UserService extends BaseCrudService<User> {
         try {
             const offset = (page - 1) * limit;
 
-            // Query chính (không lấy chapters)
             const qb = this.dataSource
                 .getRepository(ReadingHistory)
                 .createQueryBuilder('rh')
@@ -548,7 +317,6 @@ export class UserService extends BaseCrudService<User> {
                     's.tags AS "hashtags"',
                     's.canEdit AS "canEdit"',
                     's.isCompleted AS "isCompleted"',
-
                     's.createdAt AS "createdAt"',
                     's.updatedAt AS "updatedAt"',
                     `json_agg(DISTINCT jsonb_build_object('id', cat.id, 'name', cat.name)) AS "categories"`,
@@ -559,7 +327,6 @@ export class UserService extends BaseCrudService<User> {
                     'rh.lastReadAt AS "lastReadAt"',
                     'rh.lastReadChapter AS "lastReadChapter"',
                     'CASE WHEN likes.id IS NULL THEN false ELSE true END AS "isLike"',
-
                     'ss.chapter_count AS "chapterCount"',
                 ])
                 .where('rh.user_id = :userId', { userId })
@@ -594,204 +361,16 @@ export class UserService extends BaseCrudService<User> {
         }
     }
 
-    async calculateLoginStreakAndBonus(
-        userId: string,
-        isSubUser?: boolean,
-    ): Promise<{
-        currentStreak: number;
-        todayBonus: number | null;
-        todayPremiumBonus: number | null;
-    }> {
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-
-        const loginActions = await this.userDailyActionRepo.find({
-            where: { userId, actionType: ActionType.LOGIN },
-            order: { actionDate: 'DESC' },
-        });
-
-        if (loginActions.length === 0) {
-            return {
-                currentStreak: 0,
-                todayBonus: this.STREAK_REWARDS[0],
-                todayPremiumBonus: isSubUser
-                    ? this.PREMIUM_STREAK_REWARDS[0]
-                    : null,
-            };
-        }
-
-        let streak = 0;
-        let previousDate = today;
-        let hasLoggedInToday = false;
-
-        for (const action of loginActions) {
-            const date = new Date(action.actionDate);
-            date.setHours(0, 0, 0, 0);
-
-            const diffDays = Math.floor(
-                (previousDate.getTime() - date.getTime()) / MS_PER_DAY,
-            );
-
-            if (diffDays === 0) {
-                hasLoggedInToday = true;
-            } else if (diffDays !== 1) {
-                break;
-            }
-
-            streak++;
-            previousDate = date;
-        }
-
-        const currentStreak = hasLoggedInToday ? streak : streak + 1;
-        const bonusIndex = streak % 7;
-
-        return {
-            currentStreak,
-            todayBonus: hasLoggedInToday
-                ? null
-                : this.STREAK_REWARDS[bonusIndex],
-            todayPremiumBonus:
-                hasLoggedInToday || !isSubUser
-                    ? null
-                    : this.PREMIUM_STREAK_REWARDS[bonusIndex],
-        };
-    }
-
-    async recordDailyCheckInAndGrantBonus(userId: string) {
-        const todayStr = new Date().toISOString().split('T')[0];
-
-        return this.dataSource.transaction(async (manager) => {
-            const repo = manager.getRepository(UserDailyAction);
-
-            await this.getActiveUserOrFail(userId);
-
-            // 1. Tìm hoặc tạo record login hôm nay
-            let todayLogin = await repo.findOne({
-                where: {
-                    userId,
-                    actionType: ActionType.LOGIN,
-                    actionDate: todayStr,
-                },
-                lock: { mode: 'pessimistic_write' },
-            });
-
-            const isFirstLoginToday = !todayLogin;
-
-            if (isFirstLoginToday) {
-                todayLogin = repo.create({
-                    userId,
-                    actionType: ActionType.LOGIN,
-                    actionDate: todayStr,
-                    count: 1,
-                    lastActionAt: new Date(),
-                });
-            } else {
-                todayLogin.count += 1;
-                todayLogin.lastActionAt = new Date();
-            }
-
-            await repo.save(todayLogin);
-
-            if (isFirstLoginToday) {
-                const { isSubUser } = await this.getSubscriptionStatus(userId);
-
-                const { todayBonus, todayPremiumBonus, currentStreak } =
-                    await this.calculateLoginStreakAndBonus(userId, isSubUser);
-
-                // Grant normal bonus
-                if (todayBonus !== null && todayBonus > 0) {
-                    this.logger.log(
-                        `Granting login bonus of ${todayBonus} coins to user ${userId} for login on ${todayStr}`,
-                    );
-
-                    await this.addCoins({
-                        manager,
-                        userId,
-                        amount: todayBonus,
-                        coinType: CoinType.TEMPORARY,
-                        description: `Daily login streak bonus (day ${currentStreak})`,
-                        referenceType: CoinReferenceType.LOGIN,
-                    });
-                }
-
-                // Grant premium bonus if applicable
-                if (todayPremiumBonus !== null && todayPremiumBonus > 0) {
-                    this.logger.log(
-                        `Granting premium login bonus of ${todayPremiumBonus} coins to user ${userId} for login on ${todayStr}`,
-                    );
-
-                    await this.addCoins({
-                        manager,
-                        userId,
-                        amount: todayPremiumBonus,
-                        coinType: CoinType.TEMPORARY,
-                        description: `Premium daily login streak bonus (day ${currentStreak})`,
-                        referenceType: CoinReferenceType.LOGIN,
-                    });
-                }
-            }
-        });
-    }
-
-    async getSubscriptionStatus(userId: string): Promise<{
-        isSubUser: boolean;
-        basePlanId: string | null;
-        expiresAt: string | null;
-    }> {
-        const now = new Date();
-
-        const activeSubscription = await this.transactionRepo.findOne({
-            where: {
-                userId: userId,
-                expiryTime: MoreThan(now),
-                status: TransactionStatus.ACTIVE,
-            },
-            order: {
-                expiryTime: 'DESC',
-            },
-            select: [
-                'id',
-                'basePlanId',
-                'storeProductId',
-                'createdAt',
-                'lastCoinResetAt',
-                'expiryTime',
-                'store',
-            ],
-        });
-
-        if (activeSubscription) {
-            // Check and reset coins based on subscription renewal periods
-            await this.checkAndResetSubscriptionCoins(
-                userId,
-                activeSubscription,
-            );
-
-            return {
-                isSubUser: true,
-                basePlanId: activeSubscription.basePlanId,
-                expiresAt: activeSubscription.expiryTime.toISOString(),
-            };
-        }
-
-        return {
-            isSubUser: false,
-            basePlanId: null,
-            expiresAt: null,
-        };
-    }
-
     async getUserInfo(user: User): Promise<any> {
         if (!user) {
             throw new NotFoundException('User not found');
         }
 
         const [coinsData, subscriptionData] = await Promise.all([
-            this.calculateUserCoins(user.id),
-            this.getSubscriptionStatus(user.id),
+            this.userCoinService.calculateUserCoins(user.id),
+            this.userSubscriptionService.getSubscriptionStatus(user.id),
         ]);
 
-        // Preferred categories (sorted by some order — you may want to add order column later)
         const preferredCategories =
             user.userCategoryPreferences
                 ?.map((pref) => ({
@@ -815,218 +394,6 @@ export class UserService extends BaseCrudService<User> {
             subscription: subscriptionData,
             wallet: coinsData,
             preferredCategories,
-        };
-    }
-
-    async watchAdsAndGrantBonus(userId: string): Promise<WatchAdsResponseDto> {
-        const todayStr = new Date().toISOString().split('T')[0];
-
-        return this.dataSource.transaction(async (manager) => {
-            const actionRepo = manager.getRepository(UserDailyAction);
-
-            let todayAction = await actionRepo.findOne({
-                where: {
-                    userId,
-                    actionType: ActionType.WATCH_AD_COIN,
-                    actionDate: todayStr,
-                },
-                lock: { mode: 'pessimistic_write' },
-            });
-
-            if (
-                todayAction &&
-                todayAction.count >= this.MAX_AD_VIEWS_COIN_PER_DAY
-            ) {
-                const updatedCoins = await this.calculateUserCoins(userId, {
-                    manager,
-                });
-
-                return {
-                    success: false,
-                    message: `You've reached the daily limit of ${this.MAX_AD_VIEWS_COIN_PER_DAY} ads. Come back tomorrow!`,
-                    data: {
-                        adInfo: {
-                            coinsGranted: 0,
-                            currentViews: todayAction.count,
-                            maxViews: this.MAX_AD_VIEWS_COIN_PER_DAY,
-                        },
-                        wallet: updatedCoins,
-                    },
-                };
-            }
-
-            if (!todayAction) {
-                todayAction = actionRepo.create({
-                    userId,
-                    actionType: ActionType.WATCH_AD_COIN,
-                    actionDate: todayStr,
-                    count: 1,
-                    lastActionAt: new Date(),
-                });
-            } else {
-                todayAction.count += 1;
-                todayAction.lastActionAt = new Date();
-            }
-
-            await actionRepo.save(todayAction);
-
-            const coinsToGrant = this.AD_REWARD_COINS;
-            await this.addCoins({
-                manager,
-                userId,
-                amount: this.AD_REWARD_COINS,
-                coinType: CoinType.TEMPORARY,
-                description: `Ad reward - view #${todayAction.count}`,
-                referenceType: CoinReferenceType.WATCH_AD_COIN,
-            });
-
-            const updatedCoins = await this.calculateUserCoins(userId, {
-                manager,
-            });
-
-            return {
-                success: true,
-                message: `Ad watched successfully! You received ${coinsToGrant} coins.`,
-                data: {
-                    adInfo: {
-                        coinsGranted: coinsToGrant,
-                        currentViews: todayAction.count,
-                        maxViews: this.MAX_AD_VIEWS_COIN_PER_DAY,
-                    },
-                    wallet: updatedCoins,
-                },
-            };
-        });
-    }
-
-    async watchAdsAndUnlockChapter(
-        userId: string,
-        chapterId: string,
-    ): Promise<WatchAdsUnlockChapterResponseDto> {
-        const todayStr = new Date().toISOString().split('T')[0];
-
-        return this.dataSource.transaction(async (manager) => {
-            const actionRepo = manager.getRepository(UserDailyAction);
-
-            let todayAction = await actionRepo.findOne({
-                where: {
-                    userId,
-                    actionType: ActionType.WATCH_AD_UNLOCK,
-                    actionDate: todayStr,
-                },
-                lock: { mode: 'pessimistic_write' },
-            });
-
-            if (
-                todayAction &&
-                todayAction.count >= this.MAX_AD_VIEWS_UNLOCK_PER_DAY
-            ) {
-                return {
-                    success: false,
-                    message: `You've reached the daily limit of ${this.MAX_AD_VIEWS_UNLOCK_PER_DAY} ads. Come back tomorrow!`,
-                    data: {
-                        adInfo: {
-                            coinsGranted: 0,
-                            currentViews: todayAction.count,
-                            maxViews: this.MAX_AD_VIEWS_UNLOCK_PER_DAY,
-                        },
-                        chapterId: chapterId,
-                    },
-                };
-            }
-
-            const unlockResult =
-                await this.chapterUnlockService.unlockChapterWithAds({
-                    userId,
-                    chapterId,
-                    manager,
-                });
-
-            if (!unlockResult.success) {
-                return {
-                    success: false,
-                    message: unlockResult.message,
-                    data: {
-                        adInfo: {
-                            coinsGranted: 0,
-                            currentViews: todayAction?.count || 0,
-                            maxViews: this.MAX_AD_VIEWS_UNLOCK_PER_DAY,
-                        },
-                        chapterId: chapterId,
-                    },
-                };
-            }
-
-            if (!todayAction) {
-                todayAction = actionRepo.create({
-                    userId,
-                    actionType: ActionType.WATCH_AD_UNLOCK,
-                    actionDate: todayStr,
-                    count: 1,
-                    lastActionAt: new Date(),
-                });
-            } else {
-                todayAction.count += 1;
-                todayAction.lastActionAt = new Date();
-            }
-
-            await actionRepo.save(todayAction);
-
-            return {
-                success: true,
-                message: `Ad watched successfully! You unlocked the chapter without spending coins.`,
-                data: {
-                    adInfo: {
-                        coinsGranted: 0,
-                        currentViews: todayAction.count,
-                        maxViews: this.MAX_AD_VIEWS_UNLOCK_PER_DAY,
-                    },
-                    chapterId: chapterId,
-                },
-            };
-        });
-    }
-
-    async calculateUserCoins(
-        userId: string,
-        options: { manager?: EntityManager } = {},
-    ): Promise<WalletDto> {
-        const now = new Date();
-
-        // Chọn repository phù hợp
-        const repo = options.manager
-            ? options.manager.getRepository(UserCoins)
-            : this.userCoinsRepository;
-
-        const coinRecords = await repo.find({
-            where: { userId },
-            order: { createdAt: 'DESC' },
-        });
-
-        // 1. Permanent coins (thường không expire)
-        const permanentCoins = coinRecords
-            .filter((c) => c.type === CoinType.PERMANENT)
-            .reduce((sum, c) => sum + c.remaining, 0);
-
-        // 2. Temporary coins còn hiệu lực
-        const activeTemporary = coinRecords.filter(
-            (c) =>
-                c.type === CoinType.TEMPORARY &&
-                c.expiresAt &&
-                c.expiresAt > now,
-        );
-
-        const activeTemporaryAmount = activeTemporary.reduce(
-            (sum, c) => sum + c.remaining,
-            0,
-        );
-
-        const totalCoins = permanentCoins + activeTemporaryAmount;
-
-        return {
-            totalCoins,
-            permanentCoins,
-            temporaryCoins: activeTemporaryAmount,
         };
     }
 
@@ -1085,397 +452,5 @@ export class UserService extends BaseCrudService<User> {
         }
 
         return this.getUserInfo(savedUser);
-    }
-
-    async getReward(userId: string): Promise<RewardResponseDto> {
-        const user = await this.repository.findOne({ where: { id: userId } });
-        if (!user) {
-            throw new NotFoundException(ERROR_MESSAGES.USER_NOT_FOUND);
-        }
-
-        const streakInfo = await this.calculateLoginStreakAndBonus(userId);
-        const { currentStreak, todayBonus } = streakInfo;
-
-        let currentDay = 1;
-
-        if (currentStreak > 0) {
-            const remainder = currentStreak % 7;
-            currentDay = remainder === 0 ? 7 : remainder;
-        }
-
-        const hasCheckedToday = todayBonus === null;
-
-        const weekDays: WeekDayDto[] = this.STREAK_REWARDS.map(
-            (coin, index) => {
-                const day = index + 1;
-                const isChecked =
-                    day < currentDay || (day === currentDay && hasCheckedToday);
-
-                return {
-                    day,
-                    isChecked,
-                    coin,
-                    coinPremium: this.PREMIUM_STREAK_REWARDS[index],
-                };
-            },
-        );
-
-        const todayStr = new Date().toISOString().split('T')[0];
-        const todayAdAction = await this.userDailyActionRepo.findOne({
-            where: {
-                userId,
-                actionType: ActionType.WATCH_AD_COIN,
-                actionDate: todayStr,
-            },
-        });
-
-        const currentViews = todayAdAction?.count || 0;
-
-        const wallet = await this.calculateUserCoins(userId);
-
-        return {
-            checkIn: {
-                currentDay,
-                weekDays,
-            },
-            adInfo: {
-                coinsGranted: this.AD_REWARD_COINS,
-                currentViews,
-                maxViews: this.MAX_AD_VIEWS_COIN_PER_DAY,
-            },
-            wallet,
-        };
-    }
-
-    /**
-     * Cộng coin và ghi lịch sử giao dịch
-     */
-    async addCoins({
-        userId,
-        amount,
-        coinType = CoinType.PERMANENT, // hoặc TEMPORARY
-        referenceType,
-        referenceId,
-        description,
-        manager, // optional - dùng trong transaction lớn
-    }: {
-        userId: string;
-        amount: number;
-        coinType?: CoinType;
-        referenceType: CoinReferenceType;
-        referenceId?: string;
-        description?: string;
-        manager?: EntityManager;
-    }): Promise<number> {
-        if (amount <= 0) {
-            throw new BadRequestException('Amount must be positive');
-        }
-
-        const execute = async (tx: EntityManager) => {
-            // 1. Tạo bản ghi coin mới (theo logic hiện tại của bạn)
-            const coinRecord = tx.getRepository(UserCoins).create({
-                userId,
-                type: coinType,
-                amount,
-                remaining: amount,
-                expiresAt:
-                    coinType === CoinType.TEMPORARY
-                        ? addDays(new Date(), TEMPORARY_COIN_DAYS)
-                        : null,
-            });
-
-            await tx.getRepository(UserCoins).save(coinRecord);
-
-            // 2. Tính tổng số dư hiện tại SAU khi cộng
-            const wallet = await this.calculateUserCoins(userId, {
-                manager: tx,
-            });
-            const newTotalBalance = wallet.totalCoins;
-
-            // 3. Ghi lịch sử giao dịch
-            const transaction = tx.getRepository(CoinTransaction).create({
-                userId,
-                type: CoinTransactionType.ADD,
-                amount,
-                balanceAfter: newTotalBalance,
-                referenceType,
-                referenceId,
-                description:
-                    description ||
-                    `Added ${amount} ${coinType} coins from ${referenceType || 'system'}`,
-                createdAt: new Date(),
-                expiresAt: coinRecord.expiresAt,
-            });
-
-            await tx.getRepository(CoinTransaction).save(transaction);
-
-            return newTotalBalance;
-        };
-
-        if (manager) {
-            // đang trong transaction lớn → dùng luôn
-            return execute(manager);
-        }
-
-        // transaction riêng
-        return this.dataSource.transaction(execute);
-    }
-
-    /**
-     * Trừ coin với ưu tiên: temporary (sắp hết hạn trước) → permanent
-     * @throws BadRequestException nếu không đủ coin hoặc amount <= 0
-     */
-    async spendCoins({
-        userId,
-        amount,
-        referenceType,
-        referenceId,
-        description,
-        manager,
-    }: {
-        userId: string;
-        amount: number;
-        referenceType?: string;
-        referenceId?: string;
-        description: string;
-        manager?: EntityManager;
-    }): Promise<{ newBalance: number; spentDetails: any[] }> {
-        if (amount <= 0) {
-            throw new BadRequestException('Amount must be positive');
-        }
-
-        const execute = async (tx: EntityManager): Promise<any> => {
-            const now = new Date();
-
-            const coinRecords = await tx.getRepository(UserCoins).find({
-                where: [
-                    {
-                        userId,
-                        type: CoinType.PERMANENT,
-                        remaining: MoreThan(0),
-                    },
-                    {
-                        userId,
-                        type: CoinType.TEMPORARY,
-                        remaining: MoreThan(0),
-                        expiresAt: MoreThan(now),
-                    },
-                ],
-                order: {
-                    expiresAt: 'ASC',
-                },
-                lock: { mode: 'pessimistic_write' },
-            });
-
-            if (!coinRecords.length) {
-                throw new BadRequestException('No available coins');
-            }
-
-            let remainingToSpend = amount;
-            const spentDetails: Array<{
-                id: string;
-                type: CoinType;
-                amountSpent: number;
-                expiresAt?: string;
-            }> = [];
-            const recordsToUpdate: UserCoins[] = [];
-
-            for (const record of coinRecords) {
-                if (remainingToSpend <= 0) break;
-
-                const canSpend = Math.min(remainingToSpend, record.remaining);
-                if (canSpend <= 0) continue;
-
-                // Chuẩn bị cập nhật (chưa save)
-                record.remaining -= canSpend;
-                recordsToUpdate.push(record);
-
-                spentDetails.push({
-                    id: record.id,
-                    type: record.type,
-                    amountSpent: canSpend,
-                    expiresAt: record.expiresAt?.toISOString(),
-                });
-
-                remainingToSpend -= canSpend;
-            }
-
-            if (remainingToSpend > 0) {
-                throw new BadRequestException(
-                    `Insufficient coins. Required: ${amount}, Available: ${amount - remainingToSpend}`,
-                );
-            }
-
-            // Bulk update – chỉ 1 query (hoặc rất ít query)
-            if (recordsToUpdate.length > 0) {
-                await tx
-                    .getRepository(UserCoins)
-                    .save(recordsToUpdate, { chunk: 100 });
-            }
-
-            // 3. Tính tổng số dư sau khi trừ
-            const walletAfter = await this.calculateUserCoins(userId, {
-                manager: tx,
-            });
-            const newTotalBalance = walletAfter.totalCoins;
-
-            // 4. Ghi lịch sử giao dịch (amount âm để biểu thị trừ)
-            const transaction = tx.getRepository(CoinTransaction).create({
-                userId,
-                type: CoinTransactionType.SPEND,
-                amount: -amount,
-                balanceAfter: newTotalBalance,
-                referenceType,
-                referenceId,
-                description: description,
-                createdAt: new Date(),
-                expiresAt: null,
-            });
-
-            await tx.getRepository(CoinTransaction).save(transaction);
-
-            return {
-                newBalance: newTotalBalance,
-                spentDetails,
-            };
-        };
-
-        return manager
-            ? execute(manager)
-            : this.dataSource.transaction(execute);
-    }
-
-    async getCoinTransactions(userId: string, paginationDto: PaginationDto) {
-        const { page = 1, limit = 20 } = paginationDto;
-        const skip = (page - 1) * limit;
-
-        const [transactions, total] =
-            await this.coinTransactionRepo.findAndCount({
-                where: { userId },
-                order: { createdAt: 'DESC' },
-                skip,
-                take: limit,
-            });
-
-        const items = transactions.map((transaction) => {
-            const title = this.getTransactionTitle(
-                transaction.referenceType as CoinReferenceType,
-            );
-
-            return {
-                amount: transaction.amount,
-                title: title,
-                description: transaction.description,
-                createdAt: transaction.createdAt,
-                expiresAt: transaction.expiresAt,
-            };
-        });
-
-        return {
-            page,
-            limit,
-            total,
-            items,
-        };
-    }
-
-    async getAdUnlockChapterStatus(userId: string): Promise<AdInfoDto> {
-        const today = new Date().toISOString().split('T')[0];
-
-        const unlockAction = await this.userDailyActionRepo.findOne({
-            where: {
-                userId,
-                actionType: ActionType.WATCH_AD_UNLOCK,
-                actionDate: today,
-            },
-        });
-
-        const currentViews = unlockAction?.count ?? 0;
-
-        return {
-            coinsGranted: 0,
-            currentViews,
-            maxViews: this.MAX_AD_VIEWS_UNLOCK_PER_DAY,
-        };
-    }
-
-    async getAdEarnCoinStatus(userId: string): Promise<AdInfoDto> {
-        const today = new Date().toISOString().split('T')[0];
-
-        const coinAction = await this.userDailyActionRepo.findOne({
-            where: {
-                userId,
-                actionType: ActionType.WATCH_AD_COIN,
-                actionDate: today,
-            },
-        });
-
-        const currentViews = coinAction?.count ?? 0;
-
-        return {
-            coinsGranted: this.AD_REWARD_COINS,
-            currentViews,
-            maxViews: this.MAX_AD_VIEWS_COIN_PER_DAY,
-        };
-    }
-
-    async createAppFeedback(
-        userId: string,
-        platform: string,
-        createDto: CreateAppFeedbackDto,
-    ): Promise<AppFeedback> {
-        const user = await this.repository.findOne({
-            where: { id: userId },
-        });
-
-        if (!user) {
-            throw new NotFoundException(ERROR_MESSAGES.USER_NOT_FOUND);
-        }
-
-        let feedback = await this.appFeedbackRepo.findOne({
-            where: { userId },
-        });
-
-        if (feedback) {
-            feedback.platform = platform;
-            feedback.rating = createDto.rating;
-            feedback.comment = createDto.comment;
-            return await this.appFeedbackRepo.save(feedback);
-        }
-
-        feedback = this.appFeedbackRepo.create({
-            userId,
-            platform,
-            rating: createDto.rating,
-            comment: createDto.comment,
-        });
-
-        return await this.appFeedbackRepo.save(feedback);
-    }
-
-    async createStoryReport(
-        userId: string,
-        storyId: string,
-        createDto: CreateReportDto,
-    ) {
-        await this.findById(userId);
-
-        await this.storyCrudService.findStoryById(storyId);
-
-        if (createDto.reason === ReportReason.OTHER && !createDto.description) {
-            throw new BadRequestException(
-                'Description is required when reason is OTHER',
-            );
-        }
-
-        const report = this.reportRepo.create({
-            reporterId: userId,
-            entityType: ReportEntityType.STORY,
-            entityId: storyId,
-            reason: createDto.reason,
-            description: createDto.description,
-        });
-
-        return await this.reportRepo.save(report);
     }
 }

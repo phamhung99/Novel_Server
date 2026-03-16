@@ -17,10 +17,22 @@ import { PaymentsModule } from 'src/payments/payments.module';
 import { StoryModule } from 'src/story/story.module';
 import { AppFeedback } from './entities/app-feedback.entity';
 import { Report } from './entities/report.entity';
+import { UserCoinService } from './user-coin.service';
+import { UserSubscriptionService } from './user-subscription.service';
+import { UserRewardService } from './user-reward.service';
+import { UserReportService } from './user-report.service';
 
 @Module({
     controllers: [UserController],
-    providers: [UserService, MediaService, DoSpacesService],
+    providers: [
+        UserService,
+        MediaService,
+        DoSpacesService,
+        UserCoinService,
+        UserSubscriptionService,
+        UserRewardService,
+        UserReportService,
+    ],
     imports: [
         TypeOrmModule.forFeature([
             User,
@@ -38,6 +50,13 @@ import { Report } from './entities/report.entity';
         forwardRef(() => PaymentsModule),
         forwardRef(() => StoryModule),
     ],
-    exports: [UserService, TypeOrmModule],
+    exports: [
+        UserService,
+        TypeOrmModule,
+        UserCoinService,
+        UserSubscriptionService,
+        UserRewardService,
+        UserReportService,
+    ],
 })
 export class UserModule {}

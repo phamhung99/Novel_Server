@@ -18,6 +18,7 @@ import { MediaService } from 'src/media/media.service';
 import { PaginatedStoryPreviewResponse } from './dto/paginated-story-preview.response';
 import { enrichStoriesToPreviewDto } from 'src/common/mappers/story-preview.mapper';
 import { PromptSuggestion } from './entities/prompt-suggestion.entity';
+import { StoryCategory } from './entities/story-category.entity';
 
 @Injectable()
 export class StoryDiscoveryService {
@@ -31,6 +32,13 @@ export class StoryDiscoveryService {
         @InjectRepository(PromptSuggestion)
         private promptSuggestionRepo: Repository<PromptSuggestion>,
     ) {}
+
+    private getStoryCategoriesTableName(): string {
+        const metadata = this.dataSource.getMetadata(StoryCategory); // ← thay StoryCategory bằng entity thật của bạn
+        const schema = metadata.schema ? `"${metadata.schema}".` : '';
+        const table = `"${metadata.tableName}"`;
+        return `${schema}${table}`;
+    }
 
     async getUserLibrary(
         userId: string,
@@ -429,7 +437,12 @@ export class StoryDiscoveryService {
                 'recent_views',
                 'recent_views.story_id = s.id',
             )
-
+            .leftJoin(
+                'user_category_preferences',
+                'ucp',
+                'ucp.category_id = cat.id AND ucp.user_id = :userId',
+                { userId },
+            )
             .select([
                 's.id AS "storyId"',
                 's.title AS "title"',
@@ -464,6 +477,7 @@ export class StoryDiscoveryService {
                 's.views_count AS "viewsCount"',
 
                 'ss.chapter_count AS "chapterCount"',
+                `CASE WHEN COUNT(ucp.category_id) > 0 THEN 1 ELSE 0 END AS "hasPreferredCategory"`,
             ])
             .where('s.visibility = :visibility', {
                 visibility: StoryVisibility.PUBLIC,
@@ -510,9 +524,17 @@ export class StoryDiscoveryService {
                 .map((id) => id.trim())
                 .filter(Boolean);
 
-            if (categoryIds.length > 0) {
-                qb.andWhere('cat.id IN (:...categoryIds)', { categoryIds });
-            }
+            const tableName = this.getStoryCategoriesTableName();
+
+            qb.andWhere(
+                `EXISTS (
+                    SELECT 1
+                    FROM ${tableName} sc_filter
+                    WHERE sc_filter.story_id = s.id
+                    AND sc_filter.category_id IN (:...categoryIds)
+            )`,
+                { categoryIds },
+            );
         }
 
         // === Status filter: completed / ongoing ===
@@ -523,14 +545,18 @@ export class StoryDiscoveryService {
         }
 
         // === Sorting ===
+
+        // Stories that match user's preferred categories should be ranked higher
+        qb.orderBy('"hasPreferredCategory"', 'DESC');
+
         switch (sort) {
             case StorySort.POPULAR:
-                qb.orderBy('recent_views.views_count', 'DESC', 'NULLS LAST')
+                qb.addOrderBy('recent_views.views_count', 'DESC', 'NULLS LAST')
                     .addOrderBy('s.likes_count', 'DESC', 'NULLS LAST')
                     .addOrderBy('s.updatedAt', 'DESC');
                 break;
             case StorySort.RECENTLY_UPDATED:
-                qb.orderBy('s.updatedAt', 'DESC');
+                qb.addOrderBy('s.updatedAt', 'DESC');
 
                 if (
                     publishedWithin &&
@@ -555,10 +581,10 @@ export class StoryDiscoveryService {
                 }
                 break;
             case StorySort.RECENTLY_ADDED:
-                qb.orderBy('s.createdAt', 'DESC');
+                qb.addOrderBy('s.createdAt', 'DESC');
                 break;
             case StorySort.RELEASE_DATE:
-                qb.orderBy('s.approvedAt', 'DESC');
+                qb.addOrderBy('s.approvedAt', 'DESC');
 
                 if (
                     publishedWithin &&
@@ -581,7 +607,7 @@ export class StoryDiscoveryService {
                 }
                 break;
             default:
-                qb.orderBy('recent_views.views_count', 'DESC', 'NULLS LAST')
+                qb.addOrderBy('recent_views.views_count', 'DESC', 'NULLS LAST')
                     .addOrderBy('s.likes_count', 'DESC', 'NULLS LAST')
                     .addOrderBy('s.updatedAt', 'DESC');
         }
