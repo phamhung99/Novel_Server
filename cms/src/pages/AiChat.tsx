@@ -59,8 +59,8 @@ const MODEL_OPTIONS: Record<AiProvider, { value: string; label: string }[]> = {
             label: 'Gemini 3.1 Pro (latest flagship)',
         },
         {
-            value: 'gemini-3-flash-preview',
-            label: 'Gemini 3 Flash (previous gen fast)',
+            value: 'gemini-3.1-flash-lite-preview',
+            label: 'Gemini 3.1 Flash Lite (fast, cost-efficient)',
         },
         {
             value: 'gemini-2.5-pro',
