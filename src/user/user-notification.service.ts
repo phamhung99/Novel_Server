@@ -12,23 +12,31 @@ export class UserNotificationService {
         private readonly userRepo: Repository<User>,
     ) {}
 
-    async getFcmTokensForDailyCheckIn(): Promise<string[]> {
+    async getFcmTokensForDailyCheckIn(): Promise<
+        Array<{ userId: string; fcmToken: string }>
+    > {
         const rows = await this.userRepo
             .createQueryBuilder('u')
-            .select('DISTINCT u.fcm_token', 'fcmToken')
+            .select(['u.id AS "userId"', 'u.fcm_token AS "fcmToken"'])
             .where('u.deletedAt IS NULL')
             .andWhere('u.fcm_token IS NOT NULL')
-            .andWhere(`TRIM(u.fcm_token) <> ''`)
-            .getRawMany<{ fcmToken: string }>();
+            .andWhere("TRIM(u.fcm_token) <> ''")
+            .getRawMany<{ userId: string; fcmToken: string }>();
 
-        const tokens = rows
-            .map((r) => r.fcmToken?.trim())
-            .filter((t): t is string => !!t);
+        const result = rows
+            .map((row) => ({
+                userId: row.userId,
+                fcmToken: (row.fcmToken || '').trim(),
+            }))
+            .filter(
+                (item): item is { userId: string; fcmToken: string } =>
+                    item.userId && item.fcmToken.length > 0,
+            );
 
         this.logger.log(
-            `Loaded ${tokens.length} FCM tokens for daily check-in reminder`,
+            `Loaded ${result.length} valid (userId + fcmToken) pairs for daily check-in reminder`,
         );
 
-        return tokens;
+        return result;
     }
 }

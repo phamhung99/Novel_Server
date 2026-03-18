@@ -378,15 +378,17 @@ export class CronService {
     }
 
     async sendDailyCheckInGiftReminder() {
-        const deviceTokens =
+        const userDevicePairs =
             await this.userNotificationService.getFcmTokensForDailyCheckIn();
 
         return this.notificationService.sendDailyCheckInGiftReminder(
-            deviceTokens,
+            userDevicePairs,
         );
     }
 
     async runAllScheduledTasks() {
         this.logger.log('Running all scheduled tasks...');
+
+        await this.sendDailyCheckInGiftReminder();
     }
 }
