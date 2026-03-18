@@ -193,3 +193,12 @@ export enum AppleRenewalStatusSubtype {
     AUTO_RENEW_DISABLED = 'AUTO_RENEW_DISABLED',
     AUTO_RENEW_ENABLED = 'AUTO_RENEW_ENABLED',
 }
+
+export enum AppNotificationType {
+    CHECK_IN = 'CHECK_IN',
+    COIN_EXPIRY = 'COIN_EXPIRY',
+    STREAK_LOST = 'STREAK_LOST',
+    NEW_CHAPTER = 'NEW_CHAPTER',
+    RECOMMENDATION = 'RECOMMENDATION',
+    RESUME = 'RESUME',
+}

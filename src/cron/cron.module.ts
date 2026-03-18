@@ -7,6 +7,8 @@ import { Story } from 'src/story/entities/story.entity';
 import { ChapterState } from 'src/story/entities/chapter-states.entity';
 import { Chapter } from 'src/story/entities/chapter.entity';
 import { CronController } from './cron.controller';
+import { UserModule } from 'src/user/user.module';
+import { NotificationModule } from 'src/notification/notification.module';
 
 @Module({
     providers: [CronService],
@@ -20,6 +22,8 @@ import { CronController } from './cron.controller';
             ChapterState,
             Chapter,
         ]),
+        UserModule,
+        NotificationModule,
     ],
 })
 export class CronModule {}

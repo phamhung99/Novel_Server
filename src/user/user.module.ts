@@ -21,6 +21,7 @@ import { UserCoinService } from './user-coin.service';
 import { UserSubscriptionService } from './user-subscription.service';
 import { UserRewardService } from './user-reward.service';
 import { UserReportService } from './user-report.service';
+import { UserNotificationService } from 'src/user/user-notification.service';
 
 @Module({
     controllers: [UserController],
@@ -32,6 +33,7 @@ import { UserReportService } from './user-report.service';
         UserSubscriptionService,
         UserRewardService,
         UserReportService,
+        UserNotificationService,
     ],
     imports: [
         TypeOrmModule.forFeature([
@@ -57,6 +59,7 @@ import { UserReportService } from './user-report.service';
         UserSubscriptionService,
         UserRewardService,
         UserReportService,
+        UserNotificationService,
     ],
 })
 export class UserModule {}

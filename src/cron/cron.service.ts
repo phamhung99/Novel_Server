@@ -6,6 +6,8 @@ import { ChapterViews } from '../story/entities/chapter-views.entity';
 import { Story } from 'src/story/entities/story.entity';
 import { ChapterState } from 'src/story/entities/chapter-states.entity';
 import { Chapter } from 'src/story/entities/chapter.entity';
+import { NotificationService } from 'src/notification/notification.service';
+import { UserNotificationService } from 'src/user/user-notification.service';
 
 @Injectable()
 export class CronService {
@@ -26,6 +28,10 @@ export class CronService {
 
         @InjectRepository(Chapter)
         private chapterRepo: Repository<Chapter>,
+
+        private readonly notificationService: NotificationService,
+
+        private readonly userNotificationService: UserNotificationService,
     ) {}
 
     async updateTrendingScores(): Promise<void> {
@@ -371,8 +377,16 @@ export class CronService {
         }
     }
 
+    async sendDailyCheckInGiftReminder() {
+        const deviceTokens =
+            await this.userNotificationService.getFcmTokensForDailyCheckIn();
+
+        return this.notificationService.sendDailyCheckInGiftReminder(
+            deviceTokens,
+        );
+    }
+
     async runAllScheduledTasks() {
-        await this.updateTrendingScores();
-        await this.updateSearchScores();
+        this.logger.log('Running all scheduled tasks...');
     }
 }

@@ -5,6 +5,7 @@ import { Callback, Context, Handler } from 'aws-lambda';
 import { AppModule } from './app.module';
 import { CronService } from './cron/cron.service';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
+import { AppNotificationType } from './common/enums/app.enum';
 
 let server: Handler;
 let cronAppContext: any;
@@ -47,7 +48,16 @@ async function runCronJob(event: any) {
 
     const cronService = cronAppContext.get(CronService);
 
-    await cronService.runAllScheduledTasks();
+    switch (event.type) {
+        case AppNotificationType.CHECK_IN:
+            await cronService.sendDailyCheckInGiftReminder();
+            break;
+        case AppNotificationType.COIN_EXPIRY:
+            await cronService.sendCoinExpiryNotifications();
+            break;
+        default:
+            console.warn('Unknown cron job type:', event.type);
+    }
 
     console.log('Cron job completed:', event.type);
 }

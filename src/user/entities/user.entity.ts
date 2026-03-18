@@ -15,6 +15,7 @@ import { UserDailyAction } from './user-daily-action.entity';
 import { CoinTransaction } from './coin-transaction.entity';
 import { AppFeedback } from './app-feedback.entity';
 import { Report } from './report.entity';
+import { UserNotificationThrottling } from 'src/notification/entities/user-notification-throttling.entity';
 
 @Entity('users')
 export class User {
@@ -48,6 +49,9 @@ export class User {
 
     @Column({ nullable: true })
     platform: string;
+
+    @Column({ name: 'fcm_token', nullable: true })
+    fcm_token: string;
 
     @Column({ name: 'deleted_at', type: 'timestamptz', nullable: true })
     deletedAt: Date;
@@ -87,4 +91,10 @@ export class User {
 
     @OneToMany(() => Report, (report) => report.reporter)
     reports: Report[];
+
+    @OneToMany(
+        () => UserNotificationThrottling,
+        (throttling) => throttling.user,
+    )
+    notificationThrottlings: UserNotificationThrottling[];
 }

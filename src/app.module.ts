@@ -16,6 +16,8 @@ import { MasterDataModule } from './master-data/master-data.module';
 import { CronModule } from './cron/cron.module';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor';
 import { APP_INTERCEPTOR } from '@nestjs/core';
+import { NotificationModule } from './notification/notification.module';
+import { FirebaseModule } from './firebase/firebase.module';
 
 @Module({
     imports: [
@@ -57,6 +59,8 @@ import { APP_INTERCEPTOR } from '@nestjs/core';
         PaymentsModule,
         MasterDataModule,
         CronModule,
+        NotificationModule,
+        FirebaseModule,
     ],
     controllers: [HealthController],
     providers: [
