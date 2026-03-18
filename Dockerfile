@@ -13,6 +13,7 @@ COPY --from=builder ${LAMBDA_TASK_ROOT}/dist ./dist
 COPY --from=builder ${LAMBDA_TASK_ROOT}/node_modules ./node_modules
 COPY --from=builder ${LAMBDA_TASK_ROOT}/package*.json ./
 COPY --from=builder ${LAMBDA_TASK_ROOT}/service_account.json ./service_account.json
+COPY --from=builder ${LAMBDA_TASK_ROOT}/firebase-service-account.json ./firebase-service-account.json
 # Nếu có static files, config, etc. copy thêm
 # COPY --from=builder ${LAMBDA_TASK_ROOT}/some-folder ./some-folder
 

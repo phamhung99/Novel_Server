@@ -65,3 +65,4 @@ service_account.json
 
 /certs
 app.zip
+firebase-service-account.json
