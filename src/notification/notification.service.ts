@@ -4,13 +4,14 @@ import { AppNotificationType } from 'src/common/enums/app.enum';
 import { InjectRepository } from '@nestjs/typeorm';
 import { UserNotificationThrottling } from './entities/user-notification-throttling.entity';
 import { Repository, In } from 'typeorm';
+import { getCurrentDateString } from 'src/common/utils/date.utils';
 
 @Injectable()
 export class NotificationService {
     private readonly logger = new Logger(NotificationService.name);
 
     private readonly MAX_NOTIFICATIONS_PER_DAY = 5;
-    private readonly NOTIFICATION_COOLDOWN_MINUTES = 30; // ít nhất cách nhau 30 phút
+    private readonly NOTIFICATION_COOLDOWN_MINUTES = 120; // minutes
 
     constructor(
         private readonly firebaseService: FirebaseService,
@@ -23,7 +24,7 @@ export class NotificationService {
     // Helper: Kiểm tra & cập nhật throttling cho 1 user
     // ────────────────────────────────────────────────
     private async canSendNotification(userId: string): Promise<boolean> {
-        const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+        const today = getCurrentDateString(); // YYYY-MM-DD
 
         let record = await this.throttlingRepository.findOne({
             where: { userId, currentDate: today },
@@ -66,29 +67,38 @@ export class NotificationService {
     }
 
     private async updateThrottlingAfterSend(userId: string): Promise<void> {
-        const today = new Date().toISOString().split('T')[0];
+        const today = getCurrentDateString(); // YYYY-MM-DD
 
-        const existing = await this.throttlingRepository.findOne({
-            where: { userId, currentDate: today },
+        let throttling = await this.throttlingRepository.findOne({
+            where: { userId },
         });
 
-        if (existing) {
-            await this.throttlingRepository.update(
-                { userId, currentDate: today },
-                {
-                    lastSentAt: new Date(),
-                    sentTodayCount: existing.sentTodayCount + 1,
-                },
+        if (throttling) {
+            // currentDate is string -> compare as string
+            if (throttling.currentDate !== today) {
+                throttling.currentDate = today; // string
+                throttling.sentTodayCount = 0;
+            }
+
+            this.logger.debug(
+                `throttling.currentDate: ${throttling.currentDate}, today: ${today}, sentTodayCount: ${throttling.sentTodayCount}`,
             );
+            throttling.lastSentAt = new Date();
+            throttling.sentTodayCount += 1;
+
+            await this.throttlingRepository.save(throttling);
         } else {
-            await this.throttlingRepository.insert({
+            throttling = this.throttlingRepository.create({
                 userId,
-                currentDate: today,
+                currentDate: today, // string
                 lastSentAt: new Date(),
                 sentTodayCount: 1,
             });
+
+            await this.throttlingRepository.save(throttling);
         }
     }
+
     // ────────────────────────────────────────────────
     // Gửi cho 1 device (thường gắn với 1 user)
     // ────────────────────────────────────────────────
@@ -144,7 +154,7 @@ export class NotificationService {
         }
 
         const userIds = [...new Set(items.map((i) => i.userId))];
-        const today = new Date().toISOString().split('T')[0];
+        const today = getCurrentDateString();
 
         // Lấy tất cả record throttling của các user liên quan trong ngày hôm nay
         const throttlingRecords = await this.throttlingRepository.find({

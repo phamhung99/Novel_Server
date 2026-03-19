@@ -159,3 +159,7 @@ export function toDate(value: unknown): Date | null {
 
     return null;
 }
+
+export function getCurrentDateString(): string {
+    return new Date().toISOString().split('T')[0];
+}

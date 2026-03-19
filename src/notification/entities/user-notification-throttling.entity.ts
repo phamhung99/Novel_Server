@@ -4,8 +4,8 @@ import {
     Column,
     PrimaryColumn,
     UpdateDateColumn,
-    ManyToOne,
     JoinColumn,
+    OneToOne,
 } from 'typeorm';
 
 @Entity('user_notification_throttling')
@@ -33,7 +33,7 @@ export class UserNotificationThrottling {
     })
     updatedAt: Date;
 
-    @ManyToOne(() => User, (user) => user.notificationThrottlings, {
+    @OneToOne(() => User, (user) => user.notificationThrottling, {
         onDelete: 'CASCADE',
     })
     @JoinColumn({ name: 'user_id' })

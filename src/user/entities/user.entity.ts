@@ -8,6 +8,7 @@ import {
     CreateDateColumn,
     UpdateDateColumn,
     OneToMany,
+    OneToOne,
 } from 'typeorm';
 import { UserCategoryPreference } from './user-category-preference.entity';
 import { DEFAULT_PROFILE_IMAGE_URL } from 'src/common/constants/app.constant';
@@ -92,9 +93,6 @@ export class User {
     @OneToMany(() => Report, (report) => report.reporter)
     reports: Report[];
 
-    @OneToMany(
-        () => UserNotificationThrottling,
-        (throttling) => throttling.user,
-    )
-    notificationThrottlings: UserNotificationThrottling[];
+    @OneToOne(() => UserNotificationThrottling, (throttling) => throttling.user)
+    notificationThrottling: UserNotificationThrottling;
 }
