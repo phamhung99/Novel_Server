@@ -17,6 +17,7 @@ import { CoinTransaction } from './coin-transaction.entity';
 import { AppFeedback } from './app-feedback.entity';
 import { Report } from './report.entity';
 import { UserNotificationThrottling } from 'src/notification/entities/user-notification-throttling.entity';
+import { UserNotificationSettings } from 'src/notification/entities/user-notification-settings.entity';
 
 @Entity('users')
 export class User {
@@ -95,4 +96,7 @@ export class User {
 
     @OneToOne(() => UserNotificationThrottling, (throttling) => throttling.user)
     notificationThrottling: UserNotificationThrottling;
+
+    @OneToOne(() => UserNotificationSettings, (settings) => settings.user)
+    notificationSettings: UserNotificationSettings;
 }
