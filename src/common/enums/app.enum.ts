@@ -1,0 +1,204 @@
+export enum GenerationType {
+    IMAGE = 'image',
+    TEXT = 'text',
+}
+
+export enum AllowedFileMimeTypes {
+    TXT = 'text/plain',
+    DOCX = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+}
+
+export enum AllowedImageMimeTypes {
+    JPEG = 'image/jpeg',
+    PNG = 'image/png',
+    JPG = 'image/jpg',
+    WEBP = 'image/webp',
+}
+
+export enum StorySource {
+    AI = 'AI',
+    CRAWL = 'Crawl',
+    MANUAL = 'Manual',
+}
+
+export enum CoinType {
+    TEMPORARY = 'temporary',
+    PERMANENT = 'permanent',
+}
+
+export enum IapStore {
+    IOS = 'ios',
+    ANDROID = 'android',
+}
+
+export enum IapProductType {
+    SUBSCRIPTION = 'subscription',
+    ONETIME = 'onetime',
+}
+
+export enum IapPeriod {
+    DAY = 'day',
+    WEEK = 'week',
+    MONTH = 'month',
+    YEAR = 'year',
+}
+
+export enum ErrorCode {
+    // 4000–4099: Validation & Client Input Errors
+    INVALID_UUID = 4000,
+    EMAIL_ALREADY_EXISTS = 4001,
+    DUPLICATE_RECORD = 4002,
+    FOREIGN_KEY_VIOLATION = 4003,
+    REQUIRED_FIELD_MISSING = 4004,
+    NOT_FOUND = 4005,
+    USER_TOKEN_NOT_ENOUGH = 4006,
+    DUPLICATE_REQUEST_ID = 4007,
+
+    // 4100–4199: Authentication & Authorization Errors
+    INVALID_TOKEN = 4100,
+    TOKEN_EXPIRED = 4101,
+    TOKEN_NOT_ACTIVE = 4102,
+
+    // 4200–4299: Subscription & Payment Errors
+    SUBSCRIPTION_NOT_ACTIVE = 4200,
+    SUBSCRIPTION_EXPIRED = 4201,
+
+    // 5000–5099: Internal & Server Errors
+    DATABASE_ERROR = 5000,
+    INTERNAL_SERVER_ERROR = 5001,
+}
+
+export enum LibraryType {
+    CREATED = 'created',
+    LIKED = 'liked',
+}
+
+export enum GenerationStatus {
+    PENDING = 'pending',
+    PROCESSING = 'processing',
+    COMPLETED = 'completed',
+    FAILED = 'failed',
+    RETRYING = 'retrying',
+    REJECTED = 'rejected',
+}
+
+export enum StoryStatusFilter {
+    COMPLETED = 'completed',
+    ONGOING = 'ongoing',
+    ALL = 'all',
+}
+
+export enum StorySort {
+    POPULAR = 'popular',
+    RECENTLY_UPDATED = 'recently_updated',
+    RECENTLY_ADDED = 'recently_added',
+    RELEASE_DATE = 'release_date',
+}
+
+export enum PublishedWithin {
+    ALL = 'all',
+    DAYS_7 = '7',
+    DAYS_30 = '30',
+    DAYS_60 = '60',
+    DAYS_90 = '90',
+    DAYS_365 = '365',
+    DAYS_400 = '400',
+}
+
+export enum UserRole {
+    USER = 'user',
+    ADMIN = 'admin',
+    EDITOR = 'editor',
+}
+
+export enum ActionType {
+    LOGIN = 'login',
+    WATCH_AD_COIN = 'watch_ad_coin',
+    WATCH_AD_UNLOCK = 'watch_ad_unlock',
+    SHARE_STORY = 'share_story',
+}
+
+export enum SUBSCRIPTION_STATUS {
+    SUBSCRIPTION_STATE_ACTIVE = 'SUBSCRIPTION_STATE_ACTIVE',
+    SUBSCRIPTION_STATE_CANCELED = 'SUBSCRIPTION_STATE_CANCELED',
+    SUBSCRIPTION_STATE_EXPIRED = 'SUBSCRIPTION_STATE_EXPIRED',
+    SUBSCRIPTION_STATE_ON_HOLD = 'SUBSCRIPTION_STATE_ON_HOLD',
+    SUBSCRIPTION_STATE_PAUSED = 'SUBSCRIPTION_STATE_PAUSED',
+    SUBSCRIPTION_STATE_IN_GRACE_PERIOD = 'SUBSCRIPTION_STATE_IN_GRACE_PERIOD',
+    SUBSCRIPTION_STATE_PENDING = 'SUBSCRIPTION_STATE_PENDING',
+    SUBSCRIPTION_STATE_REVOKED = 'SUBSCRIPTION_STATE_REVOKED',
+    SUBSCRIPTION_STATE_FAILED = 'SUBSCRIPTION_STATE_FAILED',
+}
+
+export enum TransactionStatus {
+    ACTIVE = 'ACTIVE',
+    EXPIRED = 'EXPIRED',
+    // cho one-time
+    PURCHASED = 'PURCHASED',
+    CONSUMED = 'CONSUMED',
+    // lỗi hoặc pending
+    PENDING = 'PENDING',
+    FAILED = 'FAILED',
+
+    REFUNDED = 'REFUNDED',
+}
+
+export enum CoinTransactionType {
+    ADD = 'add',
+    SPEND = 'spend',
+    EXPIRE = 'expire',
+    ADJUSTMENT = 'adjustment',
+    REFUND = 'refund',
+}
+
+export enum CoinReferenceType {
+    IAP = 'iap',
+    LOGIN = 'login',
+    WATCH_AD_COIN = 'watch_ad_coin',
+    CHAPTER_UNLOCK = 'chapter_unlock',
+    ADMIN_ADJUST = 'admin_adjust',
+    REFUND = 'refund',
+    GIFT_CODE = 'gift_code',
+}
+
+export enum GoogleSubscriptionNotificationType {
+    RECOVERED = 1,
+    RENEWED = 2,
+    RESTARTED = 7,
+    ON_HOLD = 5,
+    IN_GRACE_PERIOD = 6,
+    CANCELED = 3,
+    REVOKED = 12,
+    EXPIRED = 13,
+}
+
+export enum AppleNotificationType {
+    SUBSCRIBED = 'SUBSCRIBED',
+    DID_RENEW = 'DID_RENEW',
+    DID_FAIL_TO_RENEW = 'DID_FAIL_TO_RENEW',
+    DID_CHANGE_RENEWAL_STATUS = 'DID_CHANGE_RENEWAL_STATUS',
+    DID_CHANGE_RENEWAL_PREF = 'DID_CHANGE_RENEWAL_PREF',
+    PRICE_INCREASE = 'PRICE_INCREASE',
+    OFFER_REDEEMED = 'OFFER_REDEEMED',
+    REFUND = 'REFUND',
+    REFUND_DECLINED = 'REFUND_DECLINED',
+    REFUND_REVERSED = 'REFUND_REVERSED',
+    RENEWAL_EXTENDED = 'RENEWAL_EXTENDED',
+    REVOKE = 'REVOKE',
+    EXPIRED = 'EXPIRED',
+    GRACE_PERIOD_EXPIRED = 'GRACE_PERIOD_EXPIRED',
+}
+
+export enum AppleRenewalStatusSubtype {
+    AUTO_RENEW_DISABLED = 'AUTO_RENEW_DISABLED',
+    AUTO_RENEW_ENABLED = 'AUTO_RENEW_ENABLED',
+}
+
+export enum AppNotificationType {
+    CHECK_IN = 'CHECK_IN',
+    COIN_EXPIRY = 'COIN_EXPIRY',
+    STREAK_LOST = 'STREAK_LOST',
+    NEW_CHAPTER = 'NEW_CHAPTER',
+    RECOMMENDATION = 'RECOMMENDATION',
+    RESUME = 'RESUME',
+}

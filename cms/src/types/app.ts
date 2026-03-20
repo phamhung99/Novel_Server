@@ -1,0 +1,62 @@
+export interface AuthorDto {
+    id: string;
+    firstName?: string;
+    lastName?: string;
+    active?: boolean;
+    username?: string;
+}
+
+export interface ChapterDto {
+    id: string;
+    index: number;
+    title: string;
+    content: string;
+}
+
+export interface StoryDto {
+    id: string;
+    authorId: string;
+    authorUsername?: string;
+    title: string;
+    synopsis: string;
+    genres: string[];
+    coverImageUrl: string;
+    type: string;
+    viewsCount: number;
+    likesCount: number;
+    rating: string;
+    status: string;
+    visibility: string;
+    sourceType: string;
+    freeChaptersCount?: number;
+    isFullyFree?: boolean;
+    tags: string[];
+    createdAt: string;
+    updatedAt: string;
+    deletedAt: string | null;
+    author: AuthorDto;
+    mainCategory: any;
+    categories: any[];
+    chapters: ChapterDto[];
+    generation?: any;
+    isCompleted: boolean;
+}
+
+export interface Message {
+    id: string;
+    role: 'user' | 'assistant' | 'system';
+    content: string;
+    timestamp: string;
+}
+
+export interface GenerateRawContentDto {
+    prompt: string;
+    systemPrompt?: string;
+    aiProvider?: string;
+}
+
+export interface GenerateResponse {
+    // tùy theo server trả về, tạm giả định
+    content: string;
+    // có thể thêm usage, model, finishReason,...
+}

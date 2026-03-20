@@ -1,0 +1,87 @@
+import {
+    Entity,
+    PrimaryGeneratedColumn,
+    Column,
+    CreateDateColumn,
+    UpdateDateColumn,
+    ManyToOne,
+    JoinColumn,
+} from 'typeorm';
+import { User } from 'src/user/entities/user.entity';
+import { IapStore } from 'src/common/enums/app.enum';
+
+@Entity('transactions')
+export class Transaction {
+    @PrimaryGeneratedColumn('uuid')
+    id: string;
+
+    @ManyToOne(() => User)
+    @JoinColumn({ name: 'user_id' })
+    user: User;
+
+    @Column({ name: 'user_id' })
+    userId: string;
+
+    @Column({ name: 'order_id', unique: true })
+    orderId: string;
+
+    @Column({ name: 'original_transaction_id', nullable: true })
+    originalTransactionId: string | null;
+
+    @Column()
+    store: IapStore;
+
+    @Column({ name: 'store_product_id' })
+    storeProductId: string;
+
+    @Column({ name: 'base_plan_id', nullable: true })
+    basePlanId: string;
+
+    // purchase token for android, jws for ios
+    @Column({ name: 'receipt' })
+    receipt: string;
+
+    @Column({ name: 'purchase_time', type: 'timestamptz' })
+    purchaseTime: Date;
+
+    @Column({ default: false })
+    isOneTime: boolean;
+
+    @Column({ name: 'expiry_time', type: 'timestamptz', nullable: true })
+    expiryTime: Date | null;
+
+    @Column({ default: 1 })
+    quantity: number;
+
+    @Column({
+        name: 'granted_coins',
+        type: 'int',
+        nullable: true,
+        default: null,
+    })
+    grantedCoins: number | null;
+
+    @Column({ name: 'amount_paid', type: 'float', nullable: true })
+    amountPaid: number | null;
+
+    @Column({ nullable: true, length: 8 })
+    currency: string | null;
+
+    @Column()
+    status: string;
+
+    @Column({ name: 'subscription_state', nullable: true })
+    subscriptionState: string | null;
+
+    @Column({ name: 'store_payload', type: 'jsonb' })
+    storePayload: any;
+
+    @Column({ name: 'last_coin_reset_at', type: 'timestamptz', nullable: true })
+    lastCoinResetAt: Date | null;
+
+    @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
+    createdAt: Date;
+
+    @UpdateDateColumn({ name: 'updated_at', type: 'timestamptz' })
+    updatedAt: Date;
+}

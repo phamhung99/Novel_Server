@@ -1,0 +1,89 @@
+import {
+    Entity,
+    Column,
+    PrimaryGeneratedColumn,
+    CreateDateColumn,
+    UpdateDateColumn,
+    OneToMany,
+} from 'typeorm';
+import { ChapterGeneration } from './chapter-generation.entity';
+import { GenerationStatus } from 'src/common/enums/app.enum';
+
+@Entity('story_generation')
+export class StoryGeneration {
+    @PrimaryGeneratedColumn('uuid')
+    id: string;
+
+    @Column({ name: 'story_id', nullable: true })
+    storyId: string;
+
+    @Column({
+        type: 'enum',
+        enum: GenerationStatus,
+        default: GenerationStatus.PENDING,
+    })
+    status: GenerationStatus;
+
+    @Column({ name: 'ai_provider' })
+    aiProvider: string;
+
+    @Column({ name: 'ai_model', nullable: true })
+    aiModel: string;
+
+    @Column({ type: 'jsonb' })
+    prompt: Record<string, any>;
+
+    @Column({ type: 'text', nullable: true })
+    response: string | null;
+
+    @Column({ name: 'tokens_used', type: 'int', nullable: true })
+    tokensUsed: number;
+
+    @Column({
+        name: 'cost_usd',
+        type: 'decimal',
+        precision: 10,
+        scale: 4,
+        nullable: true,
+    })
+    costUsd: number;
+
+    @Column({ name: 'error_message', type: 'text', nullable: true })
+    errorMessage: string;
+
+    @Column({ type: 'jsonb', nullable: true })
+    metadata: Record<string, any>;
+
+    @Column({ nullable: true })
+    title?: string;
+
+    @Column({ type: 'text', nullable: true })
+    synopsis?: string;
+
+    @Column({ name: 'prompt_version', type: 'int', default: 1 })
+    promptVersion: number;
+
+    @Column({ name: 'request_id', nullable: true, unique: true })
+    requestId: string;
+
+    @Column({ type: 'int', default: 0 })
+    attempts: number;
+
+    @Column({ name: 'retry_details', type: 'jsonb', nullable: true })
+    retryDetails: Record<string, any>;
+
+    @Column({ name: 'last_attempt_at', type: 'timestamptz', nullable: true })
+    lastAttemptAt: Date;
+
+    @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
+    createdAt: Date;
+
+    @UpdateDateColumn({ name: 'updated_at', type: 'timestamptz' })
+    updatedAt: Date;
+
+    @OneToMany(
+        () => ChapterGeneration,
+        (chapterGen) => chapterGen.storyGeneration,
+    )
+    chapterGenerations: ChapterGeneration[];
+}
